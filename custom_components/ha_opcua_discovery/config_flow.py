@@ -179,10 +179,19 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
     def _save_node(self, settings):
         options = deepcopy(dict(self._entry.options))
         mappings = options.setdefault(CONF_NODE_SETTINGS, {})
-        if settings["platform"] == "auto":
+        # Preserve panel metadata when the platform/limits are edited here.
+        common = {
+            key: value
+            for key, value in self._current_settings().items()
+            if key in ("node_id", "invert_state", "device_class")
+        }
+        if settings["platform"] != "binary_sensor":
+            common.pop("device_class", None)
+        merged = {**common, **settings}
+        if merged == {"platform": "auto"}:
             mappings.pop(self._node_id, None)
         else:
-            mappings[self._node_id] = settings
+            mappings[self._node_id] = merged
         return self.async_create_entry(title="", data=options)
 
     def _current_settings(self):

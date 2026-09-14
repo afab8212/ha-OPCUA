@@ -90,7 +90,8 @@
         "number": "number",
         "text": "text",
         "auto": "Automatic (existing behavior)",
-        "disabled": "Excluded"
+        "disabled": "Excluded",
+        "datetime": "Date and time"
       }
     }
   },
@@ -103,7 +104,7 @@
           "name": "hub"
         },
         "value": {
-          "description": "Value (single value) to write. Can be int, float, bool, string, byte",
+          "description": "Scalar value to write. For DateTime use ISO 8601 with a timezone, e.g. 2026-09-14T18:30:00+02:00.",
           "name": "value"
         },
         "node_id": {

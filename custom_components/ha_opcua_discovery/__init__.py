@@ -28,6 +28,7 @@ from .const import (
     CONF_HUB_SCAN_INTERVAL,
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
+    CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
     DOMAIN,
     FIELD_NODE_HUB,
@@ -40,7 +41,7 @@ from .node_settings import SCALAR_TYPES, effective_platform, validate_settings
 from .values import scalar_variant
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = ["sensor", "binary_sensor", "switch", "number", "text"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "number", "text", "datetime"]
 _CONNECTION_STATUS_CODES = {
     ua.StatusCodes.BadSessionIdInvalid,
     ua.StatusCodes.BadSessionClosed,
@@ -67,6 +68,14 @@ def _connection_error(error: Exception) -> bool:
         isinstance(error, ua.UaStatusCodeError)
         and error.code in _CONNECTION_STATUS_CODES
     )
+
+
+async def async_setup(hass: HomeAssistant, config) -> bool:
+    """Register the administrator configuration panel once per HA process."""
+    from .panel import async_setup_panel
+
+    await async_setup_panel(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -324,6 +333,39 @@ class OpcuaHub:
                     await self._disconnect_locked()
                 raise
 
+    @staticmethod
+    async def _read_node_metadata(node, name=None):
+        """Validate a readable scalar using its declared type and user permissions."""
+        if await node.read_node_class() != ua.NodeClass.Variable:
+            raise ValueError("unsupported_node")
+        variant_type = await node.read_data_type_as_variant_type()
+        rank = await node.read_value_rank()
+        if variant_type.name not in SCALAR_TYPES or rank != ua.ValueRank.Scalar:
+            raise ValueError("unsupported_node")
+        await node.read_value()
+        access = await node.get_access_level()
+        user_access = await node.get_user_access_level()
+        return {
+            "name": name or (await node.read_browse_name()).Name,
+            "node_id": node.nodeid.to_string(),
+            "variant_type": variant_type.name,
+            "writable": (
+                ua.AccessLevel.CurrentWrite in access
+                and ua.AccessLevel.CurrentWrite in user_access
+            ),
+        }
+
+    async def inspect_node(self, node_id):
+        """Read a single explicit NodeId without browsing children or writing."""
+        try:
+            parsed = ua.NodeId.from_string(node_id)
+            if parsed.is_null():
+                raise ValueError("null NodeId")
+        except (ValueError, TypeError, ua.UaError) as err:
+            raise ValueError("invalid_node_id") from err
+        async with self._session() as client:
+            return await self._read_node_metadata(client.get_node(parsed))
+
     async def discover_nodes(self) -> list[dict[str, Any]]:
         """Discover each NodeId once and cache its entity classification."""
         discovered = []
@@ -339,31 +381,9 @@ class OpcuaHub:
             name = (await node.read_browse_name()).Name
             if node_class == ua.NodeClass.Variable:
                 try:
-                    variant_type = await node.read_data_type_as_variant_type()
-                    rank = await node.read_value_rank()
-                    if (
-                        variant_type.name in SCALAR_TYPES
-                        and rank == ua.ValueRank.Scalar
-                    ):
-                        # Verify readability, but classify by the declared type even if
-                        # a readable String currently has a null value.
-                        await node.read_value()
-                        access = await node.get_access_level()
-                        user_access = await node.get_user_access_level()
-                        writable = (
-                            ua.AccessLevel.CurrentWrite in access
-                            and ua.AccessLevel.CurrentWrite in user_access
-                        )
-                        discovered.append(
-                            {
-                                "name": name,
-                                "node_id": node_id,
-                                "variant_type": variant_type.name,
-                                "writable": writable,
-                            }
-                        )
-                    else:
-                        _LOGGER.debug("Skipping unsupported value on node %s", node_id)
+                    discovered.append(await self._read_node_metadata(node, name))
+                except ValueError:
+                    _LOGGER.debug("Skipping unsupported value on node %s", node_id)
                 except ua.UaStatusCodeError as err:
                     if _connection_error(err):
                         raise
@@ -450,11 +470,18 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         self._control_lock = asyncio.Lock()
         self._discovery_pending = config_entry is not None
         self.nodes = {}
+        self.discovered_nodes = {}
         self.node_settings = (
             dict(config_entry.options.get(CONF_NODE_SETTINGS, {}))
             if config_entry
             else {}
         )
+        self.manual_nodes = (
+            dict(config_entry.options.get(CONF_MANUAL_NODES, {}))
+            if config_entry
+            else {}
+        )
+        self._manual_pending = set(self.manual_nodes)
         self._platforms = {}
         super().__init__(
             hass,
@@ -501,13 +528,38 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
 
     def set_nodes(self, nodes):
         self._discovery_pending = False
-        self.nodes = {node["node_id"]: node for node in nodes}
+        self.discovered_nodes = {node["node_id"]: node for node in nodes}
+        # Keep saved manual entities visible even if temporarily unreadable.
+        candidates = {**self.manual_nodes, **self.discovered_nodes}
+        # Remapped entities retain their identity even if their original node is gone.
+        for entity_key, settings in self.node_settings.items():
+            target = self.discovered_nodes.get(settings.get("node_id"))
+            if entity_key not in candidates and target is not None:
+                candidates[entity_key] = {**target, "node_id": entity_key}
+        self.nodes = {}
         self._platforms = {}
-        for node_id, node in self.nodes.items():
+        for node_id, original in candidates.items():
+            saved = self.node_settings.get(node_id, {})
+            target_id = saved.get("node_id", node_id)
+            target = self.discovered_nodes.get(target_id)
+            node = {
+                **(target or original),
+                "name": original["name"],
+                "node_id": node_id,
+                "target_node_id": target_id,
+            }
+            self.nodes[node_id] = node
             try:
-                settings = validate_settings(node, self.node_settings.get(node_id, {}))
+                if target is None:
+                    raise ValueError("node_not_found")
+                settings = validate_settings(node, saved)
             except ValueError as err:
-                _LOGGER.warning(
+                log = (
+                    _LOGGER.debug
+                    if node_id in self.manual_nodes and target is None
+                    else _LOGGER.warning
+                )
+                log(
                     "Skipping incompatible entity configuration for %s: %s",
                     node_id,
                     err,
@@ -529,9 +581,34 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         if not self.enabled:
             return {}
         try:
-            if self._discovery_pending:
-                nodes = await self._hub.discover_nodes()
+            discovering = self._discovery_pending
+            if discovering:
+                self._manual_pending.update(self.manual_nodes)
+                try:
+                    nodes = await self._hub.discover_nodes()
+                except ua.UaStatusCodeError as err:
+                    if not self.manual_nodes or _connection_error(err):
+                        raise
+                    self._hub.discovery_complete = False
+                    _LOGGER.warning("Discovery failed; reading manual nodes: %s", err)
+                    nodes = []
+            else:
+                nodes = list(self.discovered_nodes.values())
+            pending = bool(self._manual_pending)
+            for node_id in tuple(self._manual_pending):
+                try:
+                    metadata = await self._hub.inspect_node(node_id)
+                except (ValueError, ua.UaStatusCodeError) as err:
+                    if _connection_error(err):
+                        raise
+                    _LOGGER.debug("Manual OPC UA node %s unavailable: %s", node_id, err)
+                else:
+                    nodes = [node for node in nodes if node["node_id"] != node_id]
+                    nodes.append(metadata)
+                    self._manual_pending.discard(node_id)
+            if discovering or pending:
                 self.set_nodes(nodes)
+            if discovering:
                 try:
                     if self.config_entry and nodes:
                         _migrate_entity_ids(self.hass, self.config_entry, self)
@@ -543,7 +620,15 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 for node_id in self.nodes
                 if self._platforms[node_id] != "disabled"
             ]
-            values = await self._hub.get_values(active_nodes)
+            target_ids = list(
+                dict.fromkeys(self.nodes[key]["target_node_id"] for key in active_nodes)
+            )
+            raw_values = await self._hub.get_values(target_ids)
+            values = {
+                key: raw_values[self.nodes[key]["target_node_id"]]
+                for key in active_nodes
+                if self.nodes[key]["target_node_id"] in raw_values
+            }
         except Exception as err:
             # A pause can overtake an already scheduled read. It is not a failure.
             if not self.enabled:

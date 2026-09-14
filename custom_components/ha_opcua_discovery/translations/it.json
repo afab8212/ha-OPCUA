@@ -90,7 +90,8 @@
         "number": "number",
         "text": "text",
         "auto": "Automatico (comportamento attuale)",
-        "disabled": "Escluso"
+        "disabled": "Escluso",
+        "datetime": "Data e ora"
       }
     }
   },
@@ -103,7 +104,7 @@
           "name": "hub"
         },
         "value": {
-          "description": "Value (single value) to write. Can be int, float, bool, string, byte",
+          "description": "Valore da scrivere. Per DateTime usa una data ISO 8601 con fuso orario, ad esempio 2026-09-14T18:30:00+02:00.",
           "name": "value"
         },
         "node_id": {

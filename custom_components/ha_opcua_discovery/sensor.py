@@ -1,9 +1,14 @@
 """Sensor platform for OPC UA."""
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 
 from .const import DOMAIN
 from .entity import OpcuaEntity, async_setup_node_entities
+from .values import datetime_value
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -17,6 +22,12 @@ class AsyncuaSensor(OpcuaEntity, SensorEntity):
     """Representation of an OPC UA sensor."""
 
     @property
+    def device_class(self):
+        if self.coordinator.nodes[self._node_id]["variant_type"] == "DateTime":
+            return SensorDeviceClass.TIMESTAMP
+        return None
+
+    @property
     def state_class(self):
         """Return the state class based on the type of native_value."""
         value = self.native_value
@@ -27,4 +38,6 @@ class AsyncuaSensor(OpcuaEntity, SensorEntity):
 
     @property
     def native_value(self):
+        if self.device_class == SensorDeviceClass.TIMESTAMP:
+            return datetime_value(self.node_value)
         return self.node_value

@@ -2,6 +2,7 @@
 
 import math
 import struct
+from datetime import UTC, datetime
 from typing import Any
 
 from asyncua import ua
@@ -24,6 +25,19 @@ def scalar_variant(value: Any, variant_type: ua.VariantType) -> ua.Variant:
         if not isinstance(value, str):
             raise ValueError("A String node requires a string value")
         converted = value
+    elif variant_type == ua.VariantType.DateTime:
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        if not isinstance(value, datetime) or value.utcoffset() is None:
+            raise ValueError(
+                "A DateTime write requires a date and time with a UTC offset"
+            )
+        try:
+            converted = value.astimezone(UTC)
+        except OverflowError as err:
+            raise ValueError("DateTime is outside the supported range") from err
+        if converted < datetime(1601, 1, 1, tzinfo=UTC):
+            raise ValueError("DateTime must be on or after 1601-01-01 UTC")
     elif variant_type == ua.VariantType.Boolean:
         if isinstance(value, bool):
             converted = value
@@ -63,3 +77,15 @@ def scalar_variant(value: Any, variant_type: ua.VariantType) -> ua.Variant:
     else:
         raise ValueError(f"Unsupported scalar type: {variant_type.name}")
     return ua.Variant(converted, variant_type)
+
+
+def datetime_value(value):
+    """Expose OPC UA DateTime reads as aware UTC values, including older clients."""
+    if not isinstance(value, datetime):
+        return None
+    if value.utcoffset() is None:
+        value = value.replace(tzinfo=UTC)
+    try:
+        return value.astimezone(UTC)
+    except OverflowError:
+        return None

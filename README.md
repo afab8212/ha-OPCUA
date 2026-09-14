@@ -7,7 +7,7 @@
 
 ## 🔌 Overview
 
-**Home-Assistant-Opcua-Discovery** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number` or `text` entities in Home Assistant.
+**Home-Assistant-Opcua-Discovery** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number`, `text` or `datetime` entities in Home Assistant.
 
 This integration supports **local polling** using the `asyncua` library and is ideal for industrial or automation environments where OPC UA is the communication protocol standard.
 
@@ -70,6 +70,36 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
+## OPC UA side panel (1.4.2)
+
+After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
+
+Click **Edit** on an entity to configure:
+
+- **Name**: stored in Home Assistant's entity registry; leave empty to restore the original name.
+- **Area**: choose a Home Assistant area, or inherit the device area. Explicit entity areas remain independent of device areas.
+- **Associated NodeId**: choose a compatible node from those discovered on the selected endpoint. The entity's unique ID and entity ID remain unchanged, preserving automation/dashboard references. Other entities using the same target are retained; shared targets are read once per poll. The direct `opcua_set_value` service continues to use physical NodeIds.
+- **Device class** for binary sensors, including None.
+- **Invert boolean state** for Boolean nodes. For switches this also inverts commands: with inversion enabled, turning the HA switch on writes `false` to the PLC. Nonboolean values are not inverted.
+
+Saving updates the native entity registry and integration options. NodeId, inversion and device-class changes reload the endpoint; wait for it to finish and use Refresh if needed. Cancel leaves the saved configuration unchanged. Stale forms are rejected if another editor has changed the endpoint; cancel, refresh and reopen the entity. Panel APIs require administrator access and do not perform PLC writes.
+
+To add a node that discovery did not find, select the endpoint and click **Add entity** (**Aggiungi entità**):
+
+1. Enter its complete NodeId, such as `ns=4;i=2` or `ns=4;s="DB"."Variable"`, and click **Verify node**. The connection must be enabled and the node reachable.
+2. Choose the entity category and configure name, area, binary device class and Boolean inversion as applicable. Only compatible categories are offered: sensor for supported scalar values, binary sensor for Booleans, and switch/number/text/datetime when the server grants write access.
+3. Save. The endpoint reloads and the new entity appears on the same Home Assistant device. Creating or verifying an entity never writes a value to the PLC.
+
+Manual nodes are persisted independently of discovery and verified again on reload. They can be outside the configured discovery root, including when that root is inaccessible. Temporarily unreadable manual nodes are retried during normal polling; disabling the connection stops these attempts too. A node later found by discovery does not create a duplicate. Invalid IDs, objects, arrays, unreadable nodes and duplicate entities are rejected. A manual node remains subject to the PLC's authentication and access permissions.
+
+Changing the category of an existing entity (including exclusions), number/text limits and connection settings remains in the integration options; using those options preserves panel metadata. New number entities default to min 0, max 100 and step 1 for integers or 0.1 for floats; text defaults to 0–255 characters. Adjust these limits in the integration options before use where needed. Existing entities can be edited once registered; discovery still runs at setup/reload. The connection switch and connectivity sensor remain standard HA entities outside the node editor.
+
+**Date and time (`datetime`)** is available for writable scalar OPC UA `DateTime` nodes, including manually entered nodes. Automatic mapping creates a datetime entity for writable DateTime nodes and a timestamp sensor for read-only nodes; you can also explicitly select sensor for read-only display of a writable node. Use Home Assistant's native entity control or `datetime.set_value` to change its value. The configuration panel configures the entity; it does not set the PLC value.
+
+OPC UA values are normalized to UTC, and Home Assistant displays them in the frontend's configured timezone. Home Assistant's `datetime.set_value` service treats a timezone-free input as local HA time; for unambiguous automation commands (especially during daylight-saving transitions), include the UTC offset. The direct `ha_opcua_discovery.opcua_set_value` service requires an ISO 8601 timestamp with an explicit offset or `Z`, for example `2026-09-14T18:30:00+02:00`. Bare dates, timezone-free direct writes and dates before 1601-01-01 UTC are rejected. Strings and integer timestamps are not automatically interpreted as OPC UA DateTime nodes.
+
+Panel JavaScript is bundled with the integration and uses a versioned URL; no separate Lovelace resource or frontend build is required.
+
 ## Home Assistant device page (1.3.0)
 
 Each configured OPC UA server now appears as **one device** under its integration entry, named after the connection. Open the device to see the standard Home Assistant page with node entities, connection controls, diagnostics, activity and related automations. You can assign an area and rename the device using Home Assistant's normal controls. Entities in the entity list are grouped under that device instead of “Ungrouped”. The integration uses the standard entry labels, matching the presentation of Siemens S7.
@@ -97,12 +127,13 @@ Open **Settings → Devices & services → OPC-UA Discovery → Configure → Co
 
 | Choice | Compatible nodes | Behavior |
 | --- | --- | --- |
-| Automatic | Supported scalar types | Preserves existing behavior: writable Boolean → switch; all others → sensor |
+| Automatic | Supported scalar types | Writable Boolean → switch; writable DateTime → datetime; all others → sensor |
 | sensor | Supported scalar types | Read only, even when the node is writable |
 | binary_sensor | Boolean | Read only on/off state |
 | switch | Writable Boolean | Read and write on/off |
 | number | Writable integer, Float or Double | Read and write numbers with minimum, maximum and step |
 | text | Writable String | Read and write text with minimum and maximum length |
+| datetime | Writable DateTime | Read and write date/time using UTC and the native HA control |
 | Excluded | Supported scalar types | No entity or periodic reads after reload |
 
 Choices are keyed by **NodeId**, so nodes with identical names can be configured independently. Write controls are offered only when both AccessLevel and UserAccessLevel permit writes. If a saved choice becomes incompatible after a PLC type or permission change, the entity is skipped and a warning is logged; use the options to fix the choice. Missing nodes retain their saved choices for when they return. Discovery runs at setup/reload.
@@ -115,7 +146,7 @@ Changing a node from `sensor` to `number`, for example, creates an entity in the
 
 ## 🛠 Service: `ha_opcua_discovery.opcua_set_value`
 
-You can manually set the value of a writable scalar OPC UA node. Supported write types are String, Boolean, signed/unsigned integers, Float and Double. Array and other types are rejected. String contents, including whitespace and brackets, are preserved exactly. Invalid booleans, out-of-range integers and non-finite floats are rejected before writing. Server-side permissions and string length limits still apply.
+You can manually set the value of a writable scalar OPC UA node. Supported write types are String, Boolean, signed/unsigned integers, Float, Double and DateTime. Array and other types are rejected. String contents, including whitespace and brackets, are preserved exactly. Invalid booleans, out-of-range integers and non-finite floats are rejected before writing. Server-side permissions and string length limits still apply.
 
 Writes are sent once and are never automatically replayed after a connection error or timeout. A missing acknowledgement does not prove that a write failed: read the PLC value before deciding whether to send a new command. Successful writes request a state refresh. After a connection failure, the next poll or user operation attempts to reconnect.
 
@@ -142,6 +173,9 @@ python -m pip install -r requirements.txt -r requirements-test.txt
 python -m pytest
 ruff check custom_components/ tests/
 black --check custom_components/ tests/
+npm ci
+npx playwright install chromium
+npm run test:panel
 ```
 
 Tests cover scalar conversion, a local OPC UA server, duplicate names, connection failures, cancellation, entity migration and Home Assistant service lifecycle. These tests do not replace validation on a physical PLC.
@@ -159,6 +193,7 @@ Tests cover scalar conversion, a local OPC UA server, duplicate names, connectio
 - switch –> for boolean variables writable by the connected user
 - number –> optional editable numeric variables
 - text –> optional editable String variables
+- datetime –> editable DateTime variables (read-only DateTime nodes use timestamp sensors)
 
 ## 📁 File Structure
 

@@ -23,6 +23,10 @@ class AsyncuaBinarySensor(OpcuaEntity, BinarySensorEntity):
     """Represent the actual Boolean value without numeric or string coercion."""
 
     @property
+    def device_class(self):
+        return self._settings.get("device_class")
+
+    @property
     def is_on(self):
         value = self.node_value
         return value if isinstance(value, bool) else None
