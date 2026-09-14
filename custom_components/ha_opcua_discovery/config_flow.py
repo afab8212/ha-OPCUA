@@ -99,6 +99,10 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             options = deepcopy(dict(self._entry.options))
             options.update(user_input)
+            # The frontend omits cleared optional fields. Persist explicit empty
+            # overrides so old options and initial entry credentials cannot return.
+            for key in (CONF_HUB_USERNAME, CONF_HUB_PASSWORD):
+                options[key] = user_input.get(key, "")
             options[CONF_HUB_ROOT_NODE] = options[CONF_HUB_ROOT_NODE].strip()
             return self.async_create_entry(title="", data=options)
 
@@ -109,10 +113,16 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Required(CONF_HUB_URL, default=current[CONF_HUB_URL]): str,
                     vol.Optional(
-                        CONF_HUB_USERNAME, default=current.get(CONF_HUB_USERNAME) or ""
+                        CONF_HUB_USERNAME,
+                        description={
+                            "suggested_value": current.get(CONF_HUB_USERNAME) or ""
+                        },
                     ): str,
                     vol.Optional(
-                        CONF_HUB_PASSWORD, default=current.get(CONF_HUB_PASSWORD) or ""
+                        CONF_HUB_PASSWORD,
+                        description={
+                            "suggested_value": current.get(CONF_HUB_PASSWORD) or ""
+                        },
                     ): str,
                     vol.Required(
                         CONF_HUB_SCAN_INTERVAL,

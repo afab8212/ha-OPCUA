@@ -262,3 +262,56 @@ async def test_native_entities_read_write_and_validate_with_real_server(
         finally:
             await c.async_shutdown()
             await hub.disconnect()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cleared_fields", [{}, {"username": "", "password": ""}])
+async def test_cleared_credentials_override_initial_data_and_survive_reopening(
+    hass, entry, cleared_fields
+):
+    hass.config_entries.async_update_entry(
+        entry,
+        data={**entry.data, "username": "initial-user", "password": "initial-password"},
+        options={
+            "username": "saved-user",
+            "password": "saved-password",
+            "connection_enabled": False,
+            CONF_NODE_SETTINGS: {"ns=4;i=2": {"platform": "sensor"}},
+        },
+    )
+    flow, _ = prepare_flow(hass, entry)
+    form = await flow.async_step_connection()
+    fields = to_field_list(form["data_schema"], custom_serializer=cv.custom_serializer)
+    username = next(field for field in fields if field["name"] == "username")
+    assert username["description"]["suggested_value"] == "saved-user"
+    # Exercise schema validation too: defaults used to reinsert removed fields.
+    validated = form["data_schema"](
+        {
+            "url": "opc.tcp://localhost:4840",
+            "hub_root": "ns=4;i=2",
+            "scan_interval": 5,
+            **cleared_fields,
+        }
+    )
+    assert validated.get("username", "") == ""
+    assert validated.get("password", "") == ""
+    result = await flow.async_step_connection(validated)
+    hass.config_entries.async_update_entry(entry, options=result["data"])
+    effective = {**entry.data, **entry.options}
+    assert effective["username"] == effective["password"] == ""
+    assert entry.options["connection_enabled"] is False
+    assert entry.options[CONF_NODE_SETTINGS] == {"ns=4;i=2": {"platform": "sensor"}}
+    reopened = AsyncUAOptionsFlow(entry)
+    reopened.hass = hass
+    new_form = await reopened.async_step_connection()
+    fields = to_field_list(
+        new_form["data_schema"], custom_serializer=cv.custom_serializer
+    )
+    for field in fields:
+        if field["name"] in ("username", "password"):
+            assert field["description"]["suggested_value"] == ""
+    # Passwords with spaces must remain exact when intentionally provided.
+    result = await reopened.async_step_connection(
+        {**validated, "username": "new-user", "password": " new password "}
+    )
+    assert result["data"]["password"] == " new password "
