@@ -15,6 +15,26 @@ const TEXT = {
     verify: "Verifica nodo",
     verifying: "Verifica…",
     category: "Categoria",
+    auto: "Automatico",
+    min: "Valore minimo",
+    max: "Valore massimo",
+    step: "Passo",
+    min_length: "Lunghezza minima",
+    max_length: "Lunghezza massima",
+    categoryHelp:
+      "Cambiare categoria può cambiare l’ID dell’entità. Aggiorna automazioni e dashboard; le entità della categoria precedente resteranno disabilitate.",
+    excludeHelp:
+      "Il nodo sarà escluso dalla lettura periodica. Potrai riattivarlo da questo pannello.",
+    limitsHelp:
+      "I limiti controllano i valori impostabili in Home Assistant. Per il testo usa la capacità configurata nel PLC, fino a 255 caratteri.",
+    invalid_limits: "Limiti non compatibili con la categoria selezionata.",
+    invalid_number_limits:
+      "Usa valori finiti, minimo inferiore al massimo e passo positivo non superiore all’intervallo.",
+    integer_limits_required: "Questo nodo richiede limiti e passo interi.",
+    unsafe_integer_limits:
+      "I limiti interi devono rientrare in ±9007199254740991.",
+    invalid_text_limits:
+      "Usa lunghezze intere tra 0 e 255, con minimo non superiore al massimo.",
     manualHelp:
       "Inserisci il NodeId completo, anche fuori dal discovery. La verifica legge il nodo senza modificarlo.",
     invalid_node_id: "NodeId non valido. Esempio: ns=4;i=2",
@@ -95,7 +115,7 @@ const TEXT = {
     invalid_name: "Il nome deve contenere al massimo 255 caratteri.",
     limits_outside_type:
       "I limiti numerici configurati superano quelli del nodo scelto.",
-    info: "La categoria e i limiti number/text si gestiscono ancora dalle opzioni dell’integrazione.",
+    info: "Configura categoria e limiti da Modifica. Le impostazioni di connessione restano nelle opzioni dell’integrazione.",
   },
   en: {
     remove: "Remove",
@@ -112,6 +132,25 @@ const TEXT = {
     verify: "Verify node",
     verifying: "Verifying…",
     category: "Category",
+    auto: "Automatic",
+    min: "Minimum value",
+    max: "Maximum value",
+    step: "Step",
+    min_length: "Minimum length",
+    max_length: "Maximum length",
+    categoryHelp:
+      "Changing category may change the entity ID. Update automations and dashboards; entities from the previous category remain disabled.",
+    excludeHelp:
+      "The node will be excluded from periodic reads. You can enable it again from this panel.",
+    limitsHelp:
+      "Limits control values editable in Home Assistant. For text use the PLC string capacity, up to 255 characters.",
+    invalid_limits: "Limits are incompatible with the selected category.",
+    invalid_number_limits:
+      "Use finite values, minimum below maximum, and a positive step no greater than the range.",
+    integer_limits_required: "This node requires integer limits and step.",
+    unsafe_integer_limits: "Integer limits must be within ±9007199254740991.",
+    invalid_text_limits:
+      "Use integer lengths from 0 to 255, with minimum no greater than maximum.",
     manualHelp:
       "Enter the complete NodeId, including nodes outside discovery. Verification reads the node without changing it.",
     invalid_node_id: "Invalid NodeId. Example: ns=4;i=2",
@@ -188,7 +227,7 @@ const TEXT = {
     invalid_name: "Names must contain at most 255 characters.",
     limits_outside_type:
       "Configured numeric limits exceed the selected node’s range.",
-    info: "Category and number/text limits are still managed from the integration options.",
+    info: "Configure categories and limits with Edit. Connection settings remain in the integration options.",
   },
 };
 const GROUPS = [
@@ -252,7 +291,7 @@ const CSS = `
 header{display:flex;gap:16px;align-items:center;padding:20px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:23px;margin:0 0 4px}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1}.menu{border:0;background:none;font-size:22px;padding:4px 10px}.content{max-width:1400px;margin:auto;padding:24px 28px 48px;height:calc(100% - 92px);overflow:auto}.toolbar{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:18px;align-items:end;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px}.field>span{font-weight:600}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;overflow-wrap:anywhere;margin-bottom:20px;color:var(--secondary-text-color,#637487)}.badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;border-radius:30px;padding:5px 10px;background:var(--secondary-background-color,#e9eef5);color:var(--secondary-text-color,#637487)}[data-connection]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}@media(prefers-reduced-motion:no-preference){.online::before{animation:pulse 2.4s ease-in-out infinite}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;padding:5px;background:var(--secondary-background-color,#e9eef5);border-radius:12px;width:fit-content;max-width:100%}nav button{border:0;background:none;border-radius:8px;padding:8px 13px;min-height:auto;color:var(--secondary-text-color,#637487)}nav button:hover{border-color:transparent;background:color-mix(in srgb,var(--primary-text-color,#243346) 6%,transparent)}nav .selected,nav .selected:hover{background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);font-weight:600;box-shadow:0 1px 3px color-mix(in srgb,var(--primary-text-color,#243346) 14%,transparent)}
 .group{margin-bottom:24px}.group>summary{cursor:pointer;font-size:17px;font-weight:600;padding:8px 0 14px;display:flex;align-items:center;gap:10px;list-style:none}.group>summary::-webkit-details-marker{display:none}.group>summary::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--accent,var(--secondary-text-color,#637487));flex-shrink:0}.group>summary::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--secondary-text-color,#8a97a8);border-bottom:2px solid var(--secondary-text-color,#8a97a8);transform:rotate(-45deg);transition:transform var(--speed) ease}.group:not([open])>summary::after{transform:rotate(45deg)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.card{position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:10px;padding:18px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.cardTop{display:flex;align-items:start;gap:8px;flex-wrap:wrap}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.manualTag{font-size:11px;font-weight:600;color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.entityState{margin-top:16px;padding:12px;border-radius:9px;background:var(--secondary-background-color,#f3f6fa);min-width:0}.stateLabel{display:block;font-size:12px;color:var(--secondary-text-color,#637487);margin-bottom:5px}.stateValue{display:block;font-size:20px;font-weight:500;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:16px;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.card{position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:10px;padding:18px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.cardTop{display:flex;align-items:start;gap:8px;flex-wrap:wrap}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.manualTag{font-size:11px;font-weight:600;color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.entityState{margin-top:16px;padding:12px;border-radius:9px;background:var(--secondary-background-color,#f3f6fa);min-width:0}.stateLabel{display:block;font-size:12px;color:var(--secondary-text-color,#637487);margin-bottom:5px}.stateValue{display:block;font-size:20px;font-weight:500;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:16px;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
 [data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease}dialog[open]{opacity:1;transform:none}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}
 @media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:18px 12px}.toolbar{grid-template-columns:1fr;gap:12px}.grid{grid-template-columns:1fr}nav button{padding:8px 10px}.card{padding:15px}form{padding:20px}.headerText p{font-size:12px}}
@@ -487,7 +526,9 @@ class OpcuaNodePanel extends HTMLElement {
         );
         top.append(text, element("span", row.variant_type, { class: "badge" }));
         if (row.manual)
-          top.append(element("span", this._t("manual"), { class: "manualTag" }));
+          top.append(
+            element("span", this._t("manual"), { class: "manualTag" }),
+          );
         const bottom = element("div", undefined, { class: "cardBottom" });
         const area =
           this._data.areas.find((a) => a.id === row.area_id)?.name ||
@@ -704,6 +745,7 @@ class OpcuaNodePanel extends HTMLElement {
     nodeId.focus();
   }
   _edit(row, manual = null, endpoint = this._endpoint()) {
+    row = { ...row };
     const revision = endpoint.revision;
     const dialog = element("dialog");
     this._dialog = dialog;
@@ -732,16 +774,9 @@ class OpcuaNodePanel extends HTMLElement {
       area.append(element("option", item.name, { value: item.id }));
     area.value = row.area_id || "";
     form.append(this._field("area", area));
-    const category = element("select");
-    if (manual) {
-      for (const platform of manual.platforms)
-        category.append(
-          element("option", this._t(platform), { value: platform }),
-        );
-      category.value = row.platform;
-      form.append(this._field("category", category));
-    }
     const availableNodes = manual ? [manual.node] : endpoint.nodes;
+    const originalPlatform = row.platform;
+    const category = element("select");
     const nodeFilter = element("input", undefined, {
       type: "search",
       placeholder: this._t("filterNodes"),
@@ -751,12 +786,36 @@ class OpcuaNodePanel extends HTMLElement {
       name: "node_id",
       required: "",
     });
+    const selectedNode = () =>
+      availableNodes.find((n) => n.node_id === nodes.value);
+    const choices = (node) => {
+      if (!node) return manual ? ["sensor"] : ["auto", "sensor", "disabled"];
+      return [
+        ...(manual ? [] : ["auto"]),
+        "sensor",
+        ...["binary_sensor", "switch", "number", "text", "datetime"].filter(
+          (platform) => compatible({ platform }, node),
+        ),
+        ...(manual ? [] : ["disabled"]),
+      ];
+    };
+    const populateCategories = (
+      chosen = category.value || row.settings?.platform || row.platform,
+    ) => {
+      const allowed = choices(
+        selectedNode() || availableNodes.find((n) => n.node_id === row.node_id),
+      );
+      category.replaceChildren(
+        ...allowed.map((p) => element("option", this._t(p), { value: p })),
+      );
+      category.value = allowed.includes(chosen) ? chosen : allowed[0];
+    };
     const populate = () => {
       const chosen = nodes.value || row.node_id;
       nodes.replaceChildren();
       for (const node of availableNodes.filter(
         (n) =>
-          compatible(row, n) &&
+          compatible({ platform: category.value }, n) &&
           (n.node_id === chosen ||
             `${n.name} ${n.node_id}`
               .toLowerCase()
@@ -769,13 +828,60 @@ class OpcuaNodePanel extends HTMLElement {
         );
       nodes.value = chosen;
     };
+    populateCategories();
     populate();
+    form.append(this._field("category", category));
+    const categoryHelp = element("p", "", { class: "hint" });
+    form.append(categoryHelp);
     nodeFilter.addEventListener("input", populate);
     if (!manual) form.append(this._field("filterNodes", nodeFilter));
     nodes.disabled = !!manual;
     form.append(this._field("node", nodes));
     if (!manual)
       form.append(element("p", this._t("nodeHelp"), { class: "hint" }));
+    const effective = () =>
+      category.value === "auto"
+        ? selectedNode()?.writable
+          ? { Boolean: "switch", DateTime: "datetime" }[
+              selectedNode().variant_type
+            ] || "sensor"
+          : "sensor"
+        : category.value;
+    const limitInputs = {};
+    const limitGroups = {};
+    const initial = row.settings || {};
+    const defaults = {
+      min: 0,
+      max: 100,
+      step: ["Float", "Double"].includes(selectedNode()?.variant_type)
+        ? 0.1
+        : 1,
+      min_length: 0,
+      max_length: 255,
+    };
+    for (const [platform, keys] of Object.entries({
+      number: ["min", "max", "step"],
+      text: ["min_length", "max_length"],
+    })) {
+      const group = element("div", undefined, { class: "limits" });
+      for (const key of keys) {
+        const input = element("input", undefined, {
+          type: "number",
+          step: platform === "text" ? "1" : "any",
+        });
+        if (platform === "text") {
+          input.min = "0";
+          input.max = "255";
+        }
+        input.value = initial[key] ?? defaults[key];
+        limitInputs[key] = input;
+        group.append(this._field(key, input));
+      }
+      limitGroups[platform] = group;
+      form.append(group);
+    }
+    const limitsHelp = element("p", this._t("limitsHelp"), { class: "hint" });
+    form.append(limitsHelp);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     for (const cls of this._data.device_classes)
@@ -790,12 +896,7 @@ class OpcuaNodePanel extends HTMLElement {
       );
     deviceClass.value = row.device_class || "";
     const classField = this._field("deviceClass", deviceClass);
-    classField.hidden = row.platform !== "binary_sensor";
     form.append(classField);
-    category.addEventListener("change", () => {
-      row.platform = category.value;
-      classField.hidden = row.platform !== "binary_sensor";
-    });
     const invert = element("input", undefined, {
       type: "checkbox",
       name: "invert",
@@ -805,12 +906,33 @@ class OpcuaNodePanel extends HTMLElement {
     toggle.append(invert, element("span", this._t("invert")));
     const invertHelp = element("p", this._t("invertHelp"), { class: "hint" });
     form.append(toggle, invertHelp);
-    const updateBoolean = () => {
-      const node = availableNodes.find((n) => n.node_id === nodes.value);
-      toggle.hidden = invertHelp.hidden = node?.variant_type !== "Boolean";
+    const updateFields = () => {
+      const platform = effective();
+      classField.hidden = platform !== "binary_sensor";
+      toggle.hidden = invertHelp.hidden =
+        selectedNode()?.variant_type !== "Boolean";
+      for (const [kind, group] of Object.entries(limitGroups)) {
+        group.hidden = kind !== platform;
+        for (const input of group.querySelectorAll("input")) {
+          input.disabled = group.hidden;
+          input.required = !group.hidden;
+        }
+      }
+      limitsHelp.hidden = !["number", "text"].includes(platform);
+      categoryHelp.hidden = !!manual || platform === originalPlatform;
+      categoryHelp.textContent = this._t(
+        platform === "disabled" ? "excludeHelp" : "categoryHelp",
+      );
     };
-    nodes.addEventListener("change", updateBoolean);
-    updateBoolean();
+    category.addEventListener("change", () => {
+      populate();
+      updateFields();
+    });
+    nodes.addEventListener("change", () => {
+      populateCategories();
+      updateFields();
+    });
+    updateFields();
     const error = element("div", "", { class: "error", role: "alert" });
     form.append(error);
     const footer = element("footer");
@@ -841,12 +963,23 @@ class OpcuaNodePanel extends HTMLElement {
           type: `ha_opcua_discovery/entity/${manual ? "create" : "update"}`,
           entry_id: endpoint.entry_id,
           revision,
-          ...(manual ? { platform: row.platform } : { key: row.key }),
+          ...(manual ? {} : { key: row.key }),
+          platform: category.value,
+          ...(["number", "text"].includes(effective())
+            ? {
+                limits: Object.fromEntries(
+                  (effective() === "number"
+                    ? ["min", "max", "step"]
+                    : ["min_length", "max_length"]
+                  ).map((key) => [key, Number(limitInputs[key].value)]),
+                ),
+              }
+            : {}),
           name: name.value,
           area_id: area.value || null,
           node_id: nodes.value,
           device_class:
-            row.platform === "binary_sensor" ? deviceClass.value || null : null,
+            effective() === "binary_sensor" ? deviceClass.value || null : null,
           invert_state: !toggle.hidden && invert.checked,
         });
         this._notice = this._t(result.reload ? "reloading" : "saved");

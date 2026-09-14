@@ -70,6 +70,16 @@ def endpoint_snapshot(hass, entry):
             platform, DOMAIN, f"{entry.entry_id}:{key}"
         )
         registered = registry.async_get(entity_id) if entity_id else None
+        if registered is None and platform == "disabled":
+            registered = next(
+                (
+                    e
+                    for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+                    if e.platform == DOMAIN and e.unique_id == f"{entry.entry_id}:{key}"
+                ),
+                None,
+            )
+            entity_id = registered.entity_id if registered else None
         rows.append(
             {
                 "key": key,
@@ -90,7 +100,18 @@ def endpoint_snapshot(hass, entry):
                     else settings.get("device_class")
                 ),
                 "invert_state": settings.get("invert_state", False),
-                "editable": c is not None and registered is not None,
+                "editable": bool(
+                    c
+                    and key in c.nodes
+                    and node.get("target_node_id", settings.get("node_id", key))
+                    in c.discovered_nodes
+                ),
+                "settings": {
+                    k: v
+                    for k, v in settings.items()
+                    if k
+                    in ("platform", "min", "max", "step", "min_length", "max_length")
+                },
                 "manual": key in manual,
             }
         )
@@ -153,17 +174,12 @@ async def async_save_entity(hass, msg):
             raise ValueError("node_not_found")
         saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(msg["key"], {})
         # A reassignment must preserve the entity's current domain, including Auto.
-        if effective_platform(target, saved) != row["platform"]:
+        if (
+            "platform" not in msg
+            and effective_platform(target, saved) != row["platform"]
+        ):
             raise ValueError("incompatible_platform")
-        settings = validate_settings(
-            target,
-            {
-                **saved,
-                "node_id": msg["node_id"],
-                "invert_state": msg["invert_state"],
-                "device_class": msg["device_class"],
-            },
-        )
+        settings = _entity_settings(target, msg, saved)
         area_id = msg["area_id"]
         if area_id is not None and ar.async_get(hass).async_get_area(area_id) is None:
             raise ValueError("area_not_found")
@@ -171,16 +187,87 @@ async def async_save_entity(hass, msg):
         if name is not None and len(name) > 255:
             raise ValueError("invalid_name")
         registry = er.async_get(hass)
-        registry_changes = {"name": name, "area_id": area_id}
-        if row["platform"] == "binary_sensor":
-            registry_changes["device_class"] = None
-        registry.async_update_entity(row["entity_id"], **registry_changes)
+        platform = effective_platform(target, settings)
+        unique_id = f"{entry.entry_id}:{msg['key']}"
+        related = [
+            e
+            for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+            if e.platform == DOMAIN and e.unique_id == unique_id
+        ]
+        selected = None
+        if platform != "disabled":
+            device = async_register_device(hass, entry)
+            selected = registry.async_get_or_create(
+                platform,
+                DOMAIN,
+                unique_id,
+                config_entry=entry,
+                device_id=device.id,
+                original_name=c.nodes[msg["key"]]["name"],
+                suggested_object_id=(
+                    row["entity_id"].split(".", 1)[1]
+                    if row["entity_id"]
+                    else name or row["name"]
+                ),
+            )
+            changes = {"name": name, "area_id": area_id}
+            if platform == "binary_sensor":
+                changes["device_class"] = None
+            if selected.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
+                changes["disabled_by"] = None
+            registry.async_update_entity(selected.entity_id, **changes)
+        for old in related:
+            if selected is not None and old.entity_id == selected.entity_id:
+                continue
+            changes = {"name": name, "area_id": area_id}
+            if old.disabled_by is None:
+                changes["disabled_by"] = er.RegistryEntryDisabler.INTEGRATION
+            registry.async_update_entity(old.entity_id, **changes)
+        if platform != row["platform"]:
+            # Prevent old controls from writing while the new domain loads.
+            c._platforms[msg["key"]] = "disabled"
         options = deepcopy(dict(entry.options))
         options.setdefault(CONF_NODE_SETTINGS, {})[msg["key"]] = settings
         reload_needed = options != dict(entry.options)
         if reload_needed:
             hass.config_entries.async_update_entry(entry, options=options)
-        return {"saved": True, "reload": reload_needed}
+        return {
+            "saved": True,
+            "reload": reload_needed,
+            "entity_id": selected.entity_id if selected else None,
+        }
+
+
+def _entity_settings(node, msg, saved=None):
+    """Validate panel fields with the same type/range rules as entity setup."""
+    proposed = {
+        **(saved or {}),
+        "node_id": node["node_id"],
+        "invert_state": msg["invert_state"],
+        "device_class": msg["device_class"],
+    }
+    if "platform" in msg:
+        proposed["platform"] = msg["platform"]
+    limits = msg.get("limits", {})
+    platform = effective_platform(node, proposed)
+    allowed = (
+        {"min", "max", "step"}
+        if platform == "number"
+        else {"min_length", "max_length"} if platform == "text" else set()
+    )
+    if not isinstance(limits, dict) or set(limits) - allowed:
+        raise ValueError("invalid_limits")
+    result = validate_settings(node, {**proposed, **limits})
+    if platform == "disabled":
+        # Exclusion pauses a node; keep its editing bounds for reactivation.
+        result.update(
+            {
+                key: value
+                for key, value in (saved or {}).items()
+                if key in ("min", "max", "step", "min_length", "max_length")
+            }
+        )
+    return result
 
 
 def _loaded_endpoint(hass, entry_id):
@@ -241,15 +328,7 @@ async def async_create_entity(hass, msg):
             raise ValueError("node_already_configured")
         if msg["platform"] in ("auto", "disabled"):
             raise ValueError("incompatible_platform")
-        settings = validate_settings(
-            node,
-            {
-                "platform": msg["platform"],
-                "node_id": node_id,
-                "invert_state": msg["invert_state"],
-                "device_class": msg["device_class"],
-            },
-        )
+        settings = _entity_settings(node, msg)
         area_id = msg["area_id"]
         if area_id is not None and ar.async_get(hass).async_get_area(area_id) is None:
             raise ValueError("area_not_found")
@@ -372,6 +451,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Required("revision"): str,
         vol.Required("node_id"): str,
         vol.Required("platform"): str,
+        vol.Optional("limits"): dict,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("device_class"): vol.Any(str, None),
@@ -402,6 +482,8 @@ async def ws_snapshot(hass, connection, msg):
         vol.Required("entry_id"): str,
         vol.Required("revision"): str,
         vol.Required("key"): str,
+        vol.Optional("platform"): str,
+        vol.Optional("limits"): dict,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("node_id"): str,

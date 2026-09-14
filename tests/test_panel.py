@@ -192,3 +192,113 @@ async def test_panel_registration_is_once_and_versioned(hass):
     assert register.call_args.kwargs["require_admin"] is True
     assert register.call_args.kwargs["module_url"].endswith("?v=1.4.0")
     assert commands.call_count == 5
+
+
+async def test_panel_category_exclusion_and_restore_preserve_registry_metadata(
+    hass, entry
+):
+    c, registered, msg = await prepare(hass, entry)
+    await async_save_entity(
+        hass, {**msg, "platform": "binary_sensor", "device_class": "door"}
+    )
+    registry = er.async_get(hass)
+    unique_id = registered.unique_id
+    new_id = registry.async_get_entity_id("binary_sensor", DOMAIN, unique_id)
+    binary = registry.async_get(new_id)
+    assert binary.name == "Pump" and binary.area_id == msg["area_id"]
+    assert (
+        registry.async_get(registered.entity_id).disabled_by
+        == er.RegistryEntryDisabler.INTEGRATION
+    )
+    assert new_id != registered.entity_id
+    # Exclude and restore through the same endpoint without discarding identity.
+    for platform in ("disabled", "switch"):
+        msg["revision"] = endpoint_snapshot(hass, entry)["revision"]
+        result = await async_save_entity(hass, {**msg, "platform": platform})
+        if platform == "disabled":
+            assert result["entity_id"] is None
+            assert (
+                registry.async_get(new_id).disabled_by
+                == er.RegistryEntryDisabler.INTEGRATION
+            )
+            row = next(
+                r
+                for r in endpoint_snapshot(hass, entry)["rows"]
+                if r["key"] == msg["key"]
+            )
+            assert row["editable"] and row["name"] == "Pump"
+        else:
+            assert result["entity_id"] == registered.entity_id
+            assert registry.async_get(registered.entity_id).disabled_by is None
+    restored = AsyncuaCoordinator(hass, "PLC", c.hub, config_entry=entry)
+    restored.set_nodes(NODES)
+    assert list(restored.nodes_for_platform("switch"))
+    await c.async_shutdown()
+    await restored.async_shutdown()
+
+
+@pytest.mark.parametrize(
+    "limits",
+    [
+        {"min": 10, "max": 5},
+        {"step": 0},
+        {"step": 0.5},
+        {"max": 40000},
+        {"min": True},
+        {"max_length": 10},
+    ],
+)
+async def test_panel_invalid_limits_are_atomic(hass, entry, limits):
+    c, registered, msg = await prepare(hass, entry)
+    before = deepcopy(dict(entry.options))
+    entities = list(er.async_get(hass).entities)
+    with pytest.raises(ValueError):
+        await async_save_entity(
+            hass,
+            {
+                **msg,
+                "platform": "number",
+                "node_id": "ns=2;i=3",
+                "invert_state": False,
+                "limits": limits,
+            },
+        )
+    assert dict(entry.options) == before
+    assert list(er.async_get(hass).entities) == entities
+    assert er.async_get(hass).async_get(registered.entity_id).disabled_by is None
+    await c.async_shutdown()
+
+
+async def test_panel_number_limits_and_enabling_unregistered_excluded_node(hass, entry):
+    c, _, msg = await prepare(hass, entry)
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_NODE_SETTINGS: {"ns=2;i=3": {"platform": "disabled"}}}
+    )
+    row = next(
+        r for r in endpoint_snapshot(hass, entry)["rows"] if r["key"] == "ns=2;i=3"
+    )
+    assert row["editable"] and row["entity_id"] is None
+    msg.update(
+        key="ns=2;i=3",
+        node_id="ns=2;i=3",
+        platform="number",
+        invert_state=False,
+        revision=endpoint_snapshot(hass, entry)["revision"],
+        limits={"min": -100, "max": 500, "step": 5},
+    )
+    result = await async_save_entity(hass, msg)
+    assert result["entity_id"].startswith("number.")
+    saved = entry.options[CONF_NODE_SETTINGS][msg["key"]]
+    assert saved["min"] == -100 and saved["max"] == 500 and saved["step"] == 5
+    msg["revision"] = endpoint_snapshot(hass, entry)["revision"]
+    msg["limits"] = {"min": 0, "max": 200, "step": 2}
+    assert (await async_save_entity(hass, msg))["entity_id"] == result["entity_id"]
+    msg.pop("limits")
+    for platform in ("disabled", "number"):
+        msg.update(
+            platform=platform, revision=endpoint_snapshot(hass, entry)["revision"]
+        )
+        await async_save_entity(hass, msg)
+        settings = entry.options[CONF_NODE_SETTINGS][msg["key"]]
+        assert (settings["min"], settings["max"], settings["step"]) == (0, 200, 2)
+    await c.async_shutdown()
