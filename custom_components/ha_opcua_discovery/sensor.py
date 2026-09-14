@@ -4,10 +4,10 @@ from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import AsyncuaCoordinator, entity_unique_id
+from . import AsyncuaCoordinator
 from .const import DOMAIN
+from .entity import OpcuaEntity
 
 
 async def async_setup_entry(
@@ -16,10 +16,7 @@ async def async_setup_entry(
     coordinator: AsyncuaCoordinator = hass.data[DOMAIN][entry.data["hub_id"]]
     sensors = []
 
-    for node_id, node in coordinator.nodes.items():
-        # Skip nodes that are writable booleans (handled by switches)
-        if node["writable_boolean"]:
-            continue
+    for node_id, node in coordinator.nodes_for_platform("sensor"):
         sensors.append(
             AsyncuaSensor(coordinator, node["name"], node_id, entry.entry_id)
         )
@@ -27,15 +24,8 @@ async def async_setup_entry(
     async_add_entities(sensors)
 
 
-class AsyncuaSensor(CoordinatorEntity[AsyncuaCoordinator], SensorEntity):
+class AsyncuaSensor(OpcuaEntity, SensorEntity):
     """Representation of an OPC UA sensor."""
-
-    def __init__(self, coordinator, name: str, node_id: str, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._attr_name = name
-        self._attr_unique_id = entity_unique_id(entry_id, node_id)
-        self._node_id = node_id
-        self._attr_state_class = None
 
     @property
     def state_class(self):
@@ -48,9 +38,4 @@ class AsyncuaSensor(CoordinatorEntity[AsyncuaCoordinator], SensorEntity):
 
     @property
     def native_value(self):
-        return (self.coordinator.data or {}).get(self._node_id)
-
-    @property
-    def available(self) -> bool:
-        """Return whether this node was read in the latest successful update."""
-        return super().available and self._node_id in (self.coordinator.data or {})
+        return self.node_value

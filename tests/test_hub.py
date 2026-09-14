@@ -58,7 +58,7 @@ async def test_server_roundtrip_and_duplicate_names(unused_tcp_port):
             ids = {node["node_id"] for node in nodes}
             assert a.nodeid.to_string() in ids and b.nodeid.to_string() in ids
             assert len(ids) == len(nodes) == 6
-            flags = {node["node_id"]: node["writable_boolean"] for node in nodes}
+            flags = {node["node_id"]: node["writable"] for node in nodes}
             assert flags[run.nodeid.to_string()]
             assert not flags[readonly.nodeid.to_string()]
             for text in ("  Recipe A  ", "[A,B]", "[]", "", "caffè ☕"):

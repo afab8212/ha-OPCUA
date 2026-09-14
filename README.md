@@ -7,7 +7,7 @@
 
 ## 🔌 Overview
 
-**Home-Assistant-Opcua-Discovery** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as `sensor` or `switch` entities in Home Assistant.
+**Home-Assistant-Opcua-Discovery** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number` or `text` entities in Home Assistant.
 
 This integration supports **local polling** using the `asyncua` library and is ideal for industrial or automation environments where OPC UA is the communication protocol standard.
 
@@ -17,7 +17,8 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 - 📡 Connects to any OPC UA compatible server (e.g., Siemens, B&R, etc.)
 - 🔍 Auto-discovers variables (nodes) under a defined root node
-- 🧠 Smart handling of data types (e.g., booleans become switches)
+- 🧠 Automatic mapping with per-node entity selection and exclusion
+- ✏️ Native numeric and text controls with configurable limits
 - 🔄 Periodic polling with configurable scan interval
 - 🧪 Graceful reconnection logic on connection loss
 - 📥 Set opc-ua nodes values via Home Assistant services (`ha_opcua_discovery.opcua_set_value`)
@@ -68,6 +69,28 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
+## Per-node entity configuration (1.1.0)
+
+Open **Settings → Devices & services → OPC-UA Discovery → Configure → Configure a node**. Search by name or full NodeId, choose the entity type, and save. For `number` and `text`, a second screen lets you configure editing limits. The integration reloads after the options are saved. Repeat for other nodes. Connection settings have a separate menu and preserve all node choices. English and Italian translations are included.
+
+| Choice | Compatible nodes | Behavior |
+| --- | --- | --- |
+| Automatic | Supported scalar types | Preserves existing behavior: writable Boolean → switch; all others → sensor |
+| sensor | Supported scalar types | Read only, even when the node is writable |
+| binary_sensor | Boolean | Read only on/off state |
+| switch | Writable Boolean | Read and write on/off |
+| number | Writable integer, Float or Double | Read and write numbers with minimum, maximum and step |
+| text | Writable String | Read and write text with minimum and maximum length |
+| Excluded | Supported scalar types | No entity or periodic reads after reload |
+
+Choices are keyed by **NodeId**, so nodes with identical names can be configured independently. Write controls are offered only when both AccessLevel and UserAccessLevel permit writes. If a saved choice becomes incompatible after a PLC type or permission change, the entity is skipped and a warning is logged; use the options to fix the choice. Missing nodes retain their saved choices for when they return. Discovery runs at setup/reload.
+
+Numeric limits must fit the OPC UA type. Integer nodes require integer limits and step; their editable range is restricted to ±9007199254740991 to avoid rounding in the browser. A larger 64-bit value is shown as unknown in a `number` entity. Float values retain the precision of their PLC type. The step controls the interface increment; writes must satisfy the range and PLC type, but need not be a multiple of the step.
+
+Text limits must satisfy `0 ≤ minimum ≤ maximum ≤ 255`. Set the maximum to the capacity configured in your PLC (for example, 80 for STRING[80]); the integration does not discover this capacity. Spaces, brackets and empty strings are preserved. Longer current text values are shown as unknown because Home Assistant entity states are limited to 255 characters. Server restrictions still apply to every write. Successful writes request a fresh read; values are not assumed to have changed before readback.
+
+Changing a node from `sensor` to `number`, for example, creates an entity in the new domain. The previous registry entry is retained and is no longer provided. Update automations/dashboard references before deleting it. Selecting Excluded has the same effect on the previous entity. Selecting Automatic restores the original mapping. Existing mappings are unchanged on upgrade until you choose a different type.
+
 ## 🛠 Service: `ha_opcua_discovery.opcua_set_value`
 
 You can manually set the value of a writable scalar OPC UA node. Supported write types are String, Boolean, signed/unsigned integers, Float and Double. Array and other types are rejected. String contents, including whitespace and brackets, are preserved exactly. Invalid booleans, out-of-range integers and non-finite floats are rejected before writing. Server-side permissions and string length limits still apply.
@@ -88,7 +111,7 @@ data:
 
 Existing entities with unique names are migrated to NodeId-based identifiers while preserving their Home Assistant entity IDs and customizations. If an old name identifies multiple discovered nodes, the integration cannot determine which node the old entity represented. It leaves that legacy entity untouched, logs a warning and creates separate entities for the discovered nodes. Review dashboard/automation references before removing an obsolete entity. If discovery is incomplete because nodes could not be read, legacy migration is deferred; resolve the read errors and reload before removing or remapping legacy entities.
 
-The `asyncua` dependency is updated to 2.0.1: version 1.0.2 fails during connection on Python 3.14. Sensors and switches remain the supported platforms; native `number`, `text` and `binary_sensor` platforms are a separate follow-up.
+The `asyncua` dependency is updated to 2.0.1: version 1.0.2 fails during connection on Python 3.14. Version 1.1.0 additionally provides native `number`, `text` and `binary_sensor` platforms.
 
 ## Development checks
 
@@ -110,7 +133,10 @@ Tests cover scalar conversion, a local OPC UA server, duplicate names, connectio
 ## 🏷 Supported Platforms
 
 - sensor –> for readable numeric/text variables and read-only booleans
+- binary_sensor –> optional read-only Boolean state
 - switch –> for boolean variables writable by the connected user
+- number –> optional editable numeric variables
+- text –> optional editable String variables
 
 ## 📁 File Structure
 

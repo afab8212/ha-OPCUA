@@ -28,9 +28,24 @@ def coordinator(hass):
     result = AsyncuaCoordinator(hass, "PLC", hub)
     result.set_nodes(
         [
-            {"name": "Status", "node_id": "ns=2;i=1", "writable_boolean": False},
-            {"name": "Status", "node_id": "ns=2;i=2", "writable_boolean": False},
-            {"name": "Run", "node_id": "ns=2;i=3", "writable_boolean": True},
+            {
+                "name": "Status",
+                "node_id": "ns=2;i=1",
+                "variant_type": "String",
+                "writable": False,
+            },
+            {
+                "name": "Status",
+                "node_id": "ns=2;i=2",
+                "variant_type": "String",
+                "writable": False,
+            },
+            {
+                "name": "Run",
+                "node_id": "ns=2;i=3",
+                "variant_type": "Boolean",
+                "writable": True,
+            },
         ]
     )
     return result
