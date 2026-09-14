@@ -1,5 +1,6 @@
 """Common identity, availability and write/read-back behavior."""
 
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -24,7 +25,12 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
 
     @property
     def available(self):
-        return super().available and self._node_id in (self.coordinator.data or {})
+        return (
+            super().available
+            and self.coordinator.enabled
+            and self.coordinator.hub.is_connected
+            and self._node_id in (self.coordinator.data or {})
+        )
 
     @property
     def node_value(self):
@@ -36,3 +42,27 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         except Exception as err:
             raise HomeAssistantError(f"OPC UA write failed: {err}") from err
         await self.coordinator.async_request_refresh()
+
+
+def async_setup_node_entities(
+    coordinator, entry, async_add_entities, platform, entity_class
+):
+    """Add discovered nodes at setup or after an offline startup recovers."""
+    added = set()
+
+    @callback
+    def add_discovered():
+        if coordinator._discovery_pending:
+            return
+        entities = []
+        for node_id, node in coordinator.nodes_for_platform(platform):
+            if node_id not in added:
+                added.add(node_id)
+                entities.append(
+                    entity_class(coordinator, node["name"], node_id, entry.entry_id)
+                )
+        if entities:
+            async_add_entities(entities)
+
+    entry.async_on_unload(coordinator.async_add_listener(add_discovered))
+    add_discovered()

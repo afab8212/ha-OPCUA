@@ -18,8 +18,10 @@ from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_CONNECTION_ENABLED,
     CONF_HUB_ID,
     CONF_HUB_PASSWORD,
     CONF_HUB_ROOT_NODE,
@@ -86,15 +88,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_entry=entry,
     )
     try:
-        if not await hub.connect():
-            raise ConfigEntryNotReady("Failed to connect to OPC UA server")
-        coordinator.set_nodes(await hub.discover_nodes())
-        await coordinator.async_config_entry_first_refresh()
-        _migrate_entity_ids(hass, entry, coordinator)
+        # Keep the connection controls available even when the PLC is off at startup.
+        # Discovery is retried by the coordinator; platforms add nodes on recovery.
+        await coordinator.async_refresh()
         hass.data[DOMAIN][hub_id] = coordinator
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except BaseException as err:
         hass.data[DOMAIN].pop(hub_id, None)
+        await coordinator.async_shutdown()
         await hub.disconnect(permanent=True)
         if isinstance(err, Exception) and _connection_error(err):
             raise ConfigEntryNotReady("OPC UA connection lost during setup") from err
@@ -136,7 +137,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload only after Home Assistant has saved the updated options."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    coordinator = hass.data[DOMAIN][entry.data[CONF_HUB_ID]]
+    options = {
+        key: value
+        for key, value in entry.options.items()
+        if key != CONF_CONNECTION_ENABLED
+    }
+    if options != coordinator.reload_options:
+        await hass.config_entries.async_reload(entry.entry_id)
+    else:
+        await coordinator.async_set_connection_enabled(
+            entry.options.get(CONF_CONNECTION_ENABLED, True), persist=False
+        )
 
 
 def entity_unique_id(entry_id: str, node_id: str) -> str:
@@ -185,6 +197,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator = hass.data[DOMAIN].pop(entry.data[CONF_HUB_ID], None)
         if coordinator is not None:
+            await coordinator.async_shutdown()
             await coordinator.hub.disconnect(permanent=True)
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_SET_VALUE)
@@ -204,11 +217,34 @@ class OpcuaHub:
         self.client = None
         self._connected = False
         self._closed = False
+        self.enabled = True
+        self.on_connection_state_change = None
+        self.last_connected = None
+        self.last_disconnected = None
+        self.last_successful_read = None
+        self.last_error_type = None
+        self.session_timeout_ms = None
         self._lock = asyncio.Lock()
+
+    def _set_connected(self, connected):
+        if self._connected == connected:
+            return
+        self._connected = connected
+        if connected:
+            self.last_connected = dt_util.utcnow()
+        else:
+            self.last_disconnected = dt_util.utcnow()
+        if self.on_connection_state_change is not None:
+            self.on_connection_state_change()
+
+    async def pause(self):
+        """Reject queued operations before waiting for an in-flight operation to end."""
+        self.enabled = False
+        await self.disconnect()
 
     async def _disconnect_locked(self) -> None:
         client, self.client = self.client, None
-        self._connected = False
+        self._set_connected(False)
         if client is not None:
             try:
                 await client.disconnect()
@@ -216,13 +252,23 @@ class OpcuaHub:
                 _LOGGER.debug("Error closing OPC UA client: %s", err)
 
     async def _connect_locked(self) -> bool:
-        if self._closed:
+        if self._closed or not self.enabled:
             return False
         if self._connected and self.client is not None:
             return True
         await self._disconnect_locked()
         try:
             self.client = Client(url=self._hub_url, timeout=5, auto_reconnect=False)
+            client = self.client
+
+            async def connection_lost(error):
+                # Ignore notifications from a session that has already been replaced.
+                # Never disconnect here: this callback runs inside asyncua's supervisor.
+                if self.client is client and self.enabled:
+                    self.last_error_type = type(error).__name__
+                    self._set_connected(False)
+
+            client.connection_lost_callback = connection_lost
             if self._username:
                 self.client.set_user(self._username)
             if self._password:
@@ -232,12 +278,15 @@ class OpcuaHub:
             await self._disconnect_locked()
             raise
         except Exception as err:
+            self.last_error_type = type(err).__name__
             await self._disconnect_locked()
             _LOGGER.warning(
                 "Failed to connect OPC UA hub '%s': %s", self._hub_name, err
             )
             return False
-        self._connected = True
+        self.last_error_type = None
+        self.session_timeout_ms = self.client.session_timeout
+        self._set_connected(True)
         return True
 
     async def connect(self) -> bool:
@@ -258,6 +307,8 @@ class OpcuaHub:
     @asynccontextmanager
     async def _session(self):
         async with self._lock:
+            if not self.enabled:
+                raise HomeAssistantError("OPC UA connection is disabled")
             if not await self._connect_locked():
                 raise ConnectionError("Could not connect to OPC UA server")
             try:
@@ -267,6 +318,7 @@ class OpcuaHub:
                 raise
             except Exception as err:
                 if _connection_error(err):
+                    self.last_error_type = type(err).__name__
                     await self._disconnect_locked()
                 raise
 
@@ -348,6 +400,11 @@ class OpcuaHub:
                     if _connection_error(err):
                         raise
                     _LOGGER.warning("Cannot read node %s: %s", node_id, err)
+            # With no active nodes, still verify the session while enabled.
+            if not node_ids:
+                await client.nodes.server_state.read_value()
+            if result or not node_ids:
+                self.last_successful_read = dt_util.utcnow()
         return result
 
     async def set_value(self, nodeid: str, value: Any) -> bool:
@@ -376,6 +433,20 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         config_entry=None,
     ):
         self._hub = hub
+        self.enabled = (
+            config_entry.options.get(CONF_CONNECTION_ENABLED, True)
+            if config_entry
+            else True
+        )
+        self._hub.enabled = self.enabled
+        self.poll_interval = update_interval_in_second
+        self.reload_options = {
+            key: value
+            for key, value in (config_entry.options if config_entry else {}).items()
+            if key != CONF_CONNECTION_ENABLED
+        }
+        self._control_lock = asyncio.Lock()
+        self._discovery_pending = config_entry is not None
         self.nodes = {}
         self.node_settings = (
             dict(config_entry.options.get(CONF_NODE_SETTINGS, {}))
@@ -387,15 +458,47 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=name,
-            update_interval=update_interval_in_second,
+            update_interval=update_interval_in_second if self.enabled else None,
             config_entry=config_entry,
         )
+        self._hub.on_connection_state_change = self._connection_state_changed
+
+    def _connection_state_changed(self):
+        # Do not re-expose stale node values when a replacement session connects.
+        if not self._hub.is_connected:
+            self.data = {}
+        self.async_update_listeners()
 
     @property
     def hub(self) -> OpcuaHub:
         return self._hub
 
+    async def async_set_connection_enabled(self, enabled, *, persist=True):
+        """Persist the requested state and stop or resume this hub without reloading."""
+        async with self._control_lock:
+            if self.enabled == enabled:
+                return
+            self.enabled = enabled
+            self._hub.enabled = enabled
+            self.update_interval = self.poll_interval if enabled else None
+            if persist and self.config_entry:
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    options={
+                        **self.config_entry.options,
+                        CONF_CONNECTION_ENABLED: enabled,
+                    },
+                )
+            # Clear stale values, cancel timers/debounced refreshes, and publish intent.
+            self.async_set_updated_data({})
+            if enabled:
+                await self.async_request_refresh()
+            else:
+                await self._hub.pause()
+                self.async_set_updated_data({})
+
     def set_nodes(self, nodes):
+        self._discovery_pending = False
         self.nodes = {node["node_id"]: node for node in nodes}
         self._platforms = {}
         for node_id, node in self.nodes.items():
@@ -421,13 +524,31 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self) -> dict[str, Any]:
-        active_nodes = [
-            node_id for node_id in self.nodes if self._platforms[node_id] != "disabled"
-        ]
+        if not self.enabled:
+            return {}
         try:
+            if self._discovery_pending:
+                nodes = await self._hub.discover_nodes()
+                self.set_nodes(nodes)
+                try:
+                    if self.config_entry and nodes:
+                        _migrate_entity_ids(self.hass, self.config_entry, self)
+                except Exception:
+                    self._discovery_pending = True
+                    raise
+            active_nodes = [
+                node_id
+                for node_id in self.nodes
+                if self._platforms[node_id] != "disabled"
+            ]
             values = await self._hub.get_values(active_nodes)
         except Exception as err:
+            # A pause can overtake an already scheduled read. It is not a failure.
+            if not self.enabled:
+                return {}
             raise UpdateFailed(f"OPC UA read failed: {err}") from err
+        if not self.enabled:
+            return {}
         if active_nodes and not values:
             raise UpdateFailed("No configured OPC UA nodes could be read")
         return values

@@ -128,13 +128,20 @@ async def test_registry_migrates_unambiguous_entities_only(hass, entry):
     assert registry.async_get(run.entity_id).unique_id == migrated.unique_id
 
 
-async def test_setup_failure_cleans_resources_and_requests_retry(hass, entry):
+async def test_platform_setup_failure_cleans_resources_and_requests_retry(hass, entry):
     hub = Mock(
         connect=AsyncMock(return_value=True),
         discover_nodes=AsyncMock(side_effect=ConnectionError()),
         disconnect=AsyncMock(),
     )
-    with patch("custom_components.ha_opcua_discovery.OpcuaHub", return_value=hub):
+    with (
+        patch("custom_components.ha_opcua_discovery.OpcuaHub", return_value=hub),
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            new=AsyncMock(side_effect=ConnectionError()),
+        ),
+    ):
         with pytest.raises(ConfigEntryNotReady):
             await async_setup_entry(hass, entry)
     hub.disconnect.assert_awaited_once()
@@ -161,6 +168,7 @@ async def test_service_uses_selected_hub_and_lives_until_last_unload(hass, entry
     c = hass.data[DOMAIN]["PLC"]
     c.async_request_refresh = AsyncMock()
     other = SimpleNamespace(
+        async_shutdown=AsyncMock(),
         hub=Mock(set_value=AsyncMock(), disconnect=AsyncMock()),
         async_request_refresh=AsyncMock(),
     )

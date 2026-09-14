@@ -113,5 +113,17 @@
       },
       "name": "set value"
     }
+  },
+  "entity": {
+    "switch": {
+      "connection_enabled": {
+        "name": "{hub} Connection enabled"
+      }
+    },
+    "binary_sensor": {
+      "connection_status": {
+        "name": "{hub} Connection"
+      }
+    }
   }
 }

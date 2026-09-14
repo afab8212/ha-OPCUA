@@ -4,16 +4,13 @@ from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
-from .entity import OpcuaEntity
+from .entity import OpcuaEntity, async_setup_node_entities
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.data["hub_id"]]
-    async_add_entities(
-        [
-            AsyncuaText(coordinator, node["name"], node_id, entry.entry_id)
-            for node_id, node in coordinator.nodes_for_platform("text")
-        ]
+    async_setup_node_entities(
+        coordinator, entry, async_add_entities, "text", AsyncuaText
     )
 
 
