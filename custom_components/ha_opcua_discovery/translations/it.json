@@ -117,12 +117,12 @@
   "entity": {
     "switch": {
       "connection_enabled": {
-        "name": "{hub} Connessione abilitata"
+        "name": "Connessione abilitata"
       }
     },
     "binary_sensor": {
       "connection_status": {
-        "name": "{hub} Connessione"
+        "name": "Connessione"
       }
     }
   }

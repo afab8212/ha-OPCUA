@@ -5,6 +5,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AsyncuaCoordinator, entity_unique_id
+from .device import device_info
 
 
 class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
@@ -14,6 +15,14 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         super().__init__(coordinator)
         self._attr_name = name
         self._attr_unique_id = entity_unique_id(entry_id, node_id)
+        self._attr_device_info = device_info(
+            entry_id,
+            (
+                coordinator.config_entry.title
+                if coordinator.config_entry
+                else coordinator.name
+            ),
+        )
         self._node_id = node_id
         self._settings = coordinator.node_settings.get(node_id, {})
         node = coordinator.nodes[node_id]

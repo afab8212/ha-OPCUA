@@ -4,6 +4,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .device import device_info
+
 
 def connection_attributes(coordinator):
     hub = coordinator.hub
@@ -54,7 +56,7 @@ class OpcuaConnectionEntity(CoordinatorEntity):
     def __init__(self, coordinator, entry, key):
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}:{key}"
-        self._attr_translation_placeholders = {"hub": coordinator.name}
+        self._attr_device_info = device_info(entry.entry_id, entry.title)
 
     @property
     def available(self):

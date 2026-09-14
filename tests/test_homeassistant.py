@@ -101,9 +101,6 @@ async def test_switch_reads_back_after_write_and_reports_failure(hass, entry):
 
 
 async def test_registry_migrates_unambiguous_entities_only(hass, entry):
-    # Register the real entry so the registry can validate ownership.
-    hass.config_entries._entries[entry.entry_id] = entry
-    await er.async_load(hass)
     registry = er.async_get(hass)
     run = registry.async_get_or_create(
         "switch", DOMAIN, "opcua_PLC_Run", config_entry=entry
@@ -150,7 +147,6 @@ async def test_platform_setup_failure_cleans_resources_and_requests_retry(hass, 
 
 
 async def test_service_uses_selected_hub_and_lives_until_last_unload(hass, entry):
-    await er.async_load(hass)
     hub = Mock(
         connect=AsyncMock(return_value=True),
         discover_nodes=AsyncMock(return_value=[]),

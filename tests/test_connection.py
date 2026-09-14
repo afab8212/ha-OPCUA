@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from asyncua import Server
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 
 from custom_components.ha_opcua_discovery import (
     AsyncuaCoordinator,
@@ -38,12 +37,10 @@ async def test_offline_startup_recovery_pause_and_native_controls(
     recipe = await root.add_variable(ns, "Recipe", "initial")
     await recipe.set_writable()
     node_id = recipe.nodeid.to_string()
-    hass.config_entries._entries[entry.entry_id] = entry
     hass.config_entries.async_update_entry(
         entry,
         options={CONF_NODE_SETTINGS: {node_id: {"platform": "text", "max_length": 80}}},
     )
-    await er.async_load(hass)
     hub = OpcuaHub("PLC", server.endpoint.geturl(), root.nodeid.to_string())
     entities = []
 
@@ -130,7 +127,6 @@ async def test_offline_startup_recovery_pause_and_native_controls(
 
 
 async def test_disabled_restart_never_opens_a_client(hass, entry):
-    hass.config_entries._entries[entry.entry_id] = entry
     hass.config_entries.async_update_entry(
         entry, options={CONF_CONNECTION_ENABLED: False}
     )

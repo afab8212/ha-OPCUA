@@ -7,7 +7,6 @@ import pytest
 from asyncua import Server, ua
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import entity_registry as er
 from probatio import to_field_list
 
 from custom_components.ha_opcua_discovery import (
@@ -71,7 +70,6 @@ def test_invalid_settings_rejected(kind, settings, error):
 
 
 def prepare_flow(hass, entry):
-    hass.config_entries._entries[entry.entry_id] = entry
     c = AsyncuaCoordinator(
         hass, "PLC", Mock(get_values=AsyncMock(return_value={})), config_entry=entry
     )
@@ -88,7 +86,6 @@ def prepare_flow(hass, entry):
 async def test_options_keep_other_nodes_and_connection_and_cancel_is_isolated(
     hass, entry
 ):
-    hass.config_entries._entries[entry.entry_id] = entry
     original = {
         "scan_interval": 12,
         CONF_NODE_SETTINGS: {"ns=2;i=99": {"platform": "disabled"}},
@@ -149,7 +146,6 @@ async def test_options_integer_validation_readonly_and_unloaded(hass, entry):
 
 @pytest.mark.asyncio
 async def test_disabled_and_incompatible_nodes_are_not_polled(hass, entry):
-    hass.config_entries._entries[entry.entry_id] = entry
     hass.config_entries.async_update_entry(
         entry,
         options={
@@ -170,8 +166,6 @@ async def test_disabled_and_incompatible_nodes_are_not_polled(hass, entry):
 
 @pytest.mark.asyncio
 async def test_reload_runs_after_options_are_persisted(hass, entry):
-    hass.config_entries._entries[entry.entry_id] = entry
-    await er.async_load(hass)
     hub = Mock(
         connect=AsyncMock(return_value=True),
         discover_nodes=AsyncMock(return_value=[]),
@@ -221,7 +215,6 @@ async def test_native_entities_read_write_and_validate_with_real_server(
     integer_id, string_id, boolean_id = [
         n.nodeid.to_string() for n in (integer, string, boolean)
     ]
-    hass.config_entries._entries[entry.entry_id] = entry
     hass.config_entries.async_update_entry(
         entry,
         options={
