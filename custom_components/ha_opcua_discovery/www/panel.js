@@ -28,6 +28,14 @@ const TEXT = {
       "Abilita la connessione per verificare e aggiungere il nodo.",
     connection_failed:
       "Impossibile raggiungere l’endpoint. Verifica la connessione.",
+    state: "Stato",
+    stateUnknown: "Sconosciuto",
+    stateUnavailable: "Non disponibile",
+    statePending: "Non ancora registrata",
+    stateExcluded: "Esclusa",
+    stateEmpty: "Testo vuoto",
+    stateOn: "Acceso",
+    stateOff: "Spento",
     title: "Nodi OPC UA",
     subtitle: "Configura le entità dei tuoi endpoint",
     endpoint: "Endpoint",
@@ -114,6 +122,14 @@ const TEXT = {
       "This node already has an entity. Edit it in the list or integration options.",
     connection_disabled: "Enable the connection to verify and add the node.",
     connection_failed: "Cannot reach the endpoint. Check the connection.",
+    state: "State",
+    stateUnknown: "Unknown",
+    stateUnavailable: "Unavailable",
+    statePending: "Not registered yet",
+    stateExcluded: "Excluded",
+    stateEmpty: "Empty text",
+    stateOn: "On",
+    stateOff: "Off",
     title: "OPC UA nodes",
     subtitle: "Configure entities for your endpoints",
     endpoint: "Endpoint",
@@ -216,7 +232,7 @@ function compatible(row, node) {
 const CSS = `
 :host{display:block;height:100%;color:var(--primary-text-color,#243346);background:var(--primary-background-color,#f5f7fb);font:14px var(--paper-font-body1_-_font-family,Roboto,Arial,sans-serif)}
 *{box-sizing:border-box}button,input,select{font:inherit}button{cursor:pointer;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:10px 15px;background:var(--card-background-color,#fff);color:inherit;min-height:42px}button:hover{border-color:var(--primary-color,#009ac0)}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--primary-color,#009ac0);outline-offset:2px}.primary{background:var(--primary-color,#008fac);border-color:transparent;color:var(--text-primary-color,#fff)}
-header{display:flex;gap:16px;align-items:center;padding:20px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:23px;margin:0 0 4px}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1}.menu{border:0;background:none;font-size:22px;padding:4px 10px}.content{max-width:1400px;margin:auto;padding:24px 28px 48px;height:calc(100% - 92px);overflow:auto}.toolbar{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:18px;align-items:end;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px}.field>span{font-weight:600}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;overflow-wrap:anywhere;margin-bottom:20px;color:var(--secondary-text-color,#637487)}.badge{font-size:12px;border-radius:30px;padding:5px 10px;background:var(--secondary-background-color,#e9eef5);color:var(--secondary-text-color,#637487)}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}nav .selected{background:var(--primary-color,#008fac);color:var(--text-primary-color,#fff);border-color:transparent}.group{margin-bottom:24px}.group>summary{cursor:pointer;font-size:17px;font-weight:600;padding:8px 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.card{background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-radius:14px;padding:18px;min-width:0}.cardTop{display:flex;align-items:start;gap:12px}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
+header{display:flex;gap:16px;align-items:center;padding:20px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:23px;margin:0 0 4px}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1}.menu{border:0;background:none;font-size:22px;padding:4px 10px}.content{max-width:1400px;margin:auto;padding:24px 28px 48px;height:calc(100% - 92px);overflow:auto}.toolbar{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:18px;align-items:end;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px}.field>span{font-weight:600}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;overflow-wrap:anywhere;margin-bottom:20px;color:var(--secondary-text-color,#637487)}.badge{font-size:12px;border-radius:30px;padding:5px 10px;background:var(--secondary-background-color,#e9eef5);color:var(--secondary-text-color,#637487)}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}nav .selected{background:var(--primary-color,#008fac);color:var(--text-primary-color,#fff);border-color:transparent}.group{margin-bottom:24px}.group>summary{cursor:pointer;font-size:17px;font-weight:600;padding:8px 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.card{background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-radius:14px;padding:18px;min-width:0}.cardTop{display:flex;align-items:start;gap:12px}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.entityState{margin-top:16px;padding:12px;border-radius:9px;background:var(--secondary-background-color,#f3f6fa);min-width:0}.stateLabel{display:block;font-size:12px;color:var(--secondary-text-color,#637487);margin-bottom:5px}.stateValue{display:block;font-size:20px;font-weight:500;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:16px;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}dialog::backdrop{background:#10223480}form{padding:24px;display:flex;flex-direction:column;gap:17px}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}
 @media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:18px 12px}.toolbar{grid-template-columns:1fr;gap:12px}.grid{grid-template-columns:1fr}nav button{padding:8px 10px}.card{padding:15px}form{padding:20px}.headerText p{font-size:12px}}
 `;
@@ -462,17 +478,67 @@ class OpcuaNodePanel extends HTMLElement {
             this._button("remove", () => this._remove(row), "danger"),
           );
         bottom.append(actions);
-        card.append(top, bottom);
+        const state = element("div", undefined, { class: "entityState" });
+        state.append(
+          element("span", this._t("state"), { class: "stateLabel" }),
+          element("span", "", {
+            class: "stateValue",
+            "data-entity-state": row.entity_id || "",
+            "data-platform": row.platform,
+          }),
+        );
+        card.append(top, state, bottom);
         grid.append(card);
       }
       details.append(grid);
       this._rows.append(details);
     }
+    this._paintStates();
   }
   _paintStates() {
-    if (!this._hass?.states) return;
+    const states = this._hass?.states || {};
+    for (const value of this.shadowRoot.querySelectorAll(
+      "[data-entity-state]",
+    )) {
+      const id = value.dataset.entityState;
+      const platform = value.dataset.platform;
+      const entity = states[id];
+      let kind = "value";
+      let label;
+      if (platform === "disabled") {
+        kind = "disabled";
+        label = this._t("stateExcluded");
+      } else if (!id) {
+        kind = "pending";
+        label = this._t("statePending");
+      } else if (!entity || entity.state === "unavailable") {
+        kind = "unavailable";
+        label = this._t("stateUnavailable");
+      } else if (entity.state === "unknown") {
+        kind = "unknown";
+        label = this._t("stateUnknown");
+      } else if (entity.state === "") {
+        label = this._t("stateEmpty");
+      } else {
+        // HA applies device-class labels, units, locale and timezone preferences.
+        label = this._hass.formatEntityState?.(entity);
+        if (label == null) {
+          if (
+            ["switch", "binary_sensor"].includes(platform) &&
+            ["on", "off"].includes(entity.state)
+          )
+            label = this._t(entity.state === "on" ? "stateOn" : "stateOff");
+          else {
+            const unit = entity.attributes?.unit_of_measurement;
+            label = `${entity.state}${unit ? ` ${unit}` : ""}`;
+          }
+        }
+      }
+      if (value.textContent !== label) value.textContent = label;
+      if (value.dataset.kind !== kind) value.dataset.kind = kind;
+    }
     for (const badge of this.shadowRoot.querySelectorAll("[data-connection]")) {
-      const state = this._hass.states[badge.dataset.connection];
+      const state = states[badge.dataset.connection];
       if (!state) continue;
       const online = state.state === "on";
       badge.textContent = this._t(online ? "connected" : "disconnected");
