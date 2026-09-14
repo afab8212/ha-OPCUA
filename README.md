@@ -20,6 +20,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 - 🧠 Automatic mapping with per-node entity selection and exclusion
 - ✏️ Native numeric and text controls with configurable limits
 - 🔄 Periodic polling with configurable scan interval
+- ⏯️ Persistent connection switch and live connectivity diagnostics per hub
 - 🧪 Graceful reconnection logic on connection loss
 - 📥 Set opc-ua nodes values via Home Assistant services (`ha_opcua_discovery.opcua_set_value`)
 - 🤝 Supports multiple simultaneous OPC-UA clients
@@ -68,6 +69,19 @@ This integration supports **local polling** using the `asyncua` library and is i
 - **Scan Interval** in seconds
 
 ---
+
+## Connection control and diagnostics (1.2.0)
+
+Each hub now provides two additional entities:
+
+- **Connection enabled** (`switch`, Configuration): turn it off before shutting down the machine to close the OPC UA session and stop polling, connection attempts and asyncua background session maintenance. The setting survives integration reloads and Home Assistant restarts. Turning it back on immediately attempts a connection; if the PLC is still offline, retries continue at the configured polling interval.
+- **Connection** (`binary_sensor`, Diagnostics, connectivity device class): reports the actual observed session state. It stays available and shows disconnected when communication is disabled or lost. An enabled switch does not imply a successful connection. Transport loss is reported when detected by asyncua or by a failed request; it is not an instantaneous indication of PLC power or CPU RUN/STOP mode.
+
+The binary sensor includes endpoint, host, port, root NodeId, configured polling interval, security/authentication mode, negotiated session timeout in milliseconds, discovered/polled node counts, last connection/disconnection and successful read timestamps, and the last connection error **type**. Credentials and URL query/fragment are omitted. Timestamps describe the current integration session and reset on reload/restart.
+
+While disabled, node entities are unavailable and both entity writes and `opcua_set_value` are rejected without reconnecting. A request already in flight may finish before the session closes; queued requests cannot reopen it. Each switch affects only its own hub. The switch can be controlled by normal Home Assistant automations.
+
+Connection controls are also available when the PLC is offline at startup. Node entities are discovered and added when communication becomes available, without requiring a manual reload. During a disabled/offline restart, previously registered node entities remain unavailable until discovery succeeds. Existing node mappings and identities are preserved. A connection error clears stale values; node entities become available again after fresh reads. Individual invalid-node errors do not imply that the server session is disconnected. If there are no active nodes, an enabled hub probes server state to check connectivity; a disabled hub sends no probes.
 
 ## Per-node entity configuration (1.1.0)
 

@@ -13,3 +13,5 @@ SERVICE_SET_VALUE = "opcua_set_value"
 FIELD_NODE_HUB = "hub"
 FIELD_NODE_ID = "node_id"
 FIELD_VALUE = "value"
+
+CONF_CONNECTION_ENABLED = "connection_enabled"

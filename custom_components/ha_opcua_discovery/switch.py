@@ -1,27 +1,19 @@
 """Switch platform for OPC UA."""
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.const import EntityCategory
 
-from . import AsyncuaCoordinator
+from .connection import OpcuaConnectionEntity
 from .const import DOMAIN
-from .entity import OpcuaEntity
+from .entity import OpcuaEntity, async_setup_node_entities
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
-) -> None:
-    coordinator: AsyncuaCoordinator = hass.data[DOMAIN][entry.data["hub_id"]]
-    switches = []
-
-    for node_id, node in coordinator.nodes_for_platform("switch"):
-        switches.append(
-            AsyncuaSwitch(coordinator, node["name"], node_id, entry.entry_id)
-        )
-
-    async_add_entities(switches)
+async def async_setup_entry(hass, entry, async_add_entities):
+    coordinator = hass.data[DOMAIN][entry.data["hub_id"]]
+    async_add_entities([OpcuaConnectionSwitch(coordinator, entry)])
+    async_setup_node_entities(
+        coordinator, entry, async_add_entities, "switch", AsyncuaSwitch
+    )
 
 
 class AsyncuaSwitch(OpcuaEntity, SwitchEntity):
@@ -40,3 +32,24 @@ class AsyncuaSwitch(OpcuaEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
         await self._async_write_value(False)
+
+
+class OpcuaConnectionSwitch(OpcuaConnectionEntity, SwitchEntity):
+    """Enable communication independently of whether the PLC is reachable."""
+
+    _attr_translation_key = "connection_enabled"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:lan-connect"
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry, "connection_enabled")
+
+    @property
+    def is_on(self):
+        return self.coordinator.enabled
+
+    async def async_turn_on(self, **kwargs):
+        await self.coordinator.async_set_connection_enabled(True)
+
+    async def async_turn_off(self, **kwargs):
+        await self.coordinator.async_set_connection_enabled(False)

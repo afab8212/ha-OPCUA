@@ -6,17 +6,14 @@ from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
-from .entity import OpcuaEntity
+from .entity import OpcuaEntity, async_setup_node_entities
 from .node_settings import INTEGER_TYPES, MAX_SAFE_INTEGER
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.data["hub_id"]]
-    async_add_entities(
-        [
-            AsyncuaNumber(coordinator, node["name"], node_id, entry.entry_id)
-            for node_id, node in coordinator.nodes_for_platform("number")
-        ]
+    async_setup_node_entities(
+        coordinator, entry, async_add_entities, "number", AsyncuaNumber
     )
 
 
