@@ -7,16 +7,19 @@ from copy import deepcopy
 from pathlib import Path
 
 import voluptuous as vol
+from asyncua import ua
 from homeassistant.components import panel_custom, websocket_api
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_integration
 
 from .connection import connection_attributes
-from .const import CONF_HUB_ID, CONF_NODE_SETTINGS, DOMAIN
-from .node_settings import effective_platform, validate_settings
+from .const import CONF_HUB_ID, CONF_MANUAL_NODES, CONF_NODE_SETTINGS, DOMAIN
+from .device import async_register_device
+from .node_settings import allowed_platforms, effective_platform, validate_settings
 
 PANEL_PATH = "opcua-nodes"
 PANEL_DATA = f"{DOMAIN}_panel"
@@ -44,6 +47,8 @@ async def async_setup_panel(hass):
     )
     websocket_api.async_register_command(hass, ws_snapshot)
     websocket_api.async_register_command(hass, ws_save)
+    websocket_api.async_register_command(hass, ws_inspect)
+    websocket_api.async_register_command(hass, ws_create)
     hass.data[PANEL_DATA] = {"locks": {}}
 
 
@@ -173,6 +178,146 @@ async def async_save_entity(hass, msg):
         if reload_needed:
             hass.config_entries.async_update_entry(entry, options=options)
         return {"saved": True, "reload": reload_needed}
+
+
+def _loaded_endpoint(hass, entry_id):
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    c = _coordinator(hass, entry)
+    if c is None:
+        raise ValueError("endpoint_not_loaded")
+    if not c.enabled:
+        raise ValueError("connection_disabled")
+    return entry, c
+
+
+async def _inspect(c, node_id):
+    try:
+        return await c.hub.inspect_node(node_id)
+    except ua.UaStatusCodeError as err:
+        raise ValueError("node_unreadable") from err
+    except (ConnectionError, TimeoutError, OSError, HomeAssistantError) as err:
+        raise ValueError("connection_failed") from err
+
+
+async def async_inspect_node(hass, msg):
+    entry, c = _loaded_endpoint(hass, msg["entry_id"])
+    node = await _inspect(c, msg["node_id"])
+    return {
+        "node": node,
+        "platforms": [
+            p for p in allowed_platforms(node) if p not in ("auto", "disabled")
+        ],
+    }
+
+
+async def async_create_entity(hass, msg):
+    entry, c = _loaded_endpoint(hass, msg["entry_id"])
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        if endpoint_snapshot(hass, entry)["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        # Re-read at save time: the client cannot supply type/write permissions.
+        node = await _inspect(c, msg["node_id"])
+        if (
+            _coordinator(hass, entry) is not c
+            or endpoint_snapshot(hass, entry)["revision"] != msg["revision"]
+        ):
+            raise ValueError("stale_configuration")
+        if not c.enabled:
+            raise ValueError("connection_disabled")
+        node_id = node["node_id"]
+        if (
+            node_id in c.nodes
+            or node_id in entry.options.get(CONF_MANUAL_NODES, {})
+            or any(n.get("target_node_id") == node_id for n in c.nodes.values())
+        ):
+            raise ValueError("node_already_configured")
+        if msg["platform"] in ("auto", "disabled"):
+            raise ValueError("incompatible_platform")
+        settings = validate_settings(
+            node,
+            {
+                "platform": msg["platform"],
+                "node_id": node_id,
+                "invert_state": msg["invert_state"],
+                "device_class": msg["device_class"],
+            },
+        )
+        area_id = msg["area_id"]
+        if area_id is not None and ar.async_get(hass).async_get_area(area_id) is None:
+            raise ValueError("area_not_found")
+        name = msg["name"].strip() or None
+        if name is not None and len(name) > 255:
+            raise ValueError("invalid_name")
+        registry = er.async_get(hass)
+        unique_id = f"{entry.entry_id}:{node_id}"
+        if any(
+            e.unique_id == unique_id
+            for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        ):
+            raise ValueError("node_already_configured")
+        options = deepcopy(dict(entry.options))
+        options.setdefault(CONF_MANUAL_NODES, {})[node_id] = node
+        options.setdefault(CONF_NODE_SETTINGS, {})[node_id] = settings
+        device = async_register_device(hass, entry)
+        registered = registry.async_get_or_create(
+            msg["platform"],
+            DOMAIN,
+            unique_id,
+            config_entry=entry,
+            suggested_object_id=name or node["name"],
+            original_name=node["name"],
+            device_id=device.id,
+        )
+        registry.async_update_entity(registered.entity_id, name=name, area_id=area_id)
+        hass.config_entries.async_update_entry(entry, options=options)
+        return {"saved": True, "reload": True, "entity_id": registered.entity_id}
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/node/inspect",
+        vol.Required("entry_id"): str,
+        vol.Required("node_id"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_inspect(hass, connection, msg):
+    try:
+        result = await async_inspect_node(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/entity/create",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+        vol.Required("node_id"): str,
+        vol.Required("platform"): str,
+        vol.Required("name"): str,
+        vol.Required("area_id"): vol.Any(str, None),
+        vol.Required("device_class"): vol.Any(str, None),
+        vol.Required("invert_state"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_create(hass, connection, msg):
+    try:
+        result = await async_create_entity(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/panel"})

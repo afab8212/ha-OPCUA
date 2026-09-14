@@ -1,6 +1,23 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 const TEXT = {
   it: {
+    add: "Aggiungi entità",
+    verify: "Verifica nodo",
+    verifying: "Verifica…",
+    category: "Categoria",
+    manualHelp:
+      "Inserisci il NodeId completo, anche fuori dal discovery. La verifica legge il nodo senza modificarlo.",
+    invalid_node_id: "NodeId non valido. Esempio: ns=4;i=2",
+    unsupported_node:
+      "Seleziona una variabile scalare booleana, numerica o stringa.",
+    node_unreadable:
+      "Il nodo non esiste o non è leggibile con le credenziali configurate.",
+    node_already_configured:
+      "Questo nodo ha già un’entità. Modificala dall’elenco o dalle opzioni dell’integrazione.",
+    connection_disabled:
+      "Abilita la connessione per verificare e aggiungere il nodo.",
+    connection_failed:
+      "Impossibile raggiungere l’endpoint. Verifica la connessione.",
     title: "Nodi OPC UA",
     subtitle: "Configura le entità dei tuoi endpoint",
     endpoint: "Endpoint",
@@ -61,6 +78,20 @@ const TEXT = {
     info: "La categoria e i limiti number/text si gestiscono ancora dalle opzioni dell’integrazione.",
   },
   en: {
+    add: "Add entity",
+    verify: "Verify node",
+    verifying: "Verifying…",
+    category: "Category",
+    manualHelp:
+      "Enter the complete NodeId, including nodes outside discovery. Verification reads the node without changing it.",
+    invalid_node_id: "Invalid NodeId. Example: ns=4;i=2",
+    unsupported_node: "Choose a scalar boolean, numeric or string variable.",
+    node_unreadable:
+      "The node does not exist or cannot be read with the configured credentials.",
+    node_already_configured:
+      "This node already has an entity. Edit it in the list or integration options.",
+    connection_disabled: "Enable the connection to verify and add the node.",
+    connection_failed: "Cannot reach the endpoint. Check the connection.",
     title: "OPC UA nodes",
     subtitle: "Configure entities for your endpoints",
     endpoint: "Endpoint",
@@ -323,6 +354,9 @@ class OpcuaNodePanel extends HTMLElement {
       },
     );
     meta.append(status, element("span", endpoint.endpoint || endpoint.title));
+    const add = this._button("add", () => this._add(), "primary");
+    add.disabled = !endpoint.loaded;
+    meta.append(add);
     main.append(meta);
     const nav = element("nav", undefined, { "aria-label": this._t("all") });
     for (const group of ["all", ...GROUPS]) {
@@ -413,15 +447,87 @@ class OpcuaNodePanel extends HTMLElement {
       badge.classList.toggle("online", online);
     }
   }
-  _edit(row) {
+  _add() {
     const endpoint = this._endpoint();
+    const dialog = element("dialog");
+    this._dialog = dialog;
+    const form = element("form");
+    dialog.append(form);
+    const nodeId = element("input", undefined, {
+      required: "",
+      placeholder: "ns=4;i=2",
+    });
+    const error = element("div", "", { class: "error", role: "alert" });
+    const cancel = this._button("cancel", () => dialog.close());
+    const verify = element("button", this._t("verify"), {
+      type: "submit",
+      class: "primary",
+    });
+    const footer = element("footer");
+    footer.append(cancel, verify);
+    form.append(
+      element("h2", this._t("add")),
+      this._field("node", nodeId),
+      element("p", this._t("manualHelp"), { class: "hint" }),
+      error,
+      footer,
+    );
+    let busy = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      busy = true;
+      verify.disabled = cancel.disabled = nodeId.disabled = true;
+      verify.textContent = this._t("verifying");
+      error.textContent = "";
+      try {
+        const result = await this._hass.callWS({
+          type: "ha_opcua_discovery/node/inspect",
+          entry_id: endpoint.entry_id,
+          node_id: nodeId.value,
+        });
+        if (!this.isConnected) return;
+        dialog.close();
+        this._edit(
+          {
+            name: result.node.name,
+            node_id: result.node.node_id,
+            platform: result.platforms[0],
+            invert_state: false,
+          },
+          result,
+          endpoint,
+        );
+      } catch (err) {
+        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+      } finally {
+        busy = false;
+        verify.disabled = cancel.disabled = nodeId.disabled = false;
+        verify.textContent = this._t("verify");
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+    nodeId.focus();
+  }
+  _edit(row, manual = null, endpoint = this._endpoint()) {
     const revision = endpoint.revision;
     const dialog = element("dialog");
     this._dialog = dialog;
     const form = element("form");
     dialog.append(form);
     form.append(
-      element("h2", `${this._t("edit")} · ${row.name || row.node_id}`),
+      element(
+        "h2",
+        `${this._t(manual ? "add" : "edit")} · ${row.name || row.node_id}`,
+      ),
     );
     const name = element("input", undefined, {
       type: "text",
@@ -440,6 +546,16 @@ class OpcuaNodePanel extends HTMLElement {
       area.append(element("option", item.name, { value: item.id }));
     area.value = row.area_id || "";
     form.append(this._field("area", area));
+    const category = element("select");
+    if (manual) {
+      for (const platform of manual.platforms)
+        category.append(
+          element("option", this._t(platform), { value: platform }),
+        );
+      category.value = row.platform;
+      form.append(this._field("category", category));
+    }
+    const availableNodes = manual ? [manual.node] : endpoint.nodes;
     const nodeFilter = element("input", undefined, {
       type: "search",
       placeholder: this._t("filterNodes"),
@@ -452,7 +568,7 @@ class OpcuaNodePanel extends HTMLElement {
     const populate = () => {
       const chosen = nodes.value || row.node_id;
       nodes.replaceChildren();
-      for (const node of endpoint.nodes.filter(
+      for (const node of availableNodes.filter(
         (n) =>
           compatible(row, n) &&
           (n.node_id === chosen ||
@@ -469,11 +585,11 @@ class OpcuaNodePanel extends HTMLElement {
     };
     populate();
     nodeFilter.addEventListener("input", populate);
-    form.append(
-      this._field("filterNodes", nodeFilter),
-      this._field("node", nodes),
-      element("p", this._t("nodeHelp"), { class: "hint" }),
-    );
+    if (!manual) form.append(this._field("filterNodes", nodeFilter));
+    nodes.disabled = !!manual;
+    form.append(this._field("node", nodes));
+    if (!manual)
+      form.append(element("p", this._t("nodeHelp"), { class: "hint" }));
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     for (const cls of this._data.device_classes)
@@ -487,8 +603,13 @@ class OpcuaNodePanel extends HTMLElement {
         ),
       );
     deviceClass.value = row.device_class || "";
-    if (row.platform === "binary_sensor")
-      form.append(this._field("deviceClass", deviceClass));
+    const classField = this._field("deviceClass", deviceClass);
+    classField.hidden = row.platform !== "binary_sensor";
+    form.append(classField);
+    category.addEventListener("change", () => {
+      row.platform = category.value;
+      classField.hidden = row.platform !== "binary_sensor";
+    });
     const invert = element("input", undefined, {
       type: "checkbox",
       name: "invert",
@@ -499,7 +620,7 @@ class OpcuaNodePanel extends HTMLElement {
     const invertHelp = element("p", this._t("invertHelp"), { class: "hint" });
     form.append(toggle, invertHelp);
     const updateBoolean = () => {
-      const node = endpoint.nodes.find((n) => n.node_id === nodes.value);
+      const node = availableNodes.find((n) => n.node_id === nodes.value);
       toggle.hidden = invertHelp.hidden = node?.variant_type !== "Boolean";
     };
     nodes.addEventListener("change", updateBoolean);
@@ -520,7 +641,7 @@ class OpcuaNodePanel extends HTMLElement {
     });
     dialog.addEventListener("close", () => {
       dialog.remove();
-      this._dialog = null;
+      if (this._dialog === dialog) this._dialog = null;
     });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -531,10 +652,10 @@ class OpcuaNodePanel extends HTMLElement {
       error.textContent = "";
       try {
         const result = await this._hass.callWS({
-          type: "ha_opcua_discovery/entity/update",
+          type: `ha_opcua_discovery/entity/${manual ? "create" : "update"}`,
           entry_id: endpoint.entry_id,
           revision,
-          key: row.key,
+          ...(manual ? { platform: row.platform } : { key: row.key }),
           name: name.value,
           area_id: area.value || null,
           node_id: nodes.value,

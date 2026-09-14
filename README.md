@@ -70,7 +70,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
-## OPC UA side panel (1.4.0)
+## OPC UA side panel (1.4.1)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers and text. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
@@ -84,7 +84,15 @@ Click **Edit** on an entity to configure:
 
 Saving updates the native entity registry and integration options. NodeId, inversion and device-class changes reload the endpoint; wait for it to finish and use Refresh if needed. Cancel leaves the saved configuration unchanged. Stale forms are rejected if another editor has changed the endpoint; cancel, refresh and reopen the entity. Panel APIs require administrator access and do not perform PLC writes.
 
-This first version edits registered node entities. Platform selection (including exclusions), number/text limits and connection settings remain in the integration options; using those options preserves panel metadata. If an endpoint is offline/disabled at startup, nodes must first be discovered before they can be edited. Discovery still runs at setup/reload; manually entered NodeIds outside the discovered address space are not supported by the panel yet. The connection switch and connectivity sensor remain standard HA entities outside the node editor.
+To add a node that discovery did not find, select the endpoint and click **Add entity** (**Aggiungi entità**):
+
+1. Enter its complete NodeId, such as `ns=4;i=2` or `ns=4;s="DB"."Variable"`, and click **Verify node**. The connection must be enabled and the node reachable.
+2. Choose the entity category and configure name, area, binary device class and Boolean inversion as applicable. Only compatible categories are offered: sensor for supported scalar values, binary sensor for Booleans, and switch/number/text when the server grants write access.
+3. Save. The endpoint reloads and the new entity appears on the same Home Assistant device. Creating or verifying an entity never writes a value to the PLC.
+
+Manual nodes are persisted independently of discovery and verified again on reload. They can be outside the configured discovery root, including when that root is inaccessible. Temporarily unreadable manual nodes are retried during normal polling; disabling the connection stops these attempts too. A node later found by discovery does not create a duplicate. Invalid IDs, objects, arrays, unreadable nodes and duplicate entities are rejected. A manual node remains subject to the PLC's authentication and access permissions.
+
+Changing the category of an existing entity (including exclusions), number/text limits and connection settings remains in the integration options; using those options preserves panel metadata. New number entities default to min 0, max 100 and step 1 for integers or 0.1 for floats; text defaults to 0–255 characters. Adjust these limits in the integration options before use where needed. Existing entities can be edited once registered; discovery still runs at setup/reload. The connection switch and connectivity sensor remain standard HA entities outside the node editor.
 
 Panel JavaScript is bundled with the integration and uses a versioned URL; no separate Lovelace resource or frontend build is required.
 

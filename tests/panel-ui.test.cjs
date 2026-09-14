@@ -143,6 +143,22 @@ async function pageFor(width = 1280, admin = true) {
       callWS: async (msg) => {
         window.calls.push(structuredClone(msg));
         if (msg.type.endsWith("/panel")) return structuredClone(window.fixture);
+        if (msg.type.endsWith("/inspect")) {
+          if (window.failInspect) throw { code: "node_unreadable" };
+          return {
+            node: {
+              name: "Nodo manuale",
+              node_id: msg.node_id,
+              variant_type: "Boolean",
+              writable: true,
+            },
+            platforms: ["sensor", "binary_sensor", "switch"],
+          };
+        }
+        if (msg.type.endsWith("/create")) {
+          if (window.failCreate) throw { code: "node_already_configured" };
+          return { saved: true, reload: false };
+        }
         if (window.failSave) throw { code: "stale_configuration" };
         const endpoint = window.fixture.endpoints.find(
           (e) => e.entry_id === msg.entry_id,
@@ -308,5 +324,97 @@ test("non-admin cannot request endpoint data", async () => {
     .getByText("Pannello riservato agli amministratori.", { exact: true })
     .waitFor();
   assert.equal(await page.evaluate(() => window.calls.length), 0);
+  await page.close();
+});
+
+test("manual NodeId creation on an empty endpoint, category, area and inversion", async () => {
+  const page = await pageFor(390);
+  await page.getByLabel("Endpoint", { exact: true }).selectOption("plc2");
+  await page
+    .getByRole("button", { name: "Aggiungi entità", exact: true })
+    .click();
+  let dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .fill('ns=4;s="DB"."Door"');
+  await dialog
+    .getByRole("button", { name: "Verifica nodo", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Categoria", { exact: true })
+    .selectOption("binary_sensor");
+  await dialog.getByLabel("Nome", { exact: true }).fill("Porta manuale");
+  await dialog.getByLabel("Area", { exact: true }).selectOption("workshop");
+  await dialog
+    .getByLabel("Classe dispositivo", { exact: true })
+    .selectOption("door");
+  await dialog.getByLabel("Inverti stato booleano", { exact: true }).check();
+  const box = await dialog.boundingBox();
+  assert.ok(box.x >= 0 && box.x + box.width <= 390);
+  await shot(page, "manual-mobile.png");
+  await page.evaluate(() => {
+    window.failCreate = true;
+  });
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await dialog
+    .getByRole("alert")
+    .filter({ hasText: "Questo nodo ha già" })
+    .waitFor();
+  assert.equal(
+    await dialog.getByLabel("Nome", { exact: true }).inputValue(),
+    "Porta manuale",
+  );
+  await page.evaluate(() => {
+    window.failCreate = false;
+  });
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  const saved = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/create")),
+  );
+  assert.deepEqual(saved, {
+    type: "ha_opcua_discovery/entity/create",
+    entry_id: "plc2",
+    revision: "rev2",
+    node_id: 'ns=4;s="DB"."Door"',
+    platform: "binary_sensor",
+    name: "Porta manuale",
+    area_id: "workshop",
+    device_class: "door",
+    invert_state: true,
+  });
+  await page.close();
+});
+
+test("failed node verification preserves input and cancellation creates nothing", async () => {
+  const page = await pageFor();
+  await page
+    .getByRole("button", { name: "Aggiungi entità", exact: true })
+    .click();
+  const dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .fill("ns=4;i=999");
+  await page.evaluate(() => {
+    window.failInspect = true;
+  });
+  await dialog
+    .getByRole("button", { name: "Verifica nodo", exact: true })
+    .click();
+  await dialog
+    .getByRole("alert")
+    .filter({ hasText: "Il nodo non esiste" })
+    .waitFor();
+  assert.equal(
+    await dialog.getByLabel("NodeId associato", { exact: true }).inputValue(),
+    "ns=4;i=999",
+  );
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  assert.equal(
+    await page.evaluate(
+      () => window.calls.filter((m) => m.type.endsWith("/create")).length,
+    ),
+    0,
+  );
   await page.close();
 });

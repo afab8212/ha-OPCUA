@@ -23,6 +23,8 @@ from custom_components.ha_opcua_discovery.panel import (
     async_setup_panel,
     endpoint_snapshot,
     panel_snapshot,
+    ws_create,
+    ws_inspect,
     ws_save,
     ws_snapshot,
 )
@@ -162,7 +164,7 @@ async def test_binary_device_class_inversion_and_options_flow_preserve_panel_fie
 
 async def test_websocket_endpoints_require_admin(hass):
     connection = Mock(user=SimpleNamespace(is_admin=False))
-    for handler in (ws_snapshot, ws_save):
+    for handler in (ws_snapshot, ws_save, ws_create, ws_inspect):
         with pytest.raises(Unauthorized):
             handler(hass, connection, {"id": 1})
     connection.send_result.assert_not_called()
@@ -188,4 +190,4 @@ async def test_panel_registration_is_once_and_versioned(hass):
     register.assert_awaited_once()
     assert register.call_args.kwargs["require_admin"] is True
     assert register.call_args.kwargs["module_url"].endswith("?v=1.4.0")
-    assert commands.call_count == 2
+    assert commands.call_count == 4
