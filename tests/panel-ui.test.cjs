@@ -144,6 +144,8 @@ async function pageFor(width = 1280, admin = true) {
         window.calls.push(structuredClone(msg));
         if (msg.type.endsWith("/panel")) return structuredClone(window.fixture);
         if (msg.type.endsWith("/inspect")) {
+          if (window.inspectResult)
+            return structuredClone(window.inspectResult);
           if (window.failInspect) throw { code: "node_unreadable" };
           return {
             node: {
@@ -416,5 +418,79 @@ test("failed node verification preserves input and cancellation creates nothing"
     ),
     0,
   );
+  await page.close();
+});
+
+test("datetime manual creation, category filter and compatible remapping", async () => {
+  const page = await pageFor();
+  await page.evaluate(() => {
+    window.inspectResult = {
+      node: {
+        name: "Orologio",
+        node_id: "ns=4;i=50",
+        variant_type: "DateTime",
+        writable: true,
+      },
+      platforms: ["sensor", "datetime"],
+    };
+  });
+  await page
+    .getByRole("button", { name: "Aggiungi entità", exact: true })
+    .click();
+  const dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .fill("ns=4;i=50");
+  await dialog
+    .getByRole("button", { name: "Verifica nodo", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Categoria", { exact: true })
+    .selectOption("datetime");
+  assert.equal(
+    await dialog.getByLabel("Inverti stato booleano").isVisible(),
+    false,
+  );
+  assert.equal(
+    await dialog.getByLabel("Classe dispositivo", { exact: true }).isVisible(),
+    false,
+  );
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  const saved = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/create")),
+  );
+  assert.equal(saved.platform, "datetime");
+  assert.equal(saved.node_id, "ns=4;i=50");
+  assert.equal(saved.invert_state, false);
+  assert.equal(saved.device_class, null);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    endpoint.nodes.push(window.inspectResult.node, {
+      ...window.inspectResult.node,
+      node_id: "ns=4;i=51",
+      writable: false,
+    });
+    endpoint.rows.push({
+      key: "ns=4;i=50",
+      node_id: "ns=4;i=50",
+      name: "Orologio",
+      platform: "datetime",
+      variant_type: "DateTime",
+      editable: true,
+    });
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Data e ora · 1", exact: true })
+    .click();
+  assert.equal(await page.locator("article").count(), 1);
+  await page.getByRole("button", { name: "Modifica", exact: true }).click();
+  const options = await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .locator("option")
+    .evaluateAll((nodes) => nodes.map((n) => n.value));
+  assert.deepEqual(options, ["ns=4;i=50"]);
+  await shot(page, "datetime-edit.png");
   await page.close();
 });

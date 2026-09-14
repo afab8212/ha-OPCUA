@@ -14,7 +14,7 @@ opcua_set_value:
       selector:
         text:
     value:
-      description: The value to write to the OPC UA node. Can be int, float, bool, string, byte
+      description: Scalar value to write. For DateTime use ISO 8601 with a timezone (for example 2026-09-14T18:30:00+02:00).
       required: true
       example: "0"
       selector:

@@ -41,7 +41,7 @@ from .node_settings import SCALAR_TYPES, effective_platform, validate_settings
 from .values import scalar_variant
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = ["sensor", "binary_sensor", "switch", "number", "text"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "number", "text", "datetime"]
 _CONNECTION_STATUS_CODES = {
     ua.StatusCodes.BadSessionIdInvalid,
     ua.StatusCodes.BadSessionClosed,

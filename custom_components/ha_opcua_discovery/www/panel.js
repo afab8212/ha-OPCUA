@@ -9,7 +9,7 @@ const TEXT = {
       "Inserisci il NodeId completo, anche fuori dal discovery. La verifica legge il nodo senza modificarlo.",
     invalid_node_id: "NodeId non valido. Esempio: ns=4;i=2",
     unsupported_node:
-      "Seleziona una variabile scalare booleana, numerica o stringa.",
+      "Seleziona una variabile scalare booleana, numerica, stringa o DateTime.",
     node_unreadable:
       "Il nodo non esiste o non è leggibile con le credenziali configurate.",
     node_already_configured:
@@ -29,6 +29,7 @@ const TEXT = {
     switch: "Switch",
     number: "Numeri",
     text: "Testi",
+    datetime: "Data e ora",
     disabled: "Esclusi",
     connected: "Connesso",
     disconnected: "Disconnesso",
@@ -85,7 +86,8 @@ const TEXT = {
     manualHelp:
       "Enter the complete NodeId, including nodes outside discovery. Verification reads the node without changing it.",
     invalid_node_id: "Invalid NodeId. Example: ns=4;i=2",
-    unsupported_node: "Choose a scalar boolean, numeric or string variable.",
+    unsupported_node:
+      "Choose a scalar boolean, numeric, string or DateTime variable.",
     node_unreadable:
       "The node does not exist or cannot be read with the configured credentials.",
     node_already_configured:
@@ -103,6 +105,7 @@ const TEXT = {
     switch: "Switches",
     number: "Numbers",
     text: "Text",
+    datetime: "Date and time",
     disabled: "Excluded",
     connected: "Connected",
     disconnected: "Disconnected",
@@ -156,6 +159,7 @@ const GROUPS = [
   "switch",
   "number",
   "text",
+  "datetime",
   "disabled",
 ];
 const NUMERIC = new Set([
@@ -185,6 +189,8 @@ function compatible(row, node) {
     return NUMERIC.has(node.variant_type) && node.writable;
   if (row.platform === "text")
     return node.variant_type === "String" && node.writable;
+  if (row.platform === "datetime")
+    return node.variant_type === "DateTime" && node.writable;
   return true;
 }
 const CSS = `

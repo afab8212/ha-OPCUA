@@ -18,7 +18,7 @@ INTEGER_TYPES = {
     "UInt64",
 }
 NUMERIC_TYPES = INTEGER_TYPES | {"Float", "Double"}
-SCALAR_TYPES = NUMERIC_TYPES | {"String", "Boolean"}
+SCALAR_TYPES = NUMERIC_TYPES | {"String", "Boolean", "DateTime"}
 MAX_SAFE_INTEGER = 2**53 - 1
 
 
@@ -35,6 +35,8 @@ def allowed_platforms(node):
             choices.append("number")
         elif kind == "String":
             choices.append("text")
+        elif kind == "DateTime":
+            choices.append("datetime")
     return [*choices, "disabled"]
 
 
@@ -115,6 +117,8 @@ def effective_platform(node, settings):
     requested = settings.get("platform", "auto")
     if requested != "auto":
         return requested
-    return (
-        "switch" if node["variant_type"] == "Boolean" and node["writable"] else "sensor"
-    )
+    if node["writable"]:
+        return {"Boolean": "switch", "DateTime": "datetime"}.get(
+            node["variant_type"], "sensor"
+        )
+    return "sensor"
