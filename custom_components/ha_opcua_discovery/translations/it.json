@@ -1,0 +1,117 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "OPC UA Discovery",
+        "data": {
+          "name": "Nome hub",
+          "url": "URL server OPC UA",
+          "username": "Nome utente",
+          "password": "Password",
+          "scan_interval": "Intervallo di lettura (secondi)",
+          "hub_root": "NodeId radice"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Un hub con questo nome è già configurato."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "menu_options": {
+          "connection": "Connessione",
+          "nodes": "Configura un nodo"
+        }
+      },
+      "connection": {
+        "title": "Connessione",
+        "data": {
+          "url": "URL server OPC UA",
+          "username": "Nome utente",
+          "password": "Password",
+          "scan_interval": "Intervallo di lettura (secondi)",
+          "hub_root": "NodeId radice"
+        }
+      },
+      "nodes": {
+        "title": "Seleziona un nodo scoperto",
+        "description": "Cerca per nome o NodeId. Salva un nodo alla volta; riapri le opzioni per configurarne un altro.",
+        "data": {
+          "node_id": "Nodo"
+        }
+      },
+      "node": {
+        "title": "Tipo di entità",
+        "description": "Nodo: {node}. Sono disponibili solo tipi di entità compatibili. Automatico mantiene la mappatura attuale. Cambiare dominio crea una nuova entità: aggiorna automazioni e dashboard prima di eliminare quella precedente. I nodi esclusi non vengono letti dopo il ricaricamento.",
+        "data": {
+          "platform": "Tipo di entità"
+        }
+      },
+      "number": {
+        "title": "Limiti numerici",
+        "description": "Nodo: {node}. Imposta l’intervallo modificabile e il passo del controllo. Questi limiti valgono per l’interfaccia e non modificano la configurazione del PLC.",
+        "data": {
+          "min": "Minimo",
+          "max": "Massimo",
+          "step": "Passo"
+        }
+      },
+      "text": {
+        "title": "Limiti del testo",
+        "description": "Nodo: {node}. Imposta il massimo in base alla capacità della stringa configurata nel PLC (fino a 255 caratteri per Home Assistant). La capacità non viene rilevata automaticamente. Gli spazi vengono mantenuti.",
+        "data": {
+          "min_length": "Lunghezza minima",
+          "max_length": "Lunghezza massima"
+        }
+      }
+    },
+    "error": {
+      "incompatible_platform": "Questo tipo di entità non è compatibile con il tipo del nodo o i permessi di scrittura.",
+      "node_not_found": "Il nodo non è più disponibile. Ricarica l’integrazione.",
+      "invalid_number_limits": "Usa numeri finiti, minimo inferiore al massimo e un passo positivo non superiore all’intervallo.",
+      "integer_limits_required": "Questo nodo richiede limiti e passo interi.",
+      "unsafe_integer_limits": "I limiti interi devono essere compresi tra -9007199254740991 e 9007199254740991 per una rappresentazione esatta nell’interfaccia.",
+      "limits_outside_type": "I limiti superano l’intervallo del tipo di dato OPC UA.",
+      "invalid_text_limits": "Usa lunghezze intere con 0 ≤ minimo ≤ massimo ≤ 255."
+    },
+    "abort": {
+      "integration_not_loaded": "Carica l’integrazione prima di configurare i nodi scoperti.",
+      "no_nodes": "Nessun nodo scalare supportato è stato scoperto. Controlla il NodeId radice e i permessi, poi ricarica."
+    }
+  },
+  "selector": {
+    "platform": {
+      "options": {
+        "sensor": "sensor",
+        "binary_sensor": "binary_sensor",
+        "switch": "switch",
+        "number": "number",
+        "text": "text",
+        "auto": "Automatico (comportamento attuale)",
+        "disabled": "Escluso"
+      }
+    }
+  },
+  "services": {
+    "opcua_set_value": {
+      "description": "Write a value to an opcua node.",
+      "fields": {
+        "hub": {
+          "description": "Name of the configured OPC UA hub.",
+          "name": "hub"
+        },
+        "value": {
+          "description": "Value (single value) to write. Can be int, float, bool, string, byte",
+          "name": "value"
+        },
+        "node_id": {
+          "description": "Nodeid to be written.",
+          "name": "Node ID"
+        }
+      },
+      "name": "set value"
+    }
+  }
+}

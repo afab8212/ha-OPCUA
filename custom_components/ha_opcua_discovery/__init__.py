@@ -26,16 +26,18 @@ from .const import (
     CONF_HUB_SCAN_INTERVAL,
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
+    CONF_NODE_SETTINGS,
     DOMAIN,
     FIELD_NODE_HUB,
     FIELD_NODE_ID,
     FIELD_VALUE,
     SERVICE_SET_VALUE,
 )
+from .node_settings import SCALAR_TYPES, effective_platform, validate_settings
 from .values import scalar_variant
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = ["sensor", "switch"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "number", "text"]
 _CONNECTION_STATUS_CODES = {
     ua.StatusCodes.BadSessionIdInvalid,
     ua.StatusCodes.BadSessionClosed,
@@ -98,6 +100,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             raise ConfigEntryNotReady("OPC UA connection lost during setup") from err
         raise
 
+    entry.async_on_unload(entry.add_update_listener(async_options_updated))
+
     async def stop_client(_event):
         await hub.disconnect(permanent=True)
 
@@ -128,6 +132,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=SERVICE_SET_VALUE_SCHEMA,
         )
     return True
+
+
+async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload only after Home Assistant has saved the updated options."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 def entity_unique_id(entry_id: str, node_id: str) -> str:
@@ -276,21 +285,27 @@ class OpcuaHub:
             name = (await node.read_browse_name()).Name
             if node_class == ua.NodeClass.Variable:
                 try:
-                    value = await node.read_value()
-                    if isinstance(value, (int, float, str, bool)):
-                        writable_boolean = False
-                        if isinstance(value, bool):
-                            access = await node.get_access_level()
-                            user_access = await node.get_user_access_level()
-                            writable_boolean = (
-                                ua.AccessLevel.CurrentWrite in access
-                                and ua.AccessLevel.CurrentWrite in user_access
-                            )
+                    variant_type = await node.read_data_type_as_variant_type()
+                    rank = await node.read_value_rank()
+                    if (
+                        variant_type.name in SCALAR_TYPES
+                        and rank == ua.ValueRank.Scalar
+                    ):
+                        # Verify readability, but classify by the declared type even if
+                        # a readable String currently has a null value.
+                        await node.read_value()
+                        access = await node.get_access_level()
+                        user_access = await node.get_user_access_level()
+                        writable = (
+                            ua.AccessLevel.CurrentWrite in access
+                            and ua.AccessLevel.CurrentWrite in user_access
+                        )
                         discovered.append(
                             {
                                 "name": name,
                                 "node_id": node_id,
-                                "writable_boolean": writable_boolean,
+                                "variant_type": variant_type.name,
+                                "writable": writable,
                             }
                         )
                     else:
@@ -362,6 +377,12 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
     ):
         self._hub = hub
         self.nodes = {}
+        self.node_settings = (
+            dict(config_entry.options.get(CONF_NODE_SETTINGS, {}))
+            if config_entry
+            else {}
+        )
+        self._platforms = {}
         super().__init__(
             hass,
             _LOGGER,
@@ -376,12 +397,37 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
 
     def set_nodes(self, nodes):
         self.nodes = {node["node_id"]: node for node in nodes}
+        self._platforms = {}
+        for node_id, node in self.nodes.items():
+            try:
+                settings = validate_settings(node, self.node_settings.get(node_id, {}))
+            except ValueError as err:
+                _LOGGER.warning(
+                    "Skipping incompatible entity configuration for %s: %s",
+                    node_id,
+                    err,
+                )
+                self._platforms[node_id] = "disabled"
+            else:
+                self._platforms[node_id] = effective_platform(node, settings)
+                if node_id in self.node_settings:
+                    self.node_settings[node_id] = settings
+
+    def nodes_for_platform(self, platform):
+        return (
+            (node_id, node)
+            for node_id, node in self.nodes.items()
+            if self._platforms[node_id] == platform
+        )
 
     async def _async_update_data(self) -> dict[str, Any]:
+        active_nodes = [
+            node_id for node_id in self.nodes if self._platforms[node_id] != "disabled"
+        ]
         try:
-            values = await self._hub.get_values(self.nodes)
+            values = await self._hub.get_values(active_nodes)
         except Exception as err:
             raise UpdateFailed(f"OPC UA read failed: {err}") from err
-        if self.nodes and not values:
+        if active_nodes and not values:
             raise UpdateFailed("No configured OPC UA nodes could be read")
         return values

@@ -6,6 +6,7 @@ CONF_HUB_USERNAME = "username"
 CONF_HUB_PASSWORD = "password"
 CONF_HUB_SCAN_INTERVAL = "scan_interval"
 CONF_HUB_ROOT_NODE = "hub_root"
+CONF_NODE_SETTINGS = "node_settings"
 
 # Set Value Service
 SERVICE_SET_VALUE = "opcua_set_value"
