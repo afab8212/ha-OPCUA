@@ -8,6 +8,7 @@ import pytest_asyncio
 from homeassistant.config_entries import ConfigEntries, ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import frame
 
 from custom_components.ha_opcua_discovery.const import DOMAIN
@@ -20,12 +21,13 @@ async def hass(tmp_path):
     frame.async_setup(instance)
     dr.async_setup(instance)
     await dr.async_load(instance)
+    await er.async_load(instance)
     yield instance
     await instance.async_stop()
 
 
 @pytest.fixture
-def entry():
+def entry(hass):
     kwargs = dict(
         domain=DOMAIN,
         title="PLC",
@@ -46,4 +48,6 @@ def entry():
         kwargs["discovery_keys"] = MappingProxyType({})
     if "subentries_data" in parameters:
         kwargs["subentries_data"] = []
-    return ConfigEntry(**kwargs)
+    result = ConfigEntry(**kwargs)
+    hass.config_entries._entries[result.entry_id] = result
+    return result

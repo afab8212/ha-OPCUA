@@ -70,6 +70,14 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
+## Home Assistant device page (1.3.0)
+
+Each configured OPC UA server now appears as **one device** under its integration entry, named after the connection. Open the device to see the standard Home Assistant page with node entities, connection controls, diagnostics, activity and related automations. You can assign an area and rename the device using Home Assistant's normal controls. Entities in the entity list are grouped under that device instead of “Ungrouped”. The integration uses the standard entry labels, matching the presentation of Siemens S7.
+
+Upgrading automatically associates existing ungrouped entities with the corresponding device, including unavailable or excluded nodes. Entity IDs, unique IDs, custom names, explicit entity areas and per-node settings are preserved. A device is registered even when the connection is disabled or the PLC is offline. Its identity uses the configuration entry ID, so changing the endpoint does not create a duplicate device.
+
+The **Download diagnostics** action is available from both the integration entry and device. It reports connection state and entity-type counts; credentials, PLC values, node names/identifiers and endpoint/host details are omitted or redacted. Device metadata uses the generic model “OPC UA Server”; manufacturer and CPU model are not inferred from the protocol.
+
 ## Connection control and diagnostics (1.2.0)
 
 Each hub now provides two additional entities:

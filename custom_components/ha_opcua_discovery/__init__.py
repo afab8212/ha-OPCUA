@@ -35,6 +35,7 @@ from .const import (
     FIELD_VALUE,
     SERVICE_SET_VALUE,
 )
+from .device import async_register_device
 from .node_settings import SCALAR_TYPES, effective_platform, validate_settings
 from .values import scalar_variant
 
@@ -88,6 +89,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_entry=entry,
     )
     try:
+        async_register_device(hass, entry)
         # Keep the connection controls available even when the PLC is off at startup.
         # Discovery is retried by the coordinator; platforms add nodes on recovery.
         await coordinator.async_refresh()
