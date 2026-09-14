@@ -1,6 +1,6 @@
-asyncua==1.0.2
+asyncua==2.0.1
 homeassistant>=2025.1.0
-ruff==0.8.4
+ruff==0.16.7
 voluptuous~=0.15.2
-codespell==2.4.1
-black==25.1.0
+codespell==2.4.3
+black==26.5.1
