@@ -70,9 +70,11 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
-## OPC UA side panel (1.4.3)
+## OPC UA side panel (1.4.4)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
+
+Each entity card shows its live Home Assistant state, including localized binary device-class labels, numeric units, text and date/time formatting. Values update as Home Assistant receives state changes without refreshing the panel or interrupting open dialogs. Unknown, unavailable, unregistered and excluded entities are clearly distinguished. This uses Home Assistant's existing state stream and adds no PLC polling: freshness follows the endpoint's configured polling interval. Boolean inversion is already reflected in the displayed entity state.
 
 Click **Edit** on an entity to configure:
 

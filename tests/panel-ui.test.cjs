@@ -566,3 +566,154 @@ test("manual removal works offline with confirmation, cancel and dependency erro
   });
   await page.close();
 });
+
+test("live entity states update without requests, rebuilding cards or losing drafts", async () => {
+  const page = await pageFor();
+  const card = (name) =>
+    page
+      .locator("article")
+      .filter({ has: page.getByRole("heading", { name, exact: true }) });
+  const run = card("Marcia macchina");
+  await page.evaluate(() => {
+    const panel = document.querySelector("opcua-node-panel");
+    window.originalCard = panel.shadowRoot.querySelector("article");
+    window.initialCalls = window.calls.length;
+    window.testHass.states = {
+      "switch.marcia": { state: "off", attributes: {} },
+      "binary_sensor.porta": { state: "on", attributes: {} },
+      "sensor.velocita": {
+        state: "0",
+        attributes: { unit_of_measurement: "m/s" },
+      },
+      "text.ricetta": { state: "  [Ricetta A]  ", attributes: {} },
+    };
+    panel.hass = { ...window.testHass };
+  });
+  assert.equal(await run.locator(".stateValue").textContent(), "Spento");
+  assert.equal(
+    await card("Velocità linea").locator(".stateValue").textContent(),
+    "0 m/s",
+  );
+  assert.equal(
+    await card("Nome ricetta").locator(".stateValue").textContent(),
+    "  [Ricetta A]  ",
+  );
+  await run.getByRole("button", { name: "Modifica", exact: true }).click();
+  const dialog = page.locator("dialog[open]");
+  await dialog.getByLabel("Nome", { exact: true }).fill("Bozza aperta");
+  await page.evaluate(() => {
+    window.testHass.states["switch.marcia"] = { state: "on", attributes: {} };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  assert.equal(await run.locator(".stateValue").textContent(), "Acceso");
+  assert.equal(
+    await dialog.getByLabel("Nome", { exact: true }).inputValue(),
+    "Bozza aperta",
+  );
+  assert.equal(
+    await page.evaluate(() => window.initialCalls === window.calls.length),
+    true,
+  );
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.originalCard ===
+        document
+          .querySelector("opcua-node-panel")
+          .shadowRoot.querySelector("article"),
+    ),
+    true,
+  );
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  await page
+    .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
+    .fill("Marcia");
+  assert.equal(await run.locator(".stateValue").textContent(), "Acceso");
+  await page.close();
+});
+
+test("HA formatting and unavailable, unknown, empty, excluded and pending states", async () => {
+  const page = await pageFor(390);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    endpoint.rows.push(
+      {
+        key: "date",
+        node_id: "date",
+        name: "Orologio",
+        entity_id: "datetime.clock",
+        platform: "datetime",
+        variant_type: "DateTime",
+      },
+      {
+        key: "excluded",
+        node_id: "excluded",
+        name: "Escluso",
+        entity_id: "sensor.excluded",
+        platform: "disabled",
+        variant_type: "Float",
+      },
+      {
+        key: "pending",
+        node_id: "pending",
+        name: "In attesa",
+        entity_id: null,
+        platform: "sensor",
+        variant_type: "Float",
+      },
+    );
+    window.testHass.formatEntityState = (entity) =>
+      ({
+        "binary_sensor.porta": "Aperto",
+        "datetime.clock": "14 settembre 2026 alle 18:30",
+      })[entity.entity_id] || entity.state;
+    window.testHass.states = {
+      "switch.marcia": { state: "unavailable", attributes: {} },
+      "binary_sensor.porta": {
+        entity_id: "binary_sensor.porta",
+        state: "on",
+        attributes: { device_class: "door" },
+      },
+      "sensor.velocita": { state: "unknown", attributes: {} },
+      "text.ricetta": { state: "", attributes: {} },
+      "datetime.clock": {
+        entity_id: "datetime.clock",
+        state: "2026-09-14T16:30:00+00:00",
+        attributes: {},
+      },
+      "sensor.excluded": { state: "old value", attributes: {} },
+    };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  const value = (id) => page.locator(`[data-entity-state="${id}"]`);
+  assert.equal(await value("switch.marcia").textContent(), "Non disponibile");
+  assert.equal(await value("binary_sensor.porta").textContent(), "Aperto");
+  assert.equal(await value("sensor.velocita").textContent(), "Sconosciuto");
+  assert.equal(await value("text.ricetta").textContent(), "Testo vuoto");
+  assert.equal(
+    await value("datetime.clock").textContent(),
+    "14 settembre 2026 alle 18:30",
+  );
+  assert.equal(await value("sensor.excluded").textContent(), "Esclusa");
+  assert.equal(await value("").textContent(), "Non ancora registrata");
+  await shot(page, "live-states-mobile.png");
+  await page.evaluate(() => {
+    delete window.testHass.states["binary_sensor.porta"];
+    window.testHass.states["text.ricetta"] = {
+      state: "<img src=x onerror=alert(1)>",
+      attributes: {},
+    };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  assert.equal(
+    await value("binary_sensor.porta").textContent(),
+    "Non disponibile",
+  );
+  assert.equal(await page.locator("img").count(), 0);
+  assert.equal(
+    await value("text.ricetta").textContent(),
+    "<img src=x onerror=alert(1)>",
+  );
+  await page.close();
+});
