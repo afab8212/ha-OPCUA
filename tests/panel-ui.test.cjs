@@ -157,6 +157,15 @@ async function pageFor(width = 1280, admin = true) {
             platforms: ["sensor", "binary_sensor", "switch"],
           };
         }
+        if (msg.type.endsWith("/remove")) {
+          if (window.failRemove) throw { code: window.failRemove };
+          const endpoint = window.fixture.endpoints.find(
+            (e) => e.entry_id === msg.entry_id,
+          );
+          endpoint.rows = endpoint.rows.filter((r) => r.key !== msg.key);
+          endpoint.revision = "removed";
+          return { removed: true, reload: false };
+        }
         if (msg.type.endsWith("/create")) {
           if (window.failCreate) throw { code: "node_already_configured" };
           return { saved: true, reload: false };
@@ -492,5 +501,68 @@ test("datetime manual creation, category filter and compatible remapping", async
     .evaluateAll((nodes) => nodes.map((n) => n.value));
   assert.deepEqual(options, ["ns=4;i=50"]);
   await shot(page, "datetime-edit.png");
+  await page.close();
+});
+
+test("manual removal works offline with confirmation, cancel and dependency errors", async () => {
+  const page = await pageFor(390);
+  assert.equal(
+    await page.getByRole("button", { name: "Rimuovi", exact: true }).count(),
+    0,
+  );
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[1];
+    endpoint.loaded = false;
+    endpoint.rows = [
+      {
+        key: "ns=4;i=99",
+        node_id: "ns=4;i=99",
+        name: "Ricetta manuale",
+        platform: "text",
+        manual: true,
+        editable: false,
+        entity_id: "text.manual_recipe",
+        variant_type: "String",
+      },
+    ];
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  await page.getByLabel("Endpoint", { exact: true }).selectOption("plc2");
+  await page.getByRole("button", { name: "Rimuovi", exact: true }).click();
+  let dialog = page.locator("dialog[open]");
+  await dialog.getByText("Ricetta manuale", { exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  assert.equal(
+    await page.evaluate(
+      () => window.calls.filter((m) => m.type.endsWith("/remove")).length,
+    ),
+    0,
+  );
+  await page.getByRole("button", { name: "Rimuovi", exact: true }).click();
+  dialog = page.locator("dialog[open]");
+  await page.evaluate(() => {
+    window.failRemove = "node_in_use";
+  });
+  await dialog.getByRole("button", { name: "Rimuovi", exact: true }).click();
+  await dialog.getByRole("alert").filter({ hasText: "Altre entità" }).waitFor();
+  assert.equal(await page.locator("article").count(), 1);
+  const box = await dialog.boundingBox();
+  assert.ok(box.x >= 0 && box.x + box.width <= 390);
+  await shot(page, "remove-manual-mobile.png");
+  await page.evaluate(() => {
+    window.failRemove = null;
+  });
+  await dialog.getByRole("button", { name: "Rimuovi", exact: true }).click();
+  await page.getByText("Nodo manuale rimosso.", { exact: true }).waitFor();
+  assert.equal(await page.locator("article").count(), 0);
+  const removal = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/remove")),
+  );
+  assert.deepEqual(removal, {
+    type: "ha_opcua_discovery/node/remove",
+    entry_id: "plc2",
+    revision: "rev2",
+    key: "ns=4;i=99",
+  });
   await page.close();
 });

@@ -50,6 +50,8 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         return value
 
     async def _async_write_value(self, value):
+        if self.coordinator._platforms.get(self._node_id) == "disabled":
+            raise HomeAssistantError("This OPC UA entity is disabled or removed")
         try:
             if isinstance(value, bool) and self._settings.get("invert_state", False):
                 value = not value

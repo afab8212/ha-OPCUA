@@ -1,6 +1,16 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 const TEXT = {
   it: {
+    remove: "Rimuovi",
+    removing: "Rimozione…",
+    removeTitle: "Rimuovi nodo manuale",
+    removeHelp:
+      "Verranno eliminate la configurazione manuale e le relative entità da Home Assistant. Le automazioni che le usano andranno aggiornate. Il nodo sul PLC non viene modificato. Se il discovery lo ritrova, resterà escluso.",
+    removed: "Nodo manuale rimosso.",
+    removedReloading: "Nodo manuale rimosso. L’endpoint si sta ricaricando.",
+    not_manual_node: "Puoi rimuovere soltanto un nodo configurato manualmente.",
+    node_in_use:
+      "Altre entità sono associate a questo nodo. Riassegnale prima di rimuoverlo, anche se sono escluse.",
     add: "Aggiungi entità",
     verify: "Verifica nodo",
     verifying: "Verifica…",
@@ -79,6 +89,16 @@ const TEXT = {
     info: "La categoria e i limiti number/text si gestiscono ancora dalle opzioni dell’integrazione.",
   },
   en: {
+    remove: "Remove",
+    removing: "Removing…",
+    removeTitle: "Remove manual node",
+    removeHelp:
+      "The manual configuration and its Home Assistant entities will be deleted. Automations using them will need updating. The PLC node is unchanged. If discovery finds it again, it stays excluded.",
+    removed: "Manual node removed.",
+    removedReloading: "Manual node removed. The endpoint is reloading.",
+    not_manual_node: "Only manually configured nodes can be removed here.",
+    node_in_use:
+      "Other entities are associated with this node. Reassign them before removing it, including excluded entities.",
     add: "Add entity",
     verify: "Verify node",
     verifying: "Verifying…",
@@ -196,7 +216,7 @@ function compatible(row, node) {
 const CSS = `
 :host{display:block;height:100%;color:var(--primary-text-color,#243346);background:var(--primary-background-color,#f5f7fb);font:14px var(--paper-font-body1_-_font-family,Roboto,Arial,sans-serif)}
 *{box-sizing:border-box}button,input,select{font:inherit}button{cursor:pointer;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:10px 15px;background:var(--card-background-color,#fff);color:inherit;min-height:42px}button:hover{border-color:var(--primary-color,#009ac0)}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--primary-color,#009ac0);outline-offset:2px}.primary{background:var(--primary-color,#008fac);border-color:transparent;color:var(--text-primary-color,#fff)}
-header{display:flex;gap:16px;align-items:center;padding:20px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:23px;margin:0 0 4px}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1}.menu{border:0;background:none;font-size:22px;padding:4px 10px}.content{max-width:1400px;margin:auto;padding:24px 28px 48px;height:calc(100% - 92px);overflow:auto}.toolbar{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:18px;align-items:end;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px}.field>span{font-weight:600}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;overflow-wrap:anywhere;margin-bottom:20px;color:var(--secondary-text-color,#637487)}.badge{font-size:12px;border-radius:30px;padding:5px 10px;background:var(--secondary-background-color,#e9eef5);color:var(--secondary-text-color,#637487)}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}nav .selected{background:var(--primary-color,#008fac);color:var(--text-primary-color,#fff);border-color:transparent}.group{margin-bottom:24px}.group>summary{cursor:pointer;font-size:17px;font-weight:600;padding:8px 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.card{background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-radius:14px;padding:18px;min-width:0}.cardTop{display:flex;align-items:start;gap:12px}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.cardBottom{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
+header{display:flex;gap:16px;align-items:center;padding:20px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:23px;margin:0 0 4px}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1}.menu{border:0;background:none;font-size:22px;padding:4px 10px}.content{max-width:1400px;margin:auto;padding:24px 28px 48px;height:calc(100% - 92px);overflow:auto}.toolbar{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:18px;align-items:end;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px}.field>span{font-weight:600}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;overflow-wrap:anywhere;margin-bottom:20px;color:var(--secondary-text-color,#637487)}.badge{font-size:12px;border-radius:30px;padding:5px 10px;background:var(--secondary-background-color,#e9eef5);color:var(--secondary-text-color,#637487)}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}nav .selected{background:var(--primary-color,#008fac);color:var(--text-primary-color,#fff);border-color:transparent}.group{margin-bottom:24px}.group>summary{cursor:pointer;font-size:17px;font-weight:600;padding:8px 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.card{background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-radius:14px;padding:18px;min-width:0}.cardTop{display:flex;align-items:start;gap:12px}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}dialog::backdrop{background:#10223480}form{padding:24px;display:flex;flex-direction:column;gap:17px}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}
 @media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:18px 12px}.toolbar{grid-template-columns:1fr;gap:12px}.grid{grid-template-columns:1fr}nav button{padding:8px 10px}.card{padding:15px}form{padding:20px}.headerText p{font-size:12px}}
 `;
@@ -394,7 +414,7 @@ class OpcuaNodePanel extends HTMLElement {
     this._rows.replaceChildren();
     const endpoint = this._endpoint();
     if (!endpoint) return;
-    if (!endpoint.loaded || !endpoint.rows.length) {
+    if (!endpoint.rows.length) {
       this._rows.append(
         element("div", this._t(endpoint.loaded ? "noNodes" : "notLoaded"), {
           class: "message",
@@ -435,7 +455,13 @@ class OpcuaNodePanel extends HTMLElement {
         const edit = this._button("edit", () => this._edit(row));
         edit.disabled = !row.editable;
         if (!row.editable) edit.title = this._t("notReady");
-        bottom.append(edit);
+        const actions = element("div", undefined, { class: "actions" });
+        actions.append(edit);
+        if (row.manual)
+          actions.append(
+            this._button("remove", () => this._remove(row), "danger"),
+          );
+        bottom.append(actions);
         card.append(top, bottom);
         grid.append(card);
       }
@@ -452,6 +478,69 @@ class OpcuaNodePanel extends HTMLElement {
       badge.textContent = this._t(online ? "connected" : "disconnected");
       badge.classList.toggle("online", online);
     }
+  }
+  _remove(row) {
+    const endpoint = this._endpoint();
+    const dialog = element("dialog");
+    this._dialog = dialog;
+    const form = element("form");
+    dialog.append(form);
+    const error = element("div", "", { class: "error", role: "alert" });
+    const cancel = this._button("cancel", () => dialog.close());
+    const remove = element("button", this._t("remove"), {
+      type: "submit",
+      class: "danger",
+    });
+    const footer = element("footer");
+    footer.append(cancel, remove);
+    form.append(
+      element("h2", this._t("removeTitle")),
+      element("strong", row.name || row.node_id),
+      element("div", row.node_id, { class: "address" }),
+      element("p", this._t("removeHelp")),
+      error,
+      footer,
+    );
+    let busy = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      busy = true;
+      remove.disabled = cancel.disabled = true;
+      remove.textContent = this._t("removing");
+      error.textContent = "";
+      try {
+        const result = await this._hass.callWS({
+          type: "ha_opcua_discovery/node/remove",
+          entry_id: endpoint.entry_id,
+          revision: endpoint.revision,
+          key: row.key,
+        });
+        this._notice = this._t(result.reload ? "removedReloading" : "removed");
+        dialog.close();
+        await this._load();
+        if (result.reload) {
+          clearTimeout(this._timer);
+          this._timer = setTimeout(() => this._load(), 2500);
+        }
+      } catch (err) {
+        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+      } finally {
+        busy = false;
+        remove.disabled = cancel.disabled = false;
+        remove.textContent = this._t("remove");
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+    cancel.focus();
   }
   _add() {
     const endpoint = this._endpoint();
