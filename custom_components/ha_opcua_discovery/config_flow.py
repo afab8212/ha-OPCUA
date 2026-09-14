@@ -6,21 +6,21 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import (
     CONF_NAME,
-    CONF_URL,
-    CONF_SCAN_INTERVAL,
-    CONF_USERNAME,
     CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_URL,
+    CONF_USERNAME,
 )
 from homeassistant.core import callback
 
 from .const import (
-    DOMAIN,
     CONF_HUB_ID,
-    CONF_HUB_URL,
-    CONF_HUB_SCAN_INTERVAL,
-    CONF_HUB_USERNAME,
     CONF_HUB_PASSWORD,
     CONF_HUB_ROOT_NODE,
+    CONF_HUB_SCAN_INTERVAL,
+    CONF_HUB_URL,
+    CONF_HUB_USERNAME,
+    DOMAIN,
 )
 
 DEFAULT_SCAN_INTERVAL = 10

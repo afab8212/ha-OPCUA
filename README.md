@@ -20,14 +20,14 @@ This integration supports **local polling** using the `asyncua` library and is i
 - 🧠 Smart handling of data types (e.g., booleans become switches)
 - 🔄 Periodic polling with configurable scan interval
 - 🧪 Graceful reconnection logic on connection loss
-- 📥 Set opc-ua nodes values via Home Assistant services (`opcua.set_value`)
+- 📥 Set opc-ua nodes values via Home Assistant services (`ha_opcua_discovery.opcua_set_value`)
 - 🤝 Supports multiple simultaneous OPC-UA clients
 
 ---
 
 ## Warning
 - This integration is only compatible with nodes of those types (int, float, string, bool, byte), others will get ignored and won't appear in home assistant entities!
-- The entity unique id is generated using the hub name and the opc-ua node name under that format (opcua_<hub_name>_<node_name>), if you change the node name on the opc-ua server, a new entity will be created in home assistant. **THIS ALSO MEANS THAT EVERY NODES NAMES MUST BE UNIQUE !!!**
+- Entity identity uses the config entry ID and the OPC UA NodeId. Variables may share a name; renaming a variable without changing its NodeId preserves its identity. Changing a NodeId creates a new entity. Namespace index changes are not automatically migrated.
 - When a node gets removed from the opc-ua server, its associated entity will display "this entity is no longer being provided by the integration" once the hub/integration is reloaded, this is normal, you need to manually delete it from home assistant.
 - When a node gets added on the opc-ua server, the entity will automatically get added to home assistant once the hub/integration is reloaded.
 - More you have exposed opc-ua nodes, more it will take time to load the integration
@@ -68,30 +68,49 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
-## 🛠 Service: `opcua.set_value`
+## 🛠 Service: `ha_opcua_discovery.opcua_set_value`
 
-You can manually set the value of a writable OPC UA node.
+You can manually set the value of a writable scalar OPC UA node. Supported write types are String, Boolean, signed/unsigned integers, Float and Double. Array and other types are rejected. String contents, including whitespace and brackets, are preserved exactly. Invalid booleans, out-of-range integers and non-finite floats are rejected before writing. Server-side permissions and string length limits still apply.
+
+Writes are sent once and are never automatically replayed after a connection error or timeout. A missing acknowledgement does not prove that a write failed: read the PLC value before deciding whether to send a new command. Successful writes request a state refresh. After a connection failure, the next poll or user operation attempts to reconnect.
 
 ### Example:
 
 ```yaml
-service: opcua_discovery.set_value
+action: ha_opcua_discovery.opcua_set_value
 data:
-   node_hub: "My OPC UA Server"
+   hub: "My OPC UA Server"
    node_id: "ns=2;s=Pump1/Enable"
    value: true
 ```
+
+## Upgrading to 1.0.3
+
+Existing entities with unique names are migrated to NodeId-based identifiers while preserving their Home Assistant entity IDs and customizations. If an old name identifies multiple discovered nodes, the integration cannot determine which node the old entity represented. It leaves that legacy entity untouched, logs a warning and creates separate entities for the discovered nodes. Review dashboard/automation references before removing an obsolete entity. If discovery is incomplete because nodes could not be read, legacy migration is deferred; resolve the read errors and reload before removing or remapping legacy entities.
+
+The `asyncua` dependency is updated to 2.0.1: version 1.0.2 fails during connection on Python 3.14. Sensors and switches remain the supported platforms; native `number`, `text` and `binary_sensor` platforms are a separate follow-up.
+
+## Development checks
+
+```sh
+python -m pip install -r requirements.txt -r requirements-test.txt
+python -m pytest
+ruff check custom_components/ tests/
+black --check custom_components/ tests/
+```
+
+Tests cover scalar conversion, a local OPC UA server, duplicate names, connection failures, cancellation, entity migration and Home Assistant service lifecycle. These tests do not replace validation on a physical PLC.
 
 ## 🧪 Requirements
 
 - Home Assistant 2025.1 or newer
 - Python 3.13+
-- asyncua==1.0.2 (automatically installed)
+- asyncua==2.0.1 (automatically installed)
 
 ## 🏷 Supported Platforms
 
-- sensor –> for read-only variables
-- switch –> for writable boolean variables
+- sensor –> for readable numeric/text variables and read-only booleans
+- switch –> for boolean variables writable by the connected user
 
 ## 📁 File Structure
 

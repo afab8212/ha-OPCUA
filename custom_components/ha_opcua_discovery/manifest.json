@@ -1,14 +1,21 @@
 {
   "domain": "ha_opcua_discovery",
   "name": "Home Assistant OPC-UA Discovery",
-  "codeowners": ["@guanaco0403"],
+  "codeowners": [
+    "@guanaco0403"
+  ],
   "config_flow": true,
-  "documentation": "",
+  "documentation": "https://github.com/xtimmy86x/Home-Assistant-Opcua-Discovery",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "issue_tracker": "",
-  "requirements": ["asyncua==1.0.2"],
-  "version": "v1.0.2",
-  "platforms": ["sensor", "switch"],
+  "issue_tracker": "https://github.com/xtimmy86x/Home-Assistant-Opcua-Discovery/issues",
+  "requirements": [
+    "asyncua==2.0.1"
+  ],
+  "version": "1.0.3",
+  "platforms": [
+    "sensor",
+    "switch"
+  ],
   "quality_scale": "bronze"
 }
