@@ -1,0 +1,312 @@
+const { test, before, after } = require("node:test");
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const fs = require("node:fs");
+const { chromium } = require("playwright");
+let browser;
+before(async () => {
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    args: process.env.CHROMIUM_PATH
+      ? ["--no-sandbox", "--disable-dev-shm-usage"]
+      : [],
+  });
+});
+after(async () => {
+  await browser?.close();
+});
+
+async function pageFor(width = 1280, admin = true) {
+  const page = await browser.newPage({ viewport: { width, height: 900 } });
+  await page.setContent(
+    '<html lang="it"><body style="margin:0;height:100vh"><opcua-node-panel></opcua-node-panel></body></html>',
+  );
+  await page.addScriptTag({
+    path: path.resolve("custom_components/ha_opcua_discovery/www/panel.js"),
+  });
+  await page.evaluate((admin) => {
+    const nodes = [
+      {
+        name: "Marcia",
+        node_id: "ns=4;i=1",
+        variant_type: "Boolean",
+        writable: true,
+      },
+      {
+        name: "Consenso",
+        node_id: "ns=4;i=2",
+        variant_type: "Boolean",
+        writable: true,
+      },
+      {
+        name: "Velocità linea",
+        node_id: "ns=4;i=3",
+        variant_type: "Float",
+        writable: false,
+      },
+      {
+        name: "Ricetta",
+        node_id: "ns=4;i=4",
+        variant_type: "String",
+        writable: true,
+      },
+    ];
+    const rows = [
+      {
+        key: "ns=4;i=1",
+        name: "Marcia macchina",
+        entity_id: "switch.marcia",
+        node_id: "ns=4;i=1",
+        platform: "switch",
+        variant_type: "Boolean",
+        invert_state: false,
+        device_class: null,
+        editable: true,
+        custom_name: null,
+        area_id: null,
+      },
+      {
+        key: "ns=4;i=2",
+        name: "Porta protezione",
+        entity_id: "binary_sensor.porta",
+        node_id: "ns=4;i=2",
+        platform: "binary_sensor",
+        variant_type: "Boolean",
+        invert_state: false,
+        device_class: "door",
+        editable: true,
+        custom_name: null,
+        area_id: null,
+      },
+      {
+        key: "ns=4;i=3",
+        name: "Velocità linea",
+        entity_id: "sensor.velocita",
+        node_id: "ns=4;i=3",
+        platform: "sensor",
+        variant_type: "Float",
+        invert_state: false,
+        device_class: null,
+        editable: true,
+        custom_name: null,
+        area_id: null,
+      },
+      {
+        key: "ns=4;i=4",
+        name: "Nome ricetta",
+        entity_id: "text.ricetta",
+        node_id: "ns=4;i=4",
+        platform: "text",
+        variant_type: "String",
+        invert_state: false,
+        device_class: null,
+        editable: true,
+        custom_name: null,
+        area_id: "workshop",
+      },
+    ];
+    window.calls = [];
+    window.fixture = {
+      endpoints: [
+        {
+          entry_id: "plc1",
+          title: "Aspo fermapiedi",
+          endpoint: "opc.tcp://192.168.20.12:4840",
+          loaded: true,
+          connected: true,
+          revision: "rev1",
+          nodes,
+          rows,
+          status_entity: "binary_sensor.connection",
+        },
+        {
+          entry_id: "plc2",
+          title: "Carroponte A",
+          endpoint: "opc.tcp://192.168.20.13:4840",
+          loaded: true,
+          connected: false,
+          revision: "rev2",
+          nodes: [],
+          rows: [],
+          status_entity: "binary_sensor.connection2",
+        },
+      ],
+      areas: [{ id: "workshop", name: "Officina" }],
+      device_classes: ["door", "motion", "problem"],
+    };
+    window.testHass = {
+      language: "it",
+      user: { is_admin: admin },
+      states: {},
+      localize: () => "",
+      callWS: async (msg) => {
+        window.calls.push(structuredClone(msg));
+        if (msg.type.endsWith("/panel")) return structuredClone(window.fixture);
+        if (window.failSave) throw { code: "stale_configuration" };
+        const endpoint = window.fixture.endpoints.find(
+          (e) => e.entry_id === msg.entry_id,
+        );
+        const row = endpoint.rows.find((r) => r.key === msg.key);
+        Object.assign(row, {
+          name: msg.name,
+          custom_name: msg.name,
+          area_id: msg.area_id,
+          node_id: msg.node_id,
+          invert_state: msg.invert_state,
+          device_class: msg.device_class,
+        });
+        endpoint.revision = "updated";
+        return { saved: true, reload: false };
+      },
+    };
+    document.querySelector("opcua-node-panel").hass = window.testHass;
+  }, admin);
+  await page
+    .getByRole("heading", { name: "Nodi OPC UA", exact: true })
+    .waitFor();
+  if (admin) await page.locator("article").first().waitFor();
+  return page;
+}
+async function shot(page, name) {
+  if (!process.env.PANEL_SCREENSHOTS) return;
+  fs.mkdirSync(process.env.PANEL_SCREENSHOTS, { recursive: true });
+  await page.screenshot({
+    path: path.join(process.env.PANEL_SCREENSHOTS, name),
+    fullPage: true,
+  });
+}
+
+test("desktop categories, search, endpoint selection and safe text rendering", async () => {
+  const page = await pageFor();
+  assert.equal(await page.locator("article").count(), 4);
+  await shot(page, "desktop.png");
+  await page
+    .getByRole("button", { name: "Sensori binari · 1", exact: true })
+    .click();
+  assert.equal(await page.locator("article").count(), 1);
+  await page.getByRole("button", { name: "Tutte · 4", exact: true }).click();
+  await page
+    .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
+    .fill("ns=4;i=4");
+  assert.equal(await page.locator("article").count(), 1);
+  await page
+    .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
+    .fill("");
+  await page.evaluate(() => {
+    window.fixture.endpoints[0].rows[0].name = "<img src=x onerror=alert(1)>";
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "<img src=x onerror=alert(1)>" })
+    .waitFor();
+  assert.equal(await page.locator("img").count(), 0);
+  await page.getByLabel("Endpoint", { exact: true }).selectOption("plc2");
+  assert.equal(await page.locator("article").count(), 0);
+  await page.getByText("Disconnesso", { exact: true }).waitFor();
+  await page.close();
+});
+
+test("editing saves correct fields and live hass updates preserve draft", async () => {
+  const page = await pageFor();
+  await page
+    .locator("article")
+    .filter({ hasText: "Porta protezione" })
+    .getByRole("button", { name: "Modifica" })
+    .click();
+  const dialog = page.locator("dialog");
+  await dialog.getByLabel("Nome", { exact: true }).fill("Porta ingresso");
+  await dialog.getByLabel("Area", { exact: true }).selectOption("workshop");
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .selectOption("ns=4;i=1");
+  await dialog
+    .getByLabel("Classe dispositivo", { exact: true })
+    .selectOption("motion");
+  await dialog.getByLabel("Inverti stato booleano", { exact: true }).check();
+  await page.evaluate(() => {
+    document.querySelector("opcua-node-panel").hass = {
+      ...window.testHass,
+      states: { unrelated: { state: "on" } },
+    };
+  });
+  assert.equal(
+    await dialog.getByLabel("Nome", { exact: true }).inputValue(),
+    "Porta ingresso",
+  );
+  await shot(page, "edit-desktop.png");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  const saved = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/update")),
+  );
+  assert.deepEqual(saved, {
+    type: "ha_opcua_discovery/entity/update",
+    entry_id: "plc1",
+    revision: "rev1",
+    key: "ns=4;i=2",
+    name: "Porta ingresso",
+    area_id: "workshop",
+    node_id: "ns=4;i=1",
+    device_class: "motion",
+    invert_state: true,
+  });
+  await page.close();
+});
+
+test("mobile dialog, cancel and rejected save keep data intact", async () => {
+  const page = await pageFor(390);
+  await page.evaluate(() => {
+    document.body.style.cssText +=
+      ";--primary-background-color:#111827;--card-background-color:#1f2937;--primary-text-color:#eef2f7;--secondary-text-color:#9cabc0;--divider-color:#374151;--secondary-background-color:#283548;--primary-color:#0891b2";
+  });
+  await page
+    .locator("article")
+    .filter({ hasText: "Marcia macchina" })
+    .getByRole("button", { name: "Modifica" })
+    .click();
+  let dialog = page.locator("dialog");
+  await dialog.getByLabel("Nome", { exact: true }).fill("Cancelled");
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  assert.equal(
+    await page.evaluate(
+      () => window.calls.filter((m) => m.type.endsWith("/update")).length,
+    ),
+    0,
+  );
+  await page
+    .locator("article")
+    .filter({ hasText: "Marcia macchina" })
+    .getByRole("button", { name: "Modifica" })
+    .click();
+  dialog = page.locator("dialog");
+  await dialog.getByLabel("Nome", { exact: true }).fill("Unsaved draft");
+  await page.evaluate(() => {
+    window.failSave = true;
+  });
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await dialog
+    .getByRole("alert")
+    .filter({ hasText: "La configurazione è cambiata" })
+    .waitFor();
+  assert.equal(
+    await dialog.getByLabel("Nome", { exact: true }).inputValue(),
+    "Unsaved draft",
+  );
+  const box = await dialog.boundingBox();
+  assert.ok(box.x >= 0 && box.x + box.width <= 390);
+  await dialog
+    .getByRole("button", { name: "Annulla", exact: true })
+    .scrollIntoViewIfNeeded();
+  await shot(page, "edit-mobile-dark.png");
+  await page.close();
+});
+
+test("non-admin cannot request endpoint data", async () => {
+  const page = await pageFor(1280, false);
+  await page
+    .getByText("Pannello riservato agli amministratori.", { exact: true })
+    .waitFor();
+  assert.equal(await page.evaluate(() => window.calls.length), 0);
+  await page.close();
+});

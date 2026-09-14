@@ -70,6 +70,24 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
+## OPC UA side panel (1.4.0)
+
+After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers and text. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
+
+Click **Edit** on an entity to configure:
+
+- **Name**: stored in Home Assistant's entity registry; leave empty to restore the original name.
+- **Area**: choose a Home Assistant area, or inherit the device area. Explicit entity areas remain independent of device areas.
+- **Associated NodeId**: choose a compatible node from those discovered on the selected endpoint. The entity's unique ID and entity ID remain unchanged, preserving automation/dashboard references. Other entities using the same target are retained; shared targets are read once per poll. The direct `opcua_set_value` service continues to use physical NodeIds.
+- **Device class** for binary sensors, including None.
+- **Invert boolean state** for Boolean nodes. For switches this also inverts commands: with inversion enabled, turning the HA switch on writes `false` to the PLC. Nonboolean values are not inverted.
+
+Saving updates the native entity registry and integration options. NodeId, inversion and device-class changes reload the endpoint; wait for it to finish and use Refresh if needed. Cancel leaves the saved configuration unchanged. Stale forms are rejected if another editor has changed the endpoint; cancel, refresh and reopen the entity. Panel APIs require administrator access and do not perform PLC writes.
+
+This first version edits registered node entities. Platform selection (including exclusions), number/text limits and connection settings remain in the integration options; using those options preserves panel metadata. If an endpoint is offline/disabled at startup, nodes must first be discovered before they can be edited. Discovery still runs at setup/reload; manually entered NodeIds outside the discovered address space are not supported by the panel yet. The connection switch and connectivity sensor remain standard HA entities outside the node editor.
+
+Panel JavaScript is bundled with the integration and uses a versioned URL; no separate Lovelace resource or frontend build is required.
+
 ## Home Assistant device page (1.3.0)
 
 Each configured OPC UA server now appears as **one device** under its integration entry, named after the connection. Open the device to see the standard Home Assistant page with node entities, connection controls, diagnostics, activity and related automations. You can assign an area and rename the device using Home Assistant's normal controls. Entities in the entity list are grouped under that device instead of “Ungrouped”. The integration uses the standard entry labels, matching the presentation of Siemens S7.
@@ -142,6 +160,9 @@ python -m pip install -r requirements.txt -r requirements-test.txt
 python -m pytest
 ruff check custom_components/ tests/
 black --check custom_components/ tests/
+npm ci
+npx playwright install chromium
+npm run test:panel
 ```
 
 Tests cover scalar conversion, a local OPC UA server, duplicate names, connection failures, cancellation, entity migration and Home Assistant service lifecycle. These tests do not replace validation on a physical PLC.

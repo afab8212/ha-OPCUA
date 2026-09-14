@@ -69,6 +69,14 @@ def _connection_error(error: Exception) -> bool:
     )
 
 
+async def async_setup(hass: HomeAssistant, config) -> bool:
+    """Register the administrator configuration panel once per HA process."""
+    from .panel import async_setup_panel
+
+    await async_setup_panel(hass)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Connect, discover and set up one server."""
     hass.data.setdefault(DOMAIN, {})
@@ -450,6 +458,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         self._control_lock = asyncio.Lock()
         self._discovery_pending = config_entry is not None
         self.nodes = {}
+        self.discovered_nodes = {}
         self.node_settings = (
             dict(config_entry.options.get(CONF_NODE_SETTINGS, {}))
             if config_entry
@@ -501,11 +510,30 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
 
     def set_nodes(self, nodes):
         self._discovery_pending = False
-        self.nodes = {node["node_id"]: node for node in nodes}
+        self.discovered_nodes = {node["node_id"]: node for node in nodes}
+        candidates = dict(self.discovered_nodes)
+        # Remapped entities retain their identity even if their original node is gone.
+        for entity_key, settings in self.node_settings.items():
+            target = self.discovered_nodes.get(settings.get("node_id"))
+            if entity_key not in candidates and target is not None:
+                candidates[entity_key] = {**target, "node_id": entity_key}
+        self.nodes = {}
         self._platforms = {}
-        for node_id, node in self.nodes.items():
+        for node_id, original in candidates.items():
+            saved = self.node_settings.get(node_id, {})
+            target_id = saved.get("node_id", node_id)
+            target = self.discovered_nodes.get(target_id)
+            node = {
+                **(target or original),
+                "name": original["name"],
+                "node_id": node_id,
+                "target_node_id": target_id,
+            }
+            self.nodes[node_id] = node
             try:
-                settings = validate_settings(node, self.node_settings.get(node_id, {}))
+                if target is None:
+                    raise ValueError("node_not_found")
+                settings = validate_settings(node, saved)
             except ValueError as err:
                 _LOGGER.warning(
                     "Skipping incompatible entity configuration for %s: %s",
@@ -543,7 +571,15 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 for node_id in self.nodes
                 if self._platforms[node_id] != "disabled"
             ]
-            values = await self._hub.get_values(active_nodes)
+            target_ids = list(
+                dict.fromkeys(self.nodes[key]["target_node_id"] for key in active_nodes)
+            )
+            raw_values = await self._hub.get_values(target_ids)
+            values = {
+                key: raw_values[self.nodes[key]["target_node_id"]]
+                for key in active_nodes
+                if self.nodes[key]["target_node_id"] in raw_values
+            }
         except Exception as err:
             # A pause can overtake an already scheduled read. It is not a failure.
             if not self.enabled:

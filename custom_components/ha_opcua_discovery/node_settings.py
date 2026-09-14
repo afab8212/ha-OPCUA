@@ -3,6 +3,7 @@
 import math
 
 from asyncua import ua
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 from .values import scalar_variant
 
@@ -51,6 +52,22 @@ def validate_settings(node, settings):
     if platform not in allowed_platforms(node):
         raise ValueError("incompatible_platform")
     result = {"platform": platform}
+    if "node_id" in settings:
+        if not isinstance(settings["node_id"], str) or not settings["node_id"]:
+            raise ValueError("invalid_node_id")
+        result["node_id"] = settings["node_id"]
+    if "invert_state" in settings:
+        if type(settings["invert_state"]) is not bool or (
+            settings["invert_state"] and node["variant_type"] != "Boolean"
+        ):
+            raise ValueError("invalid_inversion")
+        result["invert_state"] = settings["invert_state"]
+    if settings.get("device_class") is not None:
+        if effective_platform(node, settings) != "binary_sensor" or settings[
+            "device_class"
+        ] not in {item.value for item in BinarySensorDeviceClass}:
+            raise ValueError("invalid_device_class")
+        result["device_class"] = settings["device_class"]
     if platform == "number":
         defaults = number_defaults(node)
         try:

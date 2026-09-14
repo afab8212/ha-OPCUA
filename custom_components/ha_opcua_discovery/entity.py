@@ -26,8 +26,9 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         self._node_id = node_id
         self._settings = coordinator.node_settings.get(node_id, {})
         node = coordinator.nodes[node_id]
+        self._target_node_id = node.get("target_node_id", node_id)
         self._attr_extra_state_attributes = {
-            "node_id": node_id,
+            "node_id": self._target_node_id,
             "opcua_type": node["variant_type"],
             "writable": node["writable"],
         }
@@ -43,11 +44,16 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
 
     @property
     def node_value(self):
-        return (self.coordinator.data or {}).get(self._node_id)
+        value = (self.coordinator.data or {}).get(self._node_id)
+        if isinstance(value, bool) and self._settings.get("invert_state", False):
+            return not value
+        return value
 
     async def _async_write_value(self, value):
         try:
-            await self.coordinator.hub.set_value(self._node_id, value)
+            if isinstance(value, bool) and self._settings.get("invert_state", False):
+                value = not value
+            await self.coordinator.hub.set_value(self._target_node_id, value)
         except Exception as err:
             raise HomeAssistantError(f"OPC UA write failed: {err}") from err
         await self.coordinator.async_request_refresh()
