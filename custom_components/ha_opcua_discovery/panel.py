@@ -49,6 +49,7 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_save)
     websocket_api.async_register_command(hass, ws_inspect)
     websocket_api.async_register_command(hass, ws_create)
+    websocket_api.async_register_command(hass, ws_remove)
     hass.data[PANEL_DATA] = {"locks": {}}
 
 
@@ -60,37 +61,39 @@ def endpoint_snapshot(hass, entry):
     registry = er.async_get(hass)
     c = _coordinator(hass, entry)
     rows = []
-    if c is not None:
-        for key, node in c.nodes.items():
-            settings = c.node_settings.get(key, {})
-            platform = effective_platform(node, settings)
-            entity_id = registry.async_get_entity_id(
-                platform, DOMAIN, f"{entry.entry_id}:{key}"
-            )
-            registered = registry.async_get(entity_id) if entity_id else None
-            rows.append(
-                {
-                    "key": key,
-                    "entity_id": entity_id,
-                    "platform": platform,
-                    "name": (
-                        (registered.name or registered.original_name)
-                        if registered
-                        else node["name"]
-                    ),
-                    "custom_name": registered.name if registered else None,
-                    "area_id": registered.area_id if registered else None,
-                    "node_id": node.get("target_node_id", key),
-                    "variant_type": node["variant_type"],
-                    "device_class": (
-                        (registered.device_class or settings.get("device_class"))
-                        if registered
-                        else settings.get("device_class")
-                    ),
-                    "invert_state": settings.get("invert_state", False),
-                    "editable": registered is not None,
-                }
-            )
+    manual = entry.options.get(CONF_MANUAL_NODES, {})
+    nodes = {**manual, **(c.nodes if c else {})}
+    for key, node in nodes.items():
+        settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
+        platform = effective_platform(node, settings)
+        entity_id = registry.async_get_entity_id(
+            platform, DOMAIN, f"{entry.entry_id}:{key}"
+        )
+        registered = registry.async_get(entity_id) if entity_id else None
+        rows.append(
+            {
+                "key": key,
+                "entity_id": entity_id,
+                "platform": platform,
+                "name": (
+                    (registered.name or registered.original_name)
+                    if registered
+                    else node["name"]
+                ),
+                "custom_name": registered.name if registered else None,
+                "area_id": registered.area_id if registered else None,
+                "node_id": node.get("target_node_id", settings.get("node_id", key)),
+                "variant_type": node["variant_type"],
+                "device_class": (
+                    (registered.device_class or settings.get("device_class"))
+                    if registered
+                    else settings.get("device_class")
+                ),
+                "invert_state": settings.get("invert_state", False),
+                "editable": c is not None and registered is not None,
+                "manual": key in manual,
+            }
+        )
     revision = hashlib.sha256(
         json.dumps(
             {"options": dict(entry.options), "rows": rows}, sort_keys=True
@@ -276,6 +279,72 @@ async def async_create_entity(hass, msg):
         registry.async_update_entity(registered.entity_id, name=name, area_id=area_id)
         hass.config_entries.async_update_entry(entry, options=options)
         return {"saved": True, "reload": True, "entity_id": registered.entity_id}
+
+
+async def async_remove_manual_node(hass, msg):
+    """Remove only a persisted manual node, without needing a live PLC connection."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        if endpoint_snapshot(hass, entry)["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        key = msg["key"]
+        if key not in entry.options.get(CONF_MANUAL_NODES, {}):
+            raise ValueError("not_manual_node")
+        mappings = entry.options.get(CONF_NODE_SETTINGS, {})
+        if any(
+            other != key and settings.get("node_id") == key
+            for other, settings in mappings.items()
+        ):
+            raise ValueError("node_in_use")
+        options = deepcopy(dict(entry.options))
+        del options[CONF_MANUAL_NODES][key]
+        if not options[CONF_MANUAL_NODES]:
+            options.pop(CONF_MANUAL_NODES)
+        # Discovery may find this physical node later. Keep it excluded until the
+        # user explicitly re-enables it or adds it manually again.
+        options.setdefault(CONF_NODE_SETTINGS, {})[key] = {"platform": "disabled"}
+        c = _coordinator(hass, entry)
+        if c is not None:
+            c.manual_nodes.pop(key, None)
+            c._manual_pending.discard(key)
+            c.node_settings[key] = {"platform": "disabled"}
+            c._platforms[key] = "disabled"
+        registry = er.async_get(hass)
+        removed = []
+        for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+            # Also clean up old domains left by earlier platform changes.
+            if (
+                entity.platform == DOMAIN
+                and entity.unique_id == f"{entry.entry_id}:{key}"
+            ):
+                removed.append(entity.entity_id)
+                registry.async_remove(entity.entity_id)
+        hass.config_entries.async_update_entry(entry, options=options)
+        return {"removed": True, "reload": c is not None, "entity_ids": removed}
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/node/remove",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+        vol.Required("key"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_remove(hass, connection, msg):
+    try:
+        result = await async_remove_manual_node(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
 
 
 @websocket_api.websocket_command(

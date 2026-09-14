@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from asyncua import Server, ua
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 from test_panel import prepare
@@ -19,6 +20,7 @@ from custom_components.ha_opcua_discovery.entity import async_setup_node_entitie
 from custom_components.ha_opcua_discovery.panel import (
     async_create_entity,
     async_inspect_node,
+    async_remove_manual_node,
     endpoint_snapshot,
 )
 from custom_components.ha_opcua_discovery.text import AsyncuaText
@@ -238,3 +240,110 @@ async def test_inspection_rejects_invalid_ids_objects_arrays_and_unknown_nodes(
             assert not inspected["writable"]
         finally:
             await hub.disconnect()
+
+
+async def prepare_removal(hass, entry):
+    c, other, _ = await prepare(hass, entry)
+    c.hub.inspect_node = AsyncMock(return_value=MANUAL)
+    created = await async_create_entity(hass, payload(hass, entry))
+    await c.async_shutdown()
+    restored = AsyncuaCoordinator(hass, "PLC", c.hub, config_entry=entry)
+    restored.set_nodes([*c.nodes.values(), MANUAL])
+    hass.data[DOMAIN]["PLC"] = restored
+    return restored, other, created["entity_id"]
+
+
+def removal_payload(hass, entry):
+    return {
+        "entry_id": entry.entry_id,
+        "revision": endpoint_snapshot(hass, entry)["revision"],
+        "key": MANUAL["node_id"],
+    }
+
+
+async def test_remove_offline_manual_node_cleans_registry_and_stays_excluded(
+    hass, entry
+):
+    c, other, entity_id = await prepare_removal(hass, entry)
+    registry = er.async_get(hass)
+    old_sensor = registry.async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}:{MANUAL['node_id']}", config_entry=entry
+    )
+    control = AsyncuaText(c, "Recipe", MANUAL["node_id"], entry.entry_id)
+    # Disabled/offline connections must not prevent local deletion or cause I/O.
+    c.enabled = False
+    c.hub.inspect_node.reset_mock()
+    result = await async_remove_manual_node(hass, removal_payload(hass, entry))
+    assert set(result["entity_ids"]) == {entity_id, old_sensor.entity_id}
+    assert registry.async_get(entity_id) is None
+    assert registry.async_get(other.entity_id) is not None
+    assert CONF_MANUAL_NODES not in entry.options
+    assert entry.options[CONF_NODE_SETTINGS][MANUAL["node_id"]] == {
+        "platform": "disabled"
+    }
+    assert MANUAL["node_id"] not in c._manual_pending
+    c.hub.inspect_node.assert_not_awaited()
+    with pytest.raises(HomeAssistantError, match="disabled or removed"):
+        await control.async_set_value("Should not write")
+    c.hub.set_value.assert_not_awaited()
+    # A subsequent discovery can list the node, but cannot recreate its entity.
+    restored = AsyncuaCoordinator(hass, "PLC", c.hub, config_entry=entry)
+    restored.set_nodes([MANUAL])
+    added = []
+    async_setup_node_entities(restored, entry, added.extend, "text", AsyncuaText)
+    assert added == []
+    await restored.async_refresh()
+    assert MANUAL["node_id"] not in c.hub.get_values.call_args.args[0]
+    await c.async_shutdown()
+    await restored.async_shutdown()
+
+
+async def test_remove_without_loaded_coordinator_and_readd(hass, entry):
+    c, _, entity_id = await prepare_removal(hass, entry)
+    hass.data[DOMAIN].clear()
+    row = next(
+        r
+        for r in endpoint_snapshot(hass, entry)["rows"]
+        if r["key"] == MANUAL["node_id"]
+    )
+    assert row["manual"] and not row["editable"]
+    assert row["entity_id"] == entity_id
+    await async_remove_manual_node(hass, removal_payload(hass, entry))
+    assert not endpoint_snapshot(hass, entry)["rows"]
+    restored = AsyncuaCoordinator(hass, "PLC", c.hub, config_entry=entry)
+    restored.set_nodes([])
+    hass.data[DOMAIN]["PLC"] = restored
+    await async_create_entity(hass, payload(hass, entry))
+    assert MANUAL["node_id"] in entry.options[CONF_MANUAL_NODES]
+    assert entry.options[CONF_NODE_SETTINGS][MANUAL["node_id"]]["platform"] == "text"
+    await c.async_shutdown()
+    await restored.async_shutdown()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["stale_configuration", "not_manual_node", "node_in_use", "endpoint_not_found"],
+)
+async def test_invalid_removal_is_atomic(hass, entry, failure):
+    c, _, entity_id = await prepare_removal(hass, entry)
+    if failure == "node_in_use":
+        options = deepcopy(dict(entry.options))
+        options[CONF_NODE_SETTINGS]["ns=2;i=1"] = {
+            "node_id": MANUAL["node_id"],
+            "platform": "disabled",
+        }
+        hass.config_entries.async_update_entry(entry, options=options)
+    msg = removal_payload(hass, entry)
+    if failure == "stale_configuration":
+        msg["revision"] = "old"
+    elif failure == "not_manual_node":
+        msg["key"] = "ns=2;i=1"
+    elif failure == "endpoint_not_found":
+        msg["entry_id"] = "missing"
+    before = deepcopy(dict(entry.options))
+    with pytest.raises(ValueError, match=failure):
+        await async_remove_manual_node(hass, msg)
+    assert dict(entry.options) == before
+    assert er.async_get(hass).async_get(entity_id) is not None
+    assert MANUAL["node_id"] in c.manual_nodes
+    await c.async_shutdown()

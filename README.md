@@ -70,7 +70,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
-## OPC UA side panel (1.4.2)
+## OPC UA side panel (1.4.3)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
@@ -93,6 +93,10 @@ To add a node that discovery did not find, select the endpoint and click **Add e
 Manual nodes are persisted independently of discovery and verified again on reload. They can be outside the configured discovery root, including when that root is inaccessible. Temporarily unreadable manual nodes are retried during normal polling; disabling the connection stops these attempts too. A node later found by discovery does not create a duplicate. Invalid IDs, objects, arrays, unreadable nodes and duplicate entities are rejected. A manual node remains subject to the PLC's authentication and access permissions.
 
 Changing the category of an existing entity (including exclusions), number/text limits and connection settings remains in the integration options; using those options preserves panel metadata. New number entities default to min 0, max 100 and step 1 for integers or 0.1 for floats; text defaults to 0–255 characters. Adjust these limits in the integration options before use where needed. Existing entities can be edited once registered; discovery still runs at setup/reload. The connection switch and connectivity sensor remain standard HA entities outside the node editor.
+
+**Remove a manual node:** click **Remove** on its card and confirm. This works even when the PLC is disconnected, the connection is disabled, or the endpoint is not loaded. Removal deletes its manual-node metadata and Home Assistant registry entities, including old domains left by category changes. The PLC node and its value are untouched. Automations referencing removed entities must be updated. If another entity is mapped to this node, reassign it first (including excluded entities); the panel prevents removing a shared target.
+
+A disabled mapping is retained to prevent discovery from recreating the removed entity. If discovery later lists that node, it appears under **Excluded** and is not polled periodically; you can explicitly re-enable it in integration options. Nodes outside discovery can be added manually again. Automatically discovered nodes use the existing exclusion option instead of this removal action.
 
 **Date and time (`datetime`)** is available for writable scalar OPC UA `DateTime` nodes, including manually entered nodes. Automatic mapping creates a datetime entity for writable DateTime nodes and a timestamp sensor for read-only nodes; you can also explicitly select sensor for read-only display of a writable node. Use Home Assistant's native entity control or `datetime.set_value` to change its value. The configuration panel configures the entity; it does not set the PLC value.
 
