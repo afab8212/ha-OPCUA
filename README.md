@@ -87,7 +87,7 @@ See [Home Assistant's brand image documentation](https://developers.home-assista
 
 ---
 
-## OPC UA side panel (2.0.2)
+## OPC UA side panel (2.1.0)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
@@ -175,6 +175,14 @@ Numeric limits must fit the OPC UA type. Integer nodes require integer limits an
 Text limits must satisfy `0 ≤ minimum ≤ maximum ≤ 255`. Set the maximum to the capacity configured in your PLC (for example, 80 for STRING[80]); the integration does not discover this capacity. Spaces, brackets and empty strings are preserved. Longer current text values are shown as unknown because Home Assistant entity states are limited to 255 characters. Server restrictions still apply to every write. Successful writes request a fresh read; values are not assumed to have changed before readback.
 
 Changing a node from `sensor` to `number`, for example, creates an entity in the new domain. The previous registry entry is retained and is no longer provided. Update automations/dashboard references before deleting it. Selecting Excluded has the same effect on the previous entity. Selecting Automatic restores the original mapping. Existing mappings are unchanged on upgrade until you choose a different type.
+
+## Orphan entity repairs
+
+Open **Settings → System → Repairs** to review obsolete entities. Changing a node category, for example sensor → number, creates a repair for the old registry entity. The integration also checks on setup and after discovery, including automatic category changes and unconfigured nodes absent after a complete discovery.
+
+Each repair identifies the old entity and its endpoint. Confirming removes only that registry entity, after checking again that it is still obsolete. Update any automation, script or dashboard references first. PLC variables, node settings and the replacement entity are preserved. Cancelling leaves the entity intact. If you restore its previous category or delete it yourself, its repair is cleared.
+
+Disconnection, failed or incomplete discovery, excluded nodes and missing but explicitly configured/manual nodes do not by themselves make an entity orphaned. Name, area, precision and same-category NodeId changes preserve entity identity and do not require cleanup.
 
 ## 🛠 Service: `ha_opcua.opcua_set_value`
 

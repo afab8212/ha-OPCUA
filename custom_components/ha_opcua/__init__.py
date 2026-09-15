@@ -39,6 +39,11 @@ from .const import (
 )
 from .device import async_register_device
 from .node_settings import SCALAR_TYPES, effective_platform, validate_settings
+from .orphans import (
+    async_clear_orphan_repairs,
+    async_setup_orphan_repairs,
+    async_sync_orphan_repairs,
+)
 from .values import scalar_variant
 
 _LOGGER = logging.getLogger(__name__)
@@ -114,6 +119,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise
 
     entry.async_on_unload(entry.add_update_listener(async_options_updated))
+    async_setup_orphan_repairs(hass, entry, coordinator)
 
     async def stop_client(_event):
         await hub.disconnect(permanent=True)
@@ -149,6 +155,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload only after Home Assistant has saved the updated options."""
+    async_sync_orphan_repairs(hass, entry)
     coordinator = hass.data[DOMAIN][entry.data[CONF_HUB_ID]]
     options = {
         key: value
@@ -214,6 +221,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_SET_VALUE)
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Discard endpoint-specific repairs when the endpoint is removed."""
+    async_clear_orphan_repairs(hass, entry)
 
 
 class OpcuaHub:

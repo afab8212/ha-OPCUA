@@ -25,6 +25,7 @@ from .node_settings import (
     update_offline_node,
     validate_settings,
 )
+from .orphans import async_sync_orphan_repairs
 
 PANEL_PATH = "opcua-nodes"
 PANEL_DATA = f"{DOMAIN}_panel"
@@ -252,6 +253,7 @@ async def async_save_entity(hass, msg):
         reload_needed = options != dict(entry.options)
         if reload_needed:
             hass.config_entries.async_update_entry(entry, options=options)
+        async_sync_orphan_repairs(hass, entry)
         return {
             "saved": True,
             "reload": reload_needed,
@@ -431,6 +433,7 @@ async def async_remove_manual_node(hass, msg):
                 removed.append(entity.entity_id)
                 registry.async_remove(entity.entity_id)
         hass.config_entries.async_update_entry(entry, options=options)
+        async_sync_orphan_repairs(hass, entry)
         return {"removed": True, "reload": c is not None, "entity_ids": removed}
 
 

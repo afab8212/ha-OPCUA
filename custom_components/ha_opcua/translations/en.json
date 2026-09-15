@@ -126,5 +126,22 @@
         "name": "Connection"
       }
     }
+  },
+  "issues": {
+    "orphan_entity": {
+      "title": "Remove orphaned entity: {entity_id}",
+      "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry. Before confirming, update any automations, scripts and dashboards that reference it. The PLC node, settings and other entities are not changed.",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Remove orphaned entity: {entity_id}",
+            "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry. Before confirming, update any automations, scripts and dashboards that reference it. The PLC node, settings and other entities are not changed."
+          }
+        },
+        "abort": {
+          "no_longer_orphan": "The entity is no longer orphaned, was already removed, or cannot currently be verified. No entity was deleted."
+        }
+      }
+    }
   }
 }
