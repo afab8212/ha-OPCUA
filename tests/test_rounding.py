@@ -6,17 +6,17 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from test_panel import NODES, prepare
 
-from custom_components.ha_opcua_discovery import AsyncuaCoordinator
-from custom_components.ha_opcua_discovery.config_flow import AsyncUAOptionsFlow
-from custom_components.ha_opcua_discovery.const import CONF_NODE_SETTINGS
-from custom_components.ha_opcua_discovery.node_settings import validate_settings
-from custom_components.ha_opcua_discovery.number import AsyncuaNumber
-from custom_components.ha_opcua_discovery.panel import (
+from custom_components.ha_opcua import AsyncuaCoordinator
+from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
+from custom_components.ha_opcua.const import CONF_NODE_SETTINGS
+from custom_components.ha_opcua.node_settings import validate_settings
+from custom_components.ha_opcua.number import AsyncuaNumber
+from custom_components.ha_opcua.panel import (
     async_create_entity,
     async_save_entity,
     endpoint_snapshot,
 )
-from custom_components.ha_opcua_discovery.sensor import AsyncuaSensor
+from custom_components.ha_opcua.sensor import AsyncuaSensor
 
 REAL = {
     "name": "Real",

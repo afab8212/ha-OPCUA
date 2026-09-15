@@ -8,32 +8,32 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.ha_opcua_discovery import (
+from custom_components.ha_opcua import (
     AsyncuaCoordinator,
     OpcuaHub,
     async_setup_entry,
     entity_unique_id,
 )
-from custom_components.ha_opcua_discovery.binary_sensor import (
+from custom_components.ha_opcua.binary_sensor import (
     AsyncuaBinarySensor,
     OpcuaConnectionSensor,
 )
-from custom_components.ha_opcua_discovery.const import CONF_CONNECTION_ENABLED, DOMAIN
-from custom_components.ha_opcua_discovery.device import (
+from custom_components.ha_opcua.const import CONF_CONNECTION_ENABLED, DOMAIN
+from custom_components.ha_opcua.device import (
     async_register_device,
     device_info,
 )
-from custom_components.ha_opcua_discovery.diagnostics import (
+from custom_components.ha_opcua.diagnostics import (
     async_get_config_entry_diagnostics,
     async_get_device_diagnostics,
 )
-from custom_components.ha_opcua_discovery.number import AsyncuaNumber
-from custom_components.ha_opcua_discovery.sensor import AsyncuaSensor
-from custom_components.ha_opcua_discovery.switch import (
+from custom_components.ha_opcua.number import AsyncuaNumber
+from custom_components.ha_opcua.sensor import AsyncuaSensor
+from custom_components.ha_opcua.switch import (
     AsyncuaSwitch,
     OpcuaConnectionSwitch,
 )
-from custom_components.ha_opcua_discovery.text import AsyncuaText
+from custom_components.ha_opcua.text import AsyncuaText
 
 pytestmark = pytest.mark.asyncio
 
@@ -143,7 +143,7 @@ async def test_disabled_setup_registers_device_without_network_and_diagnostics_r
         entry, options={CONF_CONNECTION_ENABLED: False}
     )
     with (
-        patch("custom_components.ha_opcua_discovery.Client") as client,
+        patch("custom_components.ha_opcua.Client") as client,
         patch.object(
             hass.config_entries, "async_forward_entry_setups", new=AsyncMock()
         ),

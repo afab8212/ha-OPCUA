@@ -10,15 +10,15 @@ from homeassistant.exceptions import Unauthorized
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.ha_opcua_discovery import (
+from custom_components.ha_opcua import (
     AsyncuaCoordinator,
     OpcuaHub,
     entity_unique_id,
 )
-from custom_components.ha_opcua_discovery.binary_sensor import AsyncuaBinarySensor
-from custom_components.ha_opcua_discovery.config_flow import AsyncUAOptionsFlow
-from custom_components.ha_opcua_discovery.const import CONF_NODE_SETTINGS, DOMAIN
-from custom_components.ha_opcua_discovery.panel import (
+from custom_components.ha_opcua.binary_sensor import AsyncuaBinarySensor
+from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
+from custom_components.ha_opcua.const import CONF_NODE_SETTINGS, DOMAIN
+from custom_components.ha_opcua.panel import (
     async_save_entity,
     async_setup_panel,
     endpoint_snapshot,
@@ -29,7 +29,7 @@ from custom_components.ha_opcua_discovery.panel import (
     ws_save,
     ws_snapshot,
 )
-from custom_components.ha_opcua_discovery.switch import AsyncuaSwitch
+from custom_components.ha_opcua.switch import AsyncuaSwitch
 
 pytestmark = pytest.mark.asyncio
 
@@ -176,15 +176,15 @@ async def test_panel_registration_is_once_and_versioned(hass):
     hass.http = Mock(async_register_static_paths=AsyncMock())
     with (
         patch(
-            "custom_components.ha_opcua_discovery.panel.async_get_integration",
+            "custom_components.ha_opcua.panel.async_get_integration",
             new=AsyncMock(return_value=SimpleNamespace(manifest={"version": "1.4.0"})),
         ),
         patch(
-            "custom_components.ha_opcua_discovery.panel.panel_custom.async_register_panel",
+            "custom_components.ha_opcua.panel.panel_custom.async_register_panel",
             new=AsyncMock(),
         ) as register,
         patch(
-            "custom_components.ha_opcua_discovery.panel.websocket_api.async_register_command"
+            "custom_components.ha_opcua.panel.websocket_api.async_register_command"
         ) as commands,
     ):
         await async_setup_panel(hass)

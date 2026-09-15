@@ -22,7 +22,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 - 🔄 Periodic polling with configurable scan interval
 - ⏯️ Persistent connection switch and live connectivity diagnostics per hub
 - 🧪 Graceful reconnection logic on connection loss
-- 📥 Set opc-ua nodes values via Home Assistant services (`ha_opcua_discovery.opcua_set_value`)
+- 📥 Set opc-ua nodes values via Home Assistant services (`ha_opcua.opcua_set_value`)
 - 🤝 Supports multiple simultaneous OPC-UA clients
 
 ---
@@ -50,14 +50,18 @@ This integration supports **local polling** using the `asyncua` library and is i
 ### Option 2: Manual
 
 1. Download the source code for the desired version from [Releases](https://github.com/xtimmy86x/ha-OPCUA/releases), or use **Code → Download ZIP** on the [repository page](https://github.com/xtimmy86x/ha-OPCUA).
-2. Extract the archive and copy `custom_components/ha_opcua_discovery` into `/config/custom_components/`.
+2. Extract the archive and copy `custom_components/ha_opcua` into `/config/custom_components/`.
 3. Restart Home Assistant
 
 ---
 
-### Existing installations after the repository rename
+### Integration directory and domain (2.0.0)
 
-The project is now maintained independently at [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA). If HACS still uses the previous repository, update its custom repository reference to this URL. The Home Assistant integration is still named **Home Assistant OPC-UA Discovery** and its domain and directory remain `ha_opcua_discovery`. The repository rename does not require deleting or recreating your configured endpoints, entities or automations.
+The project is maintained independently at [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA). Use this URL when adding the custom repository in HACS.
+
+Starting with 2.0.0, the integration directory and Home Assistant domain are **`ha_opcua`**. The repository name remains **ha-OPCUA**, and the integration still appears as **Home Assistant OPC-UA Discovery** in Home Assistant. Install it at `/config/custom_components/ha_opcua`; do not use a hyphen in the directory name.
+
+This is a fresh-install domain change with no automatic migration from the previous domain. If an older version was installed, remove its integration entries and old custom-component directory before installing this version, then configure the endpoints again. Existing entity references and automations may need updating. Direct service calls now use `ha_opcua.opcua_set_value`.
 
 ## ⚙️ Configuration
 
@@ -74,7 +78,7 @@ The project is now maintained independently at [xtimmy86x/ha-OPCUA](https://gith
 
 ---
 
-## OPC UA side panel (1.7.0)
+## OPC UA side panel (2.0.0)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
@@ -113,7 +117,7 @@ A disabled mapping is retained to prevent discovery from recreating the removed 
 
 **Date and time (`datetime`)** is available for writable scalar OPC UA `DateTime` nodes, including manually entered nodes. Automatic mapping creates a datetime entity for writable DateTime nodes and a timestamp sensor for read-only nodes; you can also explicitly select sensor for read-only display of a writable node. Use Home Assistant's native entity control or `datetime.set_value` to change its value. The configuration panel configures the entity; it does not set the PLC value.
 
-OPC UA values are normalized to UTC, and Home Assistant displays them in the frontend's configured timezone. Home Assistant's `datetime.set_value` service treats a timezone-free input as local HA time; for unambiguous automation commands (especially during daylight-saving transitions), include the UTC offset. The direct `ha_opcua_discovery.opcua_set_value` service requires an ISO 8601 timestamp with an explicit offset or `Z`, for example `2026-09-14T18:30:00+02:00`. Bare dates, timezone-free direct writes and dates before 1601-01-01 UTC are rejected. Strings and integer timestamps are not automatically interpreted as OPC UA DateTime nodes.
+OPC UA values are normalized to UTC, and Home Assistant displays them in the frontend's configured timezone. Home Assistant's `datetime.set_value` service treats a timezone-free input as local HA time; for unambiguous automation commands (especially during daylight-saving transitions), include the UTC offset. The direct `ha_opcua.opcua_set_value` service requires an ISO 8601 timestamp with an explicit offset or `Z`, for example `2026-09-14T18:30:00+02:00`. Bare dates, timezone-free direct writes and dates before 1601-01-01 UTC are rejected. Strings and integer timestamps are not automatically interpreted as OPC UA DateTime nodes.
 
 The panel header displays the installed integration version, read from the backend manifest.
 
@@ -163,7 +167,7 @@ Text limits must satisfy `0 ≤ minimum ≤ maximum ≤ 255`. Set the maximum to
 
 Changing a node from `sensor` to `number`, for example, creates an entity in the new domain. The previous registry entry is retained and is no longer provided. Update automations/dashboard references before deleting it. Selecting Excluded has the same effect on the previous entity. Selecting Automatic restores the original mapping. Existing mappings are unchanged on upgrade until you choose a different type.
 
-## 🛠 Service: `ha_opcua_discovery.opcua_set_value`
+## 🛠 Service: `ha_opcua.opcua_set_value`
 
 You can manually set the value of a writable scalar OPC UA node. Supported write types are String, Boolean, signed/unsigned integers, Float, Double and DateTime. Array and other types are rejected. String contents, including whitespace and brackets, are preserved exactly. Invalid booleans, out-of-range integers and non-finite floats are rejected before writing. Server-side permissions and string length limits still apply.
 
@@ -172,7 +176,7 @@ Writes are sent once and are never automatically replayed after a connection err
 ### Example:
 
 ```yaml
-action: ha_opcua_discovery.opcua_set_value
+action: ha_opcua.opcua_set_value
 data:
    hub: "My OPC UA Server"
    node_id: "ns=2;s=Pump1/Enable"
@@ -218,7 +222,7 @@ Tests cover scalar conversion, a local OPC UA server, duplicate names, connectio
 
 ```
 custom_components/
-└── ha_opcua_discovery/
+└── ha_opcua/
     ├── __init__.py
     ├── manifest.json
     ├── sensor.py

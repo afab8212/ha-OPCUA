@@ -1,9 +1,9 @@
 {
-  "name": "ha-opcua-discovery-panel",
+  "name": "ha-opcua-panel",
   "private": true,
   "scripts": {
     "test:panel": "node --test tests/panel-ui.test.cjs",
-    "format:panel": "prettier --write custom_components/ha_opcua_discovery/www/panel.js tests/panel-ui.test.cjs"
+    "format:panel": "prettier --write custom_components/ha_opcua/www/panel.js tests/panel-ui.test.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1",

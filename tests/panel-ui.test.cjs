@@ -23,7 +23,7 @@ async function pageFor(width = 1280, admin = true) {
     '<html lang="it"><body style="margin:0;height:100vh"><opcua-node-panel></opcua-node-panel></body></html>',
   );
   await page.addScriptTag({
-    path: path.resolve("custom_components/ha_opcua_discovery/www/panel.js"),
+    path: path.resolve("custom_components/ha_opcua/www/panel.js"),
   });
   await page.evaluate((admin) => {
     const nodes = [
@@ -108,7 +108,7 @@ async function pageFor(width = 1280, admin = true) {
     ];
     window.calls = [];
     window.fixture = {
-      version: "1.7.0",
+      version: "2.0.0",
       endpoints: [
         {
           entry_id: "plc1",
@@ -223,7 +223,7 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
-  assert.equal(await page.locator(".version").textContent(), "Versione 1.7.0");
+  assert.equal(await page.locator(".version").textContent(), "Versione 2.0.0");
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
     0,
@@ -300,7 +300,7 @@ test("editing saves correct fields and live hass updates preserve draft", async 
     window.calls.find((m) => m.type.endsWith("/update")),
   );
   assert.deepEqual(saved, {
-    type: "ha_opcua_discovery/entity/update",
+    type: "ha_opcua/entity/update",
     entry_id: "plc1",
     revision: "rev1",
     key: "ns=4;i=2",
@@ -417,7 +417,7 @@ test("manual NodeId creation on an empty endpoint, category, area and inversion"
     window.calls.find((m) => m.type.endsWith("/create")),
   );
   assert.deepEqual(saved, {
-    type: "ha_opcua_discovery/entity/create",
+    type: "ha_opcua/entity/create",
     entry_id: "plc2",
     revision: "rev2",
     node_id: 'ns=4;s="DB"."Door"',
@@ -592,7 +592,7 @@ test("manual removal works offline with confirmation, cancel and dependency erro
     window.calls.find((m) => m.type.endsWith("/remove")),
   );
   assert.deepEqual(removal, {
-    type: "ha_opcua_discovery/node/remove",
+    type: "ha_opcua/node/remove",
     entry_id: "plc2",
     revision: "rev2",
     key: "ns=4;i=99",

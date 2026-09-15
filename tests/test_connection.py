@@ -8,20 +8,20 @@ import pytest
 from asyncua import Server
 from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.ha_opcua_discovery import (
+from custom_components.ha_opcua import (
     AsyncuaCoordinator,
     OpcuaHub,
     async_setup_entry,
 )
-from custom_components.ha_opcua_discovery.binary_sensor import OpcuaConnectionSensor
-from custom_components.ha_opcua_discovery.connection import connection_attributes
-from custom_components.ha_opcua_discovery.const import (
+from custom_components.ha_opcua.binary_sensor import OpcuaConnectionSensor
+from custom_components.ha_opcua.connection import connection_attributes
+from custom_components.ha_opcua.const import (
     CONF_CONNECTION_ENABLED,
     CONF_NODE_SETTINGS,
     DOMAIN,
     SERVICE_SET_VALUE,
 )
-from custom_components.ha_opcua_discovery.switch import OpcuaConnectionSwitch
+from custom_components.ha_opcua.switch import OpcuaConnectionSwitch
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,13 +46,11 @@ async def test_offline_startup_recovery_pause_and_native_controls(
 
     async def forward(config_entry, platforms):
         for platform in platforms:
-            module = importlib.import_module(
-                f"custom_components.ha_opcua_discovery.{platform}"
-            )
+            module = importlib.import_module(f"custom_components.ha_opcua.{platform}")
             await module.async_setup_entry(hass, config_entry, entities.extend)
 
     with (
-        patch("custom_components.ha_opcua_discovery.OpcuaHub", return_value=hub),
+        patch("custom_components.ha_opcua.OpcuaHub", return_value=hub),
         patch.object(hass.config_entries, "async_forward_entry_setups", new=forward),
     ):
         # The endpoint is not listening yet. Setup must still expose both controls.
@@ -91,7 +89,7 @@ async def test_offline_startup_recovery_pause_and_native_controls(
             assert c.update_interval is None and c._unsub_refresh is None
             assert entry.options[CONF_CONNECTION_ENABLED] is False
             assert entry.options[CONF_NODE_SETTINGS][node_id]["platform"] == "text"
-            with patch("custom_components.ha_opcua_discovery.Client") as factory:
+            with patch("custom_components.ha_opcua.Client") as factory:
                 await c.async_refresh()
                 await c.async_request_refresh()
                 with pytest.raises(HomeAssistantError, match="disabled"):
@@ -131,7 +129,7 @@ async def test_disabled_restart_never_opens_a_client(hass, entry):
         entry, options={CONF_CONNECTION_ENABLED: False}
     )
     with (
-        patch("custom_components.ha_opcua_discovery.Client") as factory,
+        patch("custom_components.ha_opcua.Client") as factory,
         patch.object(
             hass.config_entries, "async_forward_entry_setups", new=AsyncMock()
         ) as forward,
@@ -176,9 +174,7 @@ async def test_background_loss_updates_status_and_ignores_stale_client(hass, ent
     unsubscribe = c.async_add_listener(changed)
     first = Mock(connect=AsyncMock(), disconnect=AsyncMock(), session_timeout=30000)
     second = Mock(connect=AsyncMock(), disconnect=AsyncMock(), session_timeout=30000)
-    with patch(
-        "custom_components.ha_opcua_discovery.Client", side_effect=[first, second]
-    ):
+    with patch("custom_components.ha_opcua.Client", side_effect=[first, second]):
         assert await hub.connect()
         assert sensor.is_on
         c.async_set_updated_data({"ns=2;i=1": "old"})

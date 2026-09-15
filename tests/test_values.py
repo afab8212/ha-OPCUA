@@ -3,7 +3,7 @@
 import pytest
 from asyncua import ua
 
-from custom_components.ha_opcua_discovery.values import scalar_variant
+from custom_components.ha_opcua.values import scalar_variant
 
 
 @pytest.mark.parametrize(

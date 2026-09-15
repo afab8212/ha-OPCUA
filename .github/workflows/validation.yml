@@ -60,6 +60,6 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Check panel formatting
-        run: npx prettier --check custom_components/ha_opcua_discovery/www/panel.js tests/panel-ui.test.cjs
+        run: npx prettier --check custom_components/ha_opcua/www/panel.js tests/panel-ui.test.cjs
       - name: Exercise panel in Chromium
         run: npm run test:panel

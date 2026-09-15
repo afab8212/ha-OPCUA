@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from asyncua import Server, ua
 
-from custom_components.ha_opcua_discovery import OpcuaHub
+from custom_components.ha_opcua import OpcuaHub
 
 pytestmark = pytest.mark.asyncio
 
@@ -95,7 +95,7 @@ async def test_timeout_never_replays_write_and_next_operation_reconnects(monkeyp
         read_value=AsyncMock(return_value="applied")
     )
     factory = Mock(return_value=replacement)
-    monkeypatch.setattr("custom_components.ha_opcua_discovery.Client", factory)
+    monkeypatch.setattr("custom_components.ha_opcua.Client", factory)
     with pytest.raises(asyncio.TimeoutError):
         await hub.set_value("ns=2;i=10", "command")
     node.write_value.assert_awaited_once()
@@ -121,9 +121,7 @@ async def test_failed_connect_cleans_client_and_does_not_write(monkeypatch):
     failed = Mock(
         connect=AsyncMock(side_effect=ConnectionError()), disconnect=AsyncMock()
     )
-    monkeypatch.setattr(
-        "custom_components.ha_opcua_discovery.Client", Mock(return_value=failed)
-    )
+    monkeypatch.setattr("custom_components.ha_opcua.Client", Mock(return_value=failed))
     with pytest.raises(ConnectionError):
         await hub.set_value("ns=2;i=10", "command")
     client.disconnect.assert_awaited_once()

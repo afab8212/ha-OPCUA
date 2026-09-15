@@ -10,21 +10,21 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 from test_panel import prepare
 
-from custom_components.ha_opcua_discovery import AsyncuaCoordinator, OpcuaHub
-from custom_components.ha_opcua_discovery.const import (
+from custom_components.ha_opcua import AsyncuaCoordinator, OpcuaHub
+from custom_components.ha_opcua.const import (
     CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
     DOMAIN,
 )
-from custom_components.ha_opcua_discovery.entity import async_setup_node_entities
-from custom_components.ha_opcua_discovery.panel import (
+from custom_components.ha_opcua.entity import async_setup_node_entities
+from custom_components.ha_opcua.panel import (
     async_create_entity,
     async_inspect_node,
     async_remove_manual_node,
     async_save_entity,
     endpoint_snapshot,
 )
-from custom_components.ha_opcua_discovery.text import AsyncuaText
+from custom_components.ha_opcua.text import AsyncuaText
 
 pytestmark = pytest.mark.asyncio
 

@@ -9,16 +9,16 @@ from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.ha_opcua_discovery import (
+from custom_components.ha_opcua import (
     AsyncuaCoordinator,
     _migrate_entity_ids,
     async_setup_entry,
     async_unload_entry,
     entity_unique_id,
 )
-from custom_components.ha_opcua_discovery.const import DOMAIN, SERVICE_SET_VALUE
-from custom_components.ha_opcua_discovery.sensor import AsyncuaSensor
-from custom_components.ha_opcua_discovery.switch import AsyncuaSwitch
+from custom_components.ha_opcua.const import DOMAIN, SERVICE_SET_VALUE
+from custom_components.ha_opcua.sensor import AsyncuaSensor
+from custom_components.ha_opcua.switch import AsyncuaSwitch
 
 pytestmark = pytest.mark.asyncio
 
@@ -132,7 +132,7 @@ async def test_platform_setup_failure_cleans_resources_and_requests_retry(hass, 
         disconnect=AsyncMock(),
     )
     with (
-        patch("custom_components.ha_opcua_discovery.OpcuaHub", return_value=hub),
+        patch("custom_components.ha_opcua.OpcuaHub", return_value=hub),
         patch.object(
             hass.config_entries,
             "async_forward_entry_setups",
@@ -155,7 +155,7 @@ async def test_service_uses_selected_hub_and_lives_until_last_unload(hass, entry
         disconnect=AsyncMock(),
     )
     with (
-        patch("custom_components.ha_opcua_discovery.OpcuaHub", return_value=hub),
+        patch("custom_components.ha_opcua.OpcuaHub", return_value=hub),
         patch.object(
             hass.config_entries, "async_forward_entry_setups", new=AsyncMock()
         ),

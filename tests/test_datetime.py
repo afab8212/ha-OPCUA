@@ -12,23 +12,23 @@ from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import area_registry as ar
 
-from custom_components.ha_opcua_discovery import AsyncuaCoordinator, OpcuaHub
-from custom_components.ha_opcua_discovery.config_flow import AsyncUAOptionsFlow
-from custom_components.ha_opcua_discovery.const import CONF_NODE_SETTINGS, DOMAIN
-from custom_components.ha_opcua_discovery.datetime import AsyncuaDateTime
-from custom_components.ha_opcua_discovery.entity import async_setup_node_entities
-from custom_components.ha_opcua_discovery.node_settings import (
+from custom_components.ha_opcua import AsyncuaCoordinator, OpcuaHub
+from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
+from custom_components.ha_opcua.const import CONF_NODE_SETTINGS, DOMAIN
+from custom_components.ha_opcua.datetime import AsyncuaDateTime
+from custom_components.ha_opcua.entity import async_setup_node_entities
+from custom_components.ha_opcua.node_settings import (
     allowed_platforms,
     effective_platform,
     validate_settings,
 )
-from custom_components.ha_opcua_discovery.panel import (
+from custom_components.ha_opcua.panel import (
     async_create_entity,
     async_inspect_node,
     endpoint_snapshot,
 )
-from custom_components.ha_opcua_discovery.sensor import AsyncuaSensor
-from custom_components.ha_opcua_discovery.values import datetime_value, scalar_variant
+from custom_components.ha_opcua.sensor import AsyncuaSensor
+from custom_components.ha_opcua.values import datetime_value, scalar_variant
 
 
 def test_datetime_normalization_and_validation():

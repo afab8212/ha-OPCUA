@@ -9,20 +9,20 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from probatio import to_field_list
 
-from custom_components.ha_opcua_discovery import (
+from custom_components.ha_opcua import (
     AsyncuaCoordinator,
     OpcuaHub,
     async_setup_entry,
 )
-from custom_components.ha_opcua_discovery.binary_sensor import AsyncuaBinarySensor
-from custom_components.ha_opcua_discovery.config_flow import AsyncUAOptionsFlow
-from custom_components.ha_opcua_discovery.const import CONF_NODE_SETTINGS, DOMAIN
-from custom_components.ha_opcua_discovery.node_settings import (
+from custom_components.ha_opcua.binary_sensor import AsyncuaBinarySensor
+from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
+from custom_components.ha_opcua.const import CONF_NODE_SETTINGS, DOMAIN
+from custom_components.ha_opcua.node_settings import (
     allowed_platforms,
     validate_settings,
 )
-from custom_components.ha_opcua_discovery.number import AsyncuaNumber
-from custom_components.ha_opcua_discovery.text import AsyncuaText
+from custom_components.ha_opcua.number import AsyncuaNumber
+from custom_components.ha_opcua.text import AsyncuaText
 
 
 def node(kind="String", writable=True, node_id="ns=2;i=1"):
@@ -178,7 +178,7 @@ async def test_reload_runs_after_options_are_persisted(hass, entry):
         assert entry.options[CONF_NODE_SETTINGS]["ns=2;i=1"]["platform"] == "text"
 
     with (
-        patch("custom_components.ha_opcua_discovery.OpcuaHub", return_value=hub),
+        patch("custom_components.ha_opcua.OpcuaHub", return_value=hub),
         patch.object(
             hass.config_entries, "async_forward_entry_setups", new=AsyncMock()
         ),
