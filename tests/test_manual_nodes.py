@@ -21,6 +21,7 @@ from custom_components.ha_opcua_discovery.panel import (
     async_create_entity,
     async_inspect_node,
     async_remove_manual_node,
+    async_save_entity,
     endpoint_snapshot,
 )
 from custom_components.ha_opcua_discovery.text import AsyncuaText
@@ -347,3 +348,38 @@ async def test_invalid_removal_is_atomic(hass, entry, failure):
     assert er.async_get(hass).async_get(entity_id) is not None
     assert MANUAL["node_id"] in c.manual_nodes
     await c.async_shutdown()
+
+
+async def test_manual_text_limits_create_edit_and_invalid_save(hass, entry):
+    c, _, _ = await prepare(hass, entry)
+    c.hub.inspect_node = AsyncMock(return_value=MANUAL)
+    initial = payload(hass, entry, limits={"min_length": 2, "max_length": 40})
+    created = await async_create_entity(hass, initial)
+    assert entry.options[CONF_NODE_SETTINGS][MANUAL["node_id"]]["max_length"] == 40
+    restored = AsyncuaCoordinator(hass, "PLC", c.hub, config_entry=entry)
+    restored.set_nodes([MANUAL])
+    hass.data[DOMAIN]["PLC"] = restored
+    msg = {
+        **payload(hass, entry),
+        "key": MANUAL["node_id"],
+        "limits": {"min_length": 0, "max_length": 80},
+    }
+    assert (await async_save_entity(hass, msg))["entity_id"] == created["entity_id"]
+    before = deepcopy(dict(entry.options))
+    for limits in (
+        {"min_length": 3, "max_length": 2},
+        {"max_length": 256},
+        {"min_length": 0.5},
+    ):
+        with pytest.raises(ValueError, match="invalid_text_limits"):
+            await async_save_entity(
+                hass,
+                {
+                    **msg,
+                    "revision": endpoint_snapshot(hass, entry)["revision"],
+                    "limits": limits,
+                },
+            )
+    assert dict(entry.options) == before
+    await c.async_shutdown()
+    await restored.async_shutdown()

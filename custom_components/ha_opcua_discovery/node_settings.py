@@ -72,6 +72,8 @@ def validate_settings(node, settings):
         result["device_class"] = settings["device_class"]
     if platform == "number":
         defaults = number_defaults(node)
+        if any(isinstance(settings.get(key), bool) for key in defaults):
+            raise ValueError("invalid_number_limits")
         try:
             limits = {
                 key: float(settings.get(key, default))

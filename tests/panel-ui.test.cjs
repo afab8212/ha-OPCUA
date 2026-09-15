@@ -108,6 +108,7 @@ async function pageFor(width = 1280, admin = true) {
     ];
     window.calls = [];
     window.fixture = {
+      version: "1.5.2",
       endpoints: [
         {
           entry_id: "plc1",
@@ -176,7 +177,12 @@ async function pageFor(width = 1280, admin = true) {
         );
         const row = endpoint.rows.find((r) => r.key === msg.key);
         Object.assign(row, {
-          name: msg.name,
+          platform:
+            msg.platform === "auto"
+              ? row.platform
+              : msg.platform || row.platform,
+          settings: { ...row.settings, platform: msg.platform, ...msg.limits },
+          name: msg.name || row.name,
           custom_name: msg.name,
           area_id: msg.area_id,
           node_id: msg.node_id,
@@ -207,6 +213,22 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
+  assert.equal(await page.locator(".version").textContent(), "Versione 1.5.2");
+  assert.equal(
+    await page.getByRole("button", { name: "Menu", exact: true }).count(),
+    0,
+  );
+  await page.setViewportSize({ width: 870, height: 900 });
+  assert.equal(
+    await page.getByRole("button", { name: "Menu", exact: true }).isVisible(),
+    true,
+  );
+  await page.setViewportSize({ width: 871, height: 900 });
+  assert.equal(
+    await page.getByRole("button", { name: "Menu", exact: true }).count(),
+    0,
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
   await shot(page, "desktop.png");
   await page
     .getByRole("button", { name: "Sensori binari · 1", exact: true })
@@ -272,6 +294,7 @@ test("editing saves correct fields and live hass updates preserve draft", async 
     entry_id: "plc1",
     revision: "rev1",
     key: "ns=4;i=2",
+    platform: "binary_sensor",
     name: "Porta ingresso",
     area_id: "workshop",
     node_id: "ns=4;i=1",
@@ -714,6 +737,119 @@ test("HA formatting and unavailable, unknown, empty, excluded and pending states
   assert.equal(
     await value("text.ricetta").textContent(),
     "<img src=x onerror=alert(1)>",
+  );
+  await page.close();
+});
+
+test("edit number limits, preserve draft, exclude and re-enable from the panel", async () => {
+  const page = await pageFor();
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    endpoint.nodes.find((n) => n.node_id === "ns=4;i=3").writable = true;
+    const row = endpoint.rows.find((r) => r.key === "ns=4;i=3");
+    row.platform = "number";
+    row.entity_id = "number.velocita";
+    row.settings = { platform: "number", min: -5, max: 80, step: 0.25 };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  const card = page.locator("article").filter({ hasText: "Velocità linea" });
+  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  let dialog = page.locator("dialog[open]");
+  assert.equal(
+    await dialog.getByLabel("Valore minimo", { exact: true }).inputValue(),
+    "-5",
+  );
+  assert.equal(
+    await dialog.getByLabel("Passo", { exact: true }).inputValue(),
+    "0.25",
+  );
+  await dialog.getByLabel("Valore massimo", { exact: true }).fill("125.5");
+  await page.evaluate(() => {
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  assert.equal(
+    await dialog.getByLabel("Valore massimo", { exact: true }).inputValue(),
+    "125.5",
+  );
+  await shot(page, "number-limits-desktop.png");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  const saved = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/update")),
+  );
+  assert.deepEqual(saved.limits, { min: -5, max: 125.5, step: 0.25 });
+  assert.equal(saved.platform, "number");
+  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("Categoria", { exact: true })
+    .selectOption("disabled");
+  assert.equal(
+    await dialog.getByLabel("Valore minimo", { exact: true }).isVisible(),
+    false,
+  );
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Esclusi · 1", exact: true })
+    .waitFor();
+  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  await page
+    .locator("dialog[open]")
+    .getByLabel("Categoria", { exact: true })
+    .selectOption("number");
+  await page
+    .locator("dialog[open]")
+    .getByRole("button", { name: "Salva", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Numeri · 1", exact: true }).waitFor();
+  await page.close();
+});
+
+test("manual text limits and cancelled category edits on mobile", async () => {
+  const page = await pageFor(390);
+  await page.evaluate(() => {
+    window.inspectResult = {
+      node: {
+        name: "Ricetta nuova",
+        node_id: "ns=4;i=77",
+        variant_type: "String",
+        writable: true,
+      },
+      platforms: ["sensor", "text"],
+    };
+  });
+  await page
+    .getByRole("button", { name: "Aggiungi entità", exact: true })
+    .click();
+  let dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .fill("ns=4;i=77");
+  await dialog
+    .getByRole("button", { name: "Verifica nodo", exact: true })
+    .click();
+  await dialog.getByLabel("Categoria", { exact: true }).selectOption("text");
+  await dialog.getByLabel("Lunghezza minima", { exact: true }).fill("2");
+  await dialog.getByLabel("Lunghezza massima", { exact: true }).fill("64");
+  await shot(page, "text-limits-mobile.png");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  const saved = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/create")),
+  );
+  assert.deepEqual(saved.limits, { min_length: 2, max_length: 64 });
+  const card = page.locator("article").filter({ hasText: "Nome ricetta" });
+  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  dialog = page.locator("dialog[open]");
+  await dialog.getByLabel("Categoria", { exact: true }).selectOption("sensor");
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  assert.equal(
+    await page
+      .locator("dialog[open]")
+      .getByLabel("Categoria", { exact: true })
+      .inputValue(),
+    "text",
   );
   await page.close();
 });
