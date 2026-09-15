@@ -108,7 +108,7 @@ async function pageFor(width = 1280, admin = true) {
     ];
     window.calls = [];
     window.fixture = {
-      version: "1.5.1",
+      version: "1.5.2",
       endpoints: [
         {
           entry_id: "plc1",
@@ -213,7 +213,22 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
-  assert.equal(await page.locator(".version").textContent(), "Versione 1.5.1");
+  assert.equal(await page.locator(".version").textContent(), "Versione 1.5.2");
+  assert.equal(
+    await page.getByRole("button", { name: "Menu", exact: true }).count(),
+    0,
+  );
+  await page.setViewportSize({ width: 870, height: 900 });
+  assert.equal(
+    await page.getByRole("button", { name: "Menu", exact: true }).isVisible(),
+    true,
+  );
+  await page.setViewportSize({ width: 871, height: 900 });
+  assert.equal(
+    await page.getByRole("button", { name: "Menu", exact: true }).count(),
+    0,
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
   await shot(page, "desktop.png");
   await page
     .getByRole("button", { name: "Sensori binari · 1", exact: true })

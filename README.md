@@ -70,7 +70,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ---
 
-## OPC UA side panel (1.5.1)
+## OPC UA side panel (1.5.2)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
