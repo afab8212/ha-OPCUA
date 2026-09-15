@@ -30,6 +30,7 @@ from .const import (
     CONF_HUB_USERNAME,
     CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
+    CONF_OFFLINE_NODES,
     DOMAIN,
     FIELD_NODE_HUB,
     FIELD_NODE_ID,
@@ -481,6 +482,13 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             if config_entry
             else {}
         )
+        self.offline_nodes = {
+            key: node
+            for key, node in (
+                config_entry.options.get(CONF_OFFLINE_NODES, {}) if config_entry else {}
+            ).items()
+            if self.node_settings.get(key, {}).get("always_available", False)
+        }
         self._manual_pending = set(self.manual_nodes)
         self._platforms = {}
         super().__init__(
@@ -491,6 +499,10 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             config_entry=config_entry,
         )
         self._hub.on_connection_state_change = self._connection_state_changed
+        if self.offline_nodes:
+            self.set_nodes([])
+            # Cached metadata must not suppress normal discovery on reconnection.
+            self._discovery_pending = config_entry is not None
 
     def _connection_state_changed(self):
         # Do not re-expose stale node values when a replacement session connects.
@@ -530,7 +542,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         self._discovery_pending = False
         self.discovered_nodes = {node["node_id"]: node for node in nodes}
         # Keep saved manual entities visible even if temporarily unreadable.
-        candidates = {**self.manual_nodes, **self.discovered_nodes}
+        candidates = {
+            **self.offline_nodes,
+            **self.manual_nodes,
+            **self.discovered_nodes,
+        }
         # Remapped entities retain their identity even if their original node is gone.
         for entity_key, settings in self.node_settings.items():
             target = self.discovered_nodes.get(settings.get("node_id"))
@@ -542,6 +558,14 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             saved = self.node_settings.get(node_id, {})
             target_id = saved.get("node_id", node_id)
             target = self.discovered_nodes.get(target_id)
+            cached = self.offline_nodes.get(node_id)
+            if (
+                target is None
+                and saved.get("always_available", False)
+                and cached is not None
+                and cached["node_id"] == target_id
+            ):
+                target = cached
             node = {
                 **(target or original),
                 "name": original["name"],

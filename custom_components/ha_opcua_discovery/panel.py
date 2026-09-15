@@ -19,7 +19,12 @@ from homeassistant.loader import async_get_integration
 from .connection import connection_attributes
 from .const import CONF_HUB_ID, CONF_MANUAL_NODES, CONF_NODE_SETTINGS, DOMAIN
 from .device import async_register_device
-from .node_settings import allowed_platforms, effective_platform, validate_settings
+from .node_settings import (
+    allowed_platforms,
+    effective_platform,
+    update_offline_node,
+    validate_settings,
+)
 
 PANEL_PATH = "opcua-nodes"
 PANEL_DATA = f"{DOMAIN}_panel"
@@ -57,9 +62,18 @@ def _coordinator(hass, entry):
     return hass.data.get(DOMAIN, {}).get(entry.data[CONF_HUB_ID])
 
 
+def _panel_nodes(coordinator):
+    """Prefer live discovery, retaining verified metadata for offline editors."""
+    return {
+        **{node["node_id"]: node for node in coordinator.offline_nodes.values()},
+        **coordinator.discovered_nodes,
+    }
+
+
 def endpoint_snapshot(hass, entry):
     registry = er.async_get(hass)
     c = _coordinator(hass, entry)
+    available_nodes = _panel_nodes(c) if c else {}
     rows = []
     manual = entry.options.get(CONF_MANUAL_NODES, {})
     nodes = {**manual, **(c.nodes if c else {})}
@@ -104,7 +118,7 @@ def endpoint_snapshot(hass, entry):
                     c
                     and key in c.nodes
                     and node.get("target_node_id", settings.get("node_id", key))
-                    in c.discovered_nodes
+                    in available_nodes
                 ),
                 "settings": {
                     k: v
@@ -118,6 +132,7 @@ def endpoint_snapshot(hass, entry):
                         "min_length",
                         "max_length",
                         "precision",
+                        "always_available",
                     )
                 },
                 "manual": key in manual,
@@ -137,7 +152,7 @@ def endpoint_snapshot(hass, entry):
         "connected": bool(c and c.enabled and c.hub.is_connected),
         "revision": revision,
         "rows": rows,
-        "nodes": list(c.discovered_nodes.values()) if c else [],
+        "nodes": list(available_nodes.values()),
         "status_entity": registry.async_get_entity_id(
             "binary_sensor", DOMAIN, f"{entry.entry_id}:connection_status"
         ),
@@ -178,7 +193,7 @@ async def async_save_entity(hass, msg):
         )
         if row is None or not row["editable"]:
             raise ValueError("entity_not_ready")
-        target = c.discovered_nodes.get(msg["node_id"])
+        target = _panel_nodes(c).get(msg["node_id"])
         if target is None:
             raise ValueError("node_not_found")
         saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(msg["key"], {})
@@ -237,6 +252,7 @@ async def async_save_entity(hass, msg):
             c._platforms[msg["key"]] = "disabled"
         options = deepcopy(dict(entry.options))
         options.setdefault(CONF_NODE_SETTINGS, {})[msg["key"]] = settings
+        update_offline_node(options, msg["key"], target, settings)
         reload_needed = options != dict(entry.options)
         if reload_needed:
             hass.config_entries.async_update_entry(entry, options=options)
@@ -257,8 +273,9 @@ def _entity_settings(node, msg, saved=None):
     }
     if "platform" in msg:
         proposed["platform"] = msg["platform"]
-    if "precision" in msg:
-        proposed["precision"] = msg["precision"]
+    for field in ("precision", "always_available"):
+        if field in msg:
+            proposed[field] = msg[field]
     limits = msg.get("limits", {})
     platform = effective_platform(node, proposed)
     allowed = (
@@ -356,6 +373,7 @@ async def async_create_entity(hass, msg):
         options = deepcopy(dict(entry.options))
         options.setdefault(CONF_MANUAL_NODES, {})[node_id] = node
         options.setdefault(CONF_NODE_SETTINGS, {})[node_id] = settings
+        update_offline_node(options, node_id, node, settings)
         device = async_register_device(hass, entry)
         registered = registry.async_get_or_create(
             msg["platform"],
@@ -398,9 +416,11 @@ async def async_remove_manual_node(hass, msg):
         # Discovery may find this physical node later. Keep it excluded until the
         # user explicitly re-enables it or adds it manually again.
         options.setdefault(CONF_NODE_SETTINGS, {})[key] = {"platform": "disabled"}
+        update_offline_node(options, key, {}, {})
         c = _coordinator(hass, entry)
         if c is not None:
             c.manual_nodes.pop(key, None)
+            c.offline_nodes.pop(key, None)
             c._manual_pending.discard(key)
             c.node_settings[key] = {"platform": "disabled"}
             c._platforms[key] = "disabled"
@@ -464,6 +484,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Required("platform"): str,
         vol.Optional("limits"): dict,
         vol.Optional("precision"): vol.Any(int, None),
+        vol.Optional("always_available"): bool,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("device_class"): vol.Any(str, None),
@@ -497,6 +518,7 @@ async def ws_snapshot(hass, connection, msg):
         vol.Optional("platform"): str,
         vol.Optional("limits"): dict,
         vol.Optional("precision"): vol.Any(int, None),
+        vol.Optional("always_available"): bool,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("node_id"): str,

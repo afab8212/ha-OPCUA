@@ -2,6 +2,10 @@
 const TEXT = {
   it: {
     version: "Versione",
+    alwaysAvailable: "Sempre disponibile",
+    alwaysAvailableHelp:
+      "Mantiene l’ultimo valore noto quando il PLC è scollegato o la connessione è disabilitata. Senza un valore salvato lo stato è sconosciuto. Le scritture richiedono la connessione e una lettura aggiornata.",
+    invalid_availability: "Impostazione di disponibilità non valida.",
     precision: "Decimali",
     precisionHelp:
       "REAL/LREAL: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
@@ -125,6 +129,10 @@ const TEXT = {
   },
   en: {
     version: "Version",
+    alwaysAvailable: "Always available",
+    alwaysAvailableHelp:
+      "Keeps the last known value when the PLC is disconnected or the connection is disabled. Without a saved value the state is unknown. Writes require a connection and a fresh reading.",
+    invalid_availability: "Invalid availability setting.",
     precision: "Decimal places",
     precisionHelp:
       "REAL/LREAL: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
@@ -868,6 +876,20 @@ class OpcuaNodePanel extends HTMLElement {
     const limitInputs = {};
     const limitGroups = {};
     const initial = row.settings || {};
+    const alwaysAvailable = element("input", undefined, {
+      type: "checkbox",
+      name: "always_available",
+    });
+    alwaysAvailable.checked = initial.always_available === true;
+    const availabilityToggle = element("label", undefined, { class: "toggle" });
+    availabilityToggle.append(
+      alwaysAvailable,
+      element("span", this._t("alwaysAvailable")),
+    );
+    form.append(
+      availabilityToggle,
+      element("p", this._t("alwaysAvailableHelp"), { class: "hint" }),
+    );
     const defaults = {
       min: 0,
       max: 100,
@@ -1001,6 +1023,9 @@ class OpcuaNodePanel extends HTMLElement {
           revision,
           ...(manual ? {} : { key: row.key }),
           platform: category.value,
+          ...(alwaysAvailable.checked || initial.always_available !== undefined
+            ? { always_available: alwaysAvailable.checked }
+            : {}),
           ...(["number", "text"].includes(effective())
             ? {
                 limits: Object.fromEntries(
