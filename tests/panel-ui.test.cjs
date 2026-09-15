@@ -108,7 +108,7 @@ async function pageFor(width = 1280, admin = true) {
     ];
     window.calls = [];
     window.fixture = {
-      version: "2.0.1",
+      version: "2.0.2",
       endpoints: [
         {
           entry_id: "plc1",
@@ -223,7 +223,7 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
-  assert.equal(await page.locator(".version").textContent(), "Versione 2.0.1");
+  assert.equal(await page.locator(".version").textContent(), "Versione 2.0.2");
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
     0,

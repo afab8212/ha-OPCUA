@@ -3,7 +3,10 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 
-<img src="repo_logo.png" width="600" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/ha_opcua/brand/dark_logo.png">
+  <img src="custom_components/ha_opcua/brand/logo.png" alt="ha-OPCUA" width="600">
+</picture>
 
 ## 🔌 Overview
 
@@ -63,6 +66,12 @@ Starting with 2.0.0, the integration directory and Home Assistant domain are **`
 
 This is a fresh-install domain change with no automatic migration from the previous domain. If an older version was installed, remove its integration entries and old custom-component directory before installing this version, then configure the endpoints again. Existing entity references and automations may need updating. Direct service calls now use `ha_opcua.opcua_set_value`.
 
+### Integration icons
+
+On Home Assistant **2026.3 or newer**, ha-OPCUA includes local brand icons in `custom_components/ha_opcua/brand/`, with a new PLC/home/network symbol and matching **ha-OPCUA** wordmark. Both icon and logo have transparent backgrounds and dedicated light/dark variants. High-resolution images are bundled for both standard and `@2x` requests. No separate brands installation is needed. After updating, restart Home Assistant and reload the browser to refresh the images. Older Home Assistant versions do not load these bundled images.
+
+See [Home Assistant's brand image documentation](https://developers.home-assistant.io/docs/core/integration/brand_images/).
+
 ## ⚙️ Configuration
 
 ### Setup via Home Assistant UI
@@ -78,7 +87,7 @@ This is a fresh-install domain change with no automatic migration from the previ
 
 ---
 
-## OPC UA side panel (2.0.1)
+## OPC UA side panel (2.0.2)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
