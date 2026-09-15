@@ -1,13 +1,13 @@
-# 🏠 Home Assistant OPC-UA Discovery Integration
+# 🏠 ha-OPCUA — OPC UA for Home Assistant
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 
-<img src="https://github.com/guanaco0403/Home-Assistant-Opcua-Discovery/blob/main/repo_logo.png" width="600" />
+<img src="repo_logo.png" width="600" />
 
 ## 🔌 Overview
 
-**Home-Assistant-Opcua-Discovery** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number`, `text` or `datetime` entities in Home Assistant.
+**ha-OPCUA** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number`, `text` or `datetime` entities in Home Assistant.
 
 This integration supports **local polling** using the `asyncua` library and is ideal for industrial or automation environments where OPC UA is the communication protocol standard.
 
@@ -38,10 +38,10 @@ This integration supports **local polling** using the `asyncua` library and is i
 ## 📦 Installation
 
 ### Option 1: HACS (Recommended for Users)
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?repository=Home-Assistant-Opcua-Discovery&owner=guanaco0403&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?repository=ha-OPCUA&owner=xtimmy86x&category=integration)
 
 1. Go to **HACS > Integrations > Custom repositories**
-2. Add this repo URL: https://github.com/guanaco0403/Home-Assistant-Opcua-Discovery
+2. Add this repository: [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA)
 3. Select category: **Integration**
 4. Click **Add**
 5. Install the `Home Assistant OPC-UA Discovery` integration
@@ -49,11 +49,15 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 ### Option 2: Manual
 
-1. Download the latest release `ha_opcua_discovery.zip`
-2. Extract and copy the `ha_opcua_discovery` folder into: /config/custom_components/
+1. Download the source code for the desired version from [Releases](https://github.com/xtimmy86x/ha-OPCUA/releases), or use **Code → Download ZIP** on the [repository page](https://github.com/xtimmy86x/ha-OPCUA).
+2. Extract the archive and copy `custom_components/ha_opcua_discovery` into `/config/custom_components/`.
 3. Restart Home Assistant
 
 ---
+
+### Existing installations after the repository rename
+
+The project is now maintained independently at [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA). If HACS still uses the previous repository, update its custom repository reference to this URL. The Home Assistant integration is still named **Home Assistant OPC-UA Discovery** and its domain and directory remain `ha_opcua_discovery`. The repository rename does not require deleting or recreating your configured endpoints, entities or automations.
 
 ## ⚙️ Configuration
 
@@ -227,9 +231,10 @@ custom_components/
 - Quality Scale: bronze
 - IoT Class: local_polling
 
-## 🧑‍💻 Code Owner
+## 🧑‍💻 Maintainer and credits
 
-- @guanaco0403
+- Maintainer: [@xtimmy86x](https://github.com/xtimmy86x)
+- Original project: [Home-Assistant-Opcua-Discovery by @guanaco0403](https://github.com/guanaco0403/Home-Assistant-Opcua-Discovery). The original MIT copyright notice is retained in [LICENSE](LICENSE).
 
 ## 🪪 License
 
@@ -237,4 +242,4 @@ This project is licensed under the MIT License.
 
 ## 📢 Contribute
 
-Pull requests are welcome! If you want to improve auto-discovery, error handling, or add support for more OPC UA types — contributions are appreciated.
+Report bugs or request features in [Issues](https://github.com/xtimmy86x/ha-OPCUA/issues), or contribute through [Pull requests](https://github.com/xtimmy86x/ha-OPCUA/pulls). Pull requests are welcome! If you want to improve auto-discovery, error handling, or add support for more OPC UA types — contributions are appreciated.
