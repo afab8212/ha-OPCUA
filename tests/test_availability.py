@@ -14,31 +14,31 @@ from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.restore_state import RestoredExtraData, StoredState
 from test_panel import prepare
 
-from custom_components.ha_opcua_discovery import AsyncuaCoordinator, OpcuaHub
-from custom_components.ha_opcua_discovery.binary_sensor import (
+from custom_components.ha_opcua import AsyncuaCoordinator, OpcuaHub
+from custom_components.ha_opcua.binary_sensor import (
     AsyncuaBinarySensor,
     OpcuaConnectionSensor,
 )
-from custom_components.ha_opcua_discovery.const import (
+from custom_components.ha_opcua.const import (
     CONF_CONNECTION_ENABLED,
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
     DOMAIN,
 )
-from custom_components.ha_opcua_discovery.datetime import AsyncuaDateTime
-from custom_components.ha_opcua_discovery.entity import (
+from custom_components.ha_opcua.datetime import AsyncuaDateTime
+from custom_components.ha_opcua.entity import (
     OpcuaStoredValue,
     async_setup_node_entities,
 )
-from custom_components.ha_opcua_discovery.node_settings import validate_settings
-from custom_components.ha_opcua_discovery.number import AsyncuaNumber
-from custom_components.ha_opcua_discovery.panel import (
+from custom_components.ha_opcua.node_settings import validate_settings
+from custom_components.ha_opcua.number import AsyncuaNumber
+from custom_components.ha_opcua.panel import (
     async_save_entity,
     endpoint_snapshot,
 )
-from custom_components.ha_opcua_discovery.sensor import AsyncuaSensor
-from custom_components.ha_opcua_discovery.switch import AsyncuaSwitch
-from custom_components.ha_opcua_discovery.text import AsyncuaText
+from custom_components.ha_opcua.sensor import AsyncuaSensor
+from custom_components.ha_opcua.switch import AsyncuaSwitch
+from custom_components.ha_opcua.text import AsyncuaText
 
 pytestmark = pytest.mark.asyncio
 
@@ -125,7 +125,7 @@ async def test_real_connection_pause_loss_recovery_and_native_restore(
         assert len(new_entities) == 1 and restarted._discovery_pending
         restored = new_entities[0]
         restored.entity_id = "number.real"
-        with patch("custom_components.ha_opcua_discovery.Client") as client:
+        with patch("custom_components.ha_opcua.Client") as client:
             await restarted.async_refresh()
             await platform.async_add_entities([restored])
             client.assert_not_called()

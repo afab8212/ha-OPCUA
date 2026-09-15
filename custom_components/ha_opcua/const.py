@@ -1,4 +1,4 @@
-DOMAIN = "ha_opcua_discovery"
+DOMAIN = "ha_opcua"
 
 CONF_HUB_ID = "hub_id"
 CONF_HUB_URL = "url"

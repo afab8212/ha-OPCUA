@@ -11,7 +11,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import frame
 
-from custom_components.ha_opcua_discovery.const import DOMAIN
+from custom_components.ha_opcua.const import DOMAIN
 
 
 @pytest_asyncio.fixture

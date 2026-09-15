@@ -35,11 +35,7 @@ async def async_setup_panel(hass):
         return
     version = (await async_get_integration(hass, DOMAIN)).manifest["version"]
     await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                "/opcua-discovery-panel", str(Path(__file__).parent / "www"), True
-            )
-        ]
+        [StaticPathConfig("/ha-opcua-panel", str(Path(__file__).parent / "www"), True)]
     )
     await panel_custom.async_register_panel(
         hass,
@@ -47,7 +43,7 @@ async def async_setup_panel(hass):
         webcomponent_name="opcua-node-panel",
         sidebar_title="OPC UA",
         sidebar_icon="mdi:lan-connect",
-        module_url=f"/opcua-discovery-panel/panel.js?v={version}",
+        module_url=f"/ha-opcua-panel/panel.js?v={version}",
         require_admin=True,
     )
     websocket_api.async_register_command(hass, ws_snapshot)

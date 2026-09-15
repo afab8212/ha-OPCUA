@@ -375,7 +375,7 @@ class OpcuaNodePanel extends HTMLElement {
     const generation = ++this._generation;
     try {
       const data = await this._hass.callWS({
-        type: "ha_opcua_discovery/panel",
+        type: "ha_opcua/panel",
       });
       if (generation !== this._generation || !this.isConnected) return;
       this._data = data;
@@ -676,7 +676,7 @@ class OpcuaNodePanel extends HTMLElement {
       error.textContent = "";
       try {
         const result = await this._hass.callWS({
-          type: "ha_opcua_discovery/node/remove",
+          type: "ha_opcua/node/remove",
           entry_id: endpoint.entry_id,
           revision: endpoint.revision,
           key: row.key,
@@ -742,7 +742,7 @@ class OpcuaNodePanel extends HTMLElement {
       error.textContent = "";
       try {
         const result = await this._hass.callWS({
-          type: "ha_opcua_discovery/node/inspect",
+          type: "ha_opcua/node/inspect",
           entry_id: endpoint.entry_id,
           node_id: nodeId.value,
         });
@@ -1018,7 +1018,7 @@ class OpcuaNodePanel extends HTMLElement {
       error.textContent = "";
       try {
         const result = await this._hass.callWS({
-          type: `ha_opcua_discovery/entity/${manual ? "create" : "update"}`,
+          type: `ha_opcua/entity/${manual ? "create" : "update"}`,
           entry_id: endpoint.entry_id,
           revision,
           ...(manual ? {} : { key: row.key }),
