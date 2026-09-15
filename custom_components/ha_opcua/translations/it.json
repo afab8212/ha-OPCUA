@@ -126,5 +126,22 @@
         "name": "Connessione"
       }
     }
+  },
+  "issues": {
+    "orphan_entity": {
+      "title": "Elimina entità orfana: {entity_id}",
+      "description": "L’entità `{entity_id}` dell’endpoint **{endpoint}** non è più utilizzata dalla configurazione corrente, oppure il suo nodo non è più presente dopo una discovery completa. Puoi eliminare la vecchia entità dal registro di Home Assistant. Prima di confermare, aggiorna eventuali automazioni, script e dashboard che la utilizzano. Il nodo nel PLC, le impostazioni e le altre entità non vengono modificati.",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Elimina entità orfana: {entity_id}",
+            "description": "L’entità `{entity_id}` dell’endpoint **{endpoint}** non è più utilizzata dalla configurazione corrente, oppure il suo nodo non è più presente dopo una discovery completa. Puoi eliminare la vecchia entità dal registro di Home Assistant. Prima di confermare, aggiorna eventuali automazioni, script e dashboard che la utilizzano. Il nodo nel PLC, le impostazioni e le altre entità non vengono modificati."
+          }
+        },
+        "abort": {
+          "no_longer_orphan": "L’entità non è più orfana, è già stata rimossa oppure la verifica non è disponibile. Non è stata eliminata alcuna entità."
+        }
+      }
+    }
   }
 }
