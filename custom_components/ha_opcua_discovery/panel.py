@@ -110,7 +110,15 @@ def endpoint_snapshot(hass, entry):
                     k: v
                     for k, v in settings.items()
                     if k
-                    in ("platform", "min", "max", "step", "min_length", "max_length")
+                    in (
+                        "platform",
+                        "min",
+                        "max",
+                        "step",
+                        "min_length",
+                        "max_length",
+                        "precision",
+                    )
                 },
                 "manual": key in manual,
             }
@@ -249,6 +257,8 @@ def _entity_settings(node, msg, saved=None):
     }
     if "platform" in msg:
         proposed["platform"] = msg["platform"]
+    if "precision" in msg:
+        proposed["precision"] = msg["precision"]
     limits = msg.get("limits", {})
     platform = effective_platform(node, proposed)
     allowed = (
@@ -453,6 +463,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Required("node_id"): str,
         vol.Required("platform"): str,
         vol.Optional("limits"): dict,
+        vol.Optional("precision"): vol.Any(int, None),
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("device_class"): vol.Any(str, None),
@@ -485,6 +496,7 @@ async def ws_snapshot(hass, connection, msg):
         vol.Required("key"): str,
         vol.Optional("platform"): str,
         vol.Optional("limits"): dict,
+        vol.Optional("precision"): vol.Any(int, None),
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("node_id"): str,

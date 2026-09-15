@@ -183,8 +183,10 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
         common = {
             key: value
             for key, value in self._current_settings().items()
-            if key in ("node_id", "invert_state", "device_class")
+            if key in ("node_id", "invert_state", "device_class", "precision")
         }
+        if self._node["variant_type"] not in {"Float", "Double"}:
+            common.pop("precision", None)
         if settings["platform"] != "binary_sensor":
             common.pop("device_class", None)
         merged = {**common, **settings}

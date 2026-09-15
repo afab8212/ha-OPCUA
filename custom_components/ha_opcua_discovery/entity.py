@@ -1,5 +1,7 @@
 """Common identity, availability and write/read-back behavior."""
 
+import math
+
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -47,6 +49,19 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         value = (self.coordinator.data or {}).get(self._node_id)
         if isinstance(value, bool) and self._settings.get("invert_state", False):
             return not value
+        precision = self._settings.get("precision")
+        if (
+            precision is not None
+            and self.coordinator.nodes[self._node_id]["variant_type"]
+            in {"Float", "Double"}
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+        ):
+            value = round(value, precision)
+            # Avoid displaying negative zero for small negative values.
+            if value == 0:
+                return 0.0
         return value
 
     async def _async_write_value(self, value):

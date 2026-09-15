@@ -54,6 +54,15 @@ def validate_settings(node, settings):
     if platform not in allowed_platforms(node):
         raise ValueError("incompatible_platform")
     result = {"platform": platform}
+    precision = settings.get("precision")
+    if precision is not None:
+        if (
+            type(precision) is not int
+            or not 0 <= precision <= 10
+            or node["variant_type"] not in {"Float", "Double"}
+        ):
+            raise ValueError("invalid_precision")
+        result["precision"] = precision
     if "node_id" in settings:
         if not isinstance(settings["node_id"], str) or not settings["node_id"]:
             raise ValueError("invalid_node_id")

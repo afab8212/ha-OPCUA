@@ -2,6 +2,11 @@
 const TEXT = {
   it: {
     version: "Versione",
+    precision: "Decimali",
+    precisionHelp:
+      "REAL/LREAL: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
+    invalid_precision:
+      "Inserisci un numero intero da 0 a 10 per un nodo REAL/LREAL.",
     remove: "Rimuovi",
     removing: "Rimozione…",
     removeTitle: "Rimuovi nodo manuale",
@@ -120,6 +125,10 @@ const TEXT = {
   },
   en: {
     version: "Version",
+    precision: "Decimal places",
+    precisionHelp:
+      "REAL/LREAL: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
+    invalid_precision: "Enter an integer from 0 to 10 for a REAL/LREAL node.",
     remove: "Remove",
     removing: "Removing…",
     removeTitle: "Remove manual node",
@@ -891,6 +900,19 @@ class OpcuaNodePanel extends HTMLElement {
     }
     const limitsHelp = element("p", this._t("limitsHelp"), { class: "hint" });
     form.append(limitsHelp);
+    const precision = element("input", undefined, {
+      type: "number",
+      name: "precision",
+      min: "0",
+      max: "10",
+      step: "1",
+    });
+    precision.value = initial.precision ?? "";
+    const precisionField = this._field("precision", precision);
+    const precisionHelp = element("p", this._t("precisionHelp"), {
+      class: "hint",
+    });
+    form.append(precisionField, precisionHelp);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     for (const cls of this._data.device_classes)
@@ -918,6 +940,11 @@ class OpcuaNodePanel extends HTMLElement {
     const updateFields = () => {
       const platform = effective();
       classField.hidden = platform !== "binary_sensor";
+      precisionField.hidden = precisionHelp.hidden = ![
+        "Float",
+        "Double",
+      ].includes(selectedNode()?.variant_type);
+      precision.disabled = precisionField.hidden;
       toggle.hidden = invertHelp.hidden =
         selectedNode()?.variant_type !== "Boolean";
       for (const [kind, group] of Object.entries(limitGroups)) {
@@ -982,6 +1009,14 @@ class OpcuaNodePanel extends HTMLElement {
                     : ["min_length", "max_length"]
                   ).map((key) => [key, Number(limitInputs[key].value)]),
                 ),
+              }
+            : {}),
+          ...(!precision.disabled || initial.precision != null
+            ? {
+                precision:
+                  precision.disabled || precision.value === ""
+                    ? null
+                    : Number(precision.value),
               }
             : {}),
           name: name.value,

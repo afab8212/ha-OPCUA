@@ -74,7 +74,7 @@ The project is now maintained independently at [xtimmy86x/ha-OPCUA](https://gith
 
 ---
 
-## OPC UA side panel (1.5.2)
+## OPC UA side panel (1.6.0)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
@@ -83,6 +83,7 @@ Each entity card shows its live Home Assistant state, including localized binary
 Click **Edit** on an entity to configure:
 
 - **Category**: automatic, sensor, binary sensor, switch, number, text, datetime or excluded, according to node type and write permissions. Excluded discovered nodes can be enabled here even if they have no registry entity yet.
+- **Decimal places** for REAL/LREAL (OPC UA Float/Double) nodes: choose 0–10, or leave empty to disable rounding. Available for sensors and numbers, including manually added nodes. This rounds the Home Assistant state used by history and automations; the raw coordinator value and PLC writes are unchanged. For example, `12.345678` becomes `12.35` with 2 decimals. This does not force trailing zeros or change the number step. Existing nodes keep their original precision until configured.
 - **Number limits**: minimum, maximum and step, including decimals for Float/Double.
 - **Text limits**: minimum and maximum length (0–255 characters). Set the maximum to the actual PLC string capacity.
 - **Name**: stored in Home Assistant's entity registry; leave empty to restore the original name.
