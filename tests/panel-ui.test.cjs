@@ -108,7 +108,7 @@ async function pageFor(width = 1280, admin = true) {
     ];
     window.calls = [];
     window.fixture = {
-      version: "1.5.2",
+      version: "1.7.0",
       endpoints: [
         {
           entry_id: "plc1",
@@ -181,7 +181,17 @@ async function pageFor(width = 1280, admin = true) {
             msg.platform === "auto"
               ? row.platform
               : msg.platform || row.platform,
-          settings: { ...row.settings, platform: msg.platform, ...msg.limits },
+          settings: {
+            ...row.settings,
+            platform: msg.platform,
+            ...msg.limits,
+            ...(Object.hasOwn(msg, "always_available")
+              ? { always_available: msg.always_available }
+              : {}),
+            ...(Object.hasOwn(msg, "precision")
+              ? { precision: msg.precision }
+              : {}),
+          },
           name: msg.name || row.name,
           custom_name: msg.name,
           area_id: msg.area_id,
@@ -213,7 +223,7 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
-  assert.equal(await page.locator(".version").textContent(), "Versione 1.5.2");
+  assert.equal(await page.locator(".version").textContent(), "Versione 1.7.0");
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
     0,
@@ -850,6 +860,137 @@ test("manual text limits and cancelled category edits on mobile", async () => {
       .getByLabel("Categoria", { exact: true })
       .inputValue(),
     "text",
+  );
+  await page.close();
+});
+
+test("REAL precision can be saved, cleared and reset on a non-REAL remap", async () => {
+  const page = await pageFor();
+  const card = page.locator("article").filter({ hasText: "Velocità linea" });
+  const edit = () =>
+    card.getByRole("button", { name: "Modifica", exact: true }).click();
+  const dialog = page.locator("dialog[open]");
+  const field = () => dialog.getByLabel("Decimali", { exact: true });
+  const save = async () => {
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  };
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().fill("2");
+  await page.evaluate(() => {
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  assert.equal(await field().inputValue(), "2");
+  await shot(page, "real-rounding.png");
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () => window.calls.find((m) => m.type.endsWith("/update")).precision,
+    ),
+    2,
+  );
+  await edit();
+  assert.equal(await field().inputValue(), "2");
+  await field().fill("0");
+  await save();
+  await edit();
+  assert.equal(await field().inputValue(), "0");
+  await field().fill("");
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1).precision,
+    ),
+    null,
+  );
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().fill("3");
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().fill("3");
+  await save();
+  await edit();
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .selectOption("ns=4;i=4");
+  assert.equal(await field().isVisible(), false);
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1).precision,
+    ),
+    null,
+  );
+  await page.close();
+});
+
+test("always available is per entity, persists, clears and supports manual nodes", async () => {
+  const page = await pageFor(390);
+  const card = page.locator("article").filter({ hasText: "Marcia macchina" });
+  const edit = () =>
+    card.getByRole("button", { name: "Modifica", exact: true }).click();
+  const dialog = page.locator("dialog[open]");
+  const option = () => dialog.getByLabel("Sempre disponibile", { exact: true });
+  const save = async () => {
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  };
+  await edit();
+  assert.equal(await option().isChecked(), false);
+  await option().check();
+  await page.evaluate(() => {
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  assert.equal(await option().isChecked(), true);
+  await shot(page, "always-available-mobile.png");
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+          .always_available,
+    ),
+    true,
+  );
+  await edit();
+  assert.equal(await option().isChecked(), true);
+  await option().uncheck();
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  await edit();
+  assert.equal(await option().isChecked(), true);
+  await option().uncheck();
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+          .always_available,
+    ),
+    false,
+  );
+  await page
+    .getByRole("button", { name: "Aggiungi entità", exact: true })
+    .click();
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .fill("ns=4;i=77");
+  await dialog
+    .getByRole("button", { name: "Verifica nodo", exact: true })
+    .click();
+  await option().check();
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.find((m) => m.type.endsWith("/create")).always_available,
+    ),
+    true,
   );
   await page.close();
 });

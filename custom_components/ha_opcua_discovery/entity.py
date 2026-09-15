@@ -1,14 +1,41 @@
 """Common identity, availability and write/read-back behavior."""
 
+import math
+from dataclasses import dataclass
+from datetime import datetime
+
+from asyncua import ua
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AsyncuaCoordinator, entity_unique_id
 from .device import device_info
+from .values import datetime_value, scalar_variant
 
 
-class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
+@dataclass
+class OpcuaStoredValue(ExtraStoredData):
+    """Restore raw values only for the same physical node and OPC UA type."""
+
+    node_id: str
+    variant_type: str
+    value: object
+
+    def as_dict(self):
+        value = self.value
+        if isinstance(value, datetime):
+            normalized = datetime_value(value)
+            value = normalized.isoformat() if normalized is not None else None
+        return {
+            "node_id": self.node_id,
+            "variant_type": self.variant_type,
+            "value": value,
+        }
+
+
+class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator], RestoreEntity):
     """An entity for one selected OPC UA node."""
 
     def __init__(self, coordinator, name, node_id, entry_id):
@@ -27,6 +54,10 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         self._settings = coordinator.node_settings.get(node_id, {})
         node = coordinator.nodes[node_id]
         self._target_node_id = node.get("target_node_id", node_id)
+        self._variant_type = node["variant_type"]
+        self._last_value = None
+        self._has_last_value = False
+        self._capture_value()
         self._attr_extra_state_attributes = {
             "node_id": self._target_node_id,
             "opcua_type": node["variant_type"],
@@ -34,7 +65,7 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         }
 
     @property
-    def available(self):
+    def _value_is_live(self):
         return (
             super().available
             and self.coordinator.enabled
@@ -43,15 +74,96 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator]):
         )
 
     @property
+    def available(self):
+        if self.coordinator._platforms.get(self._node_id) == "disabled":
+            return False
+        return self._settings.get("always_available", False) or self._value_is_live
+
+    @property
+    def extra_state_attributes(self):
+        attributes = dict(self._attr_extra_state_attributes)
+        if self._settings.get("always_available", False):
+            attributes["value_stale"] = not self._value_is_live
+        return attributes
+
+    @callback
+    def _capture_value(self):
+        if self._value_is_live:
+            value = self.coordinator.data[self._node_id]
+            if isinstance(value, float) and not math.isfinite(value):
+                return
+            self._last_value = value
+            self._has_last_value = True
+
+    @callback
+    def _handle_coordinator_update(self):
+        self._capture_value()
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self._capture_value()
+        if self._settings.get("always_available", False) and not self._has_last_value:
+            stored = await self.async_get_last_extra_data()
+            if stored is not None:
+                data = stored.as_dict()
+                if (
+                    data.get("node_id") == self._target_node_id
+                    and data.get("variant_type") == self._variant_type
+                    and "value" in data
+                ):
+                    try:
+                        self._last_value = (
+                            scalar_variant(
+                                data["value"], ua.VariantType[self._variant_type]
+                            ).Value
+                            if data["value"] is not None
+                            else None
+                        )
+                    except (ValueError, TypeError, OverflowError):
+                        pass
+                    else:
+                        self._has_last_value = True
+
+    @property
+    def extra_restore_state_data(self):
+        self._capture_value()
+        if not self._has_last_value:
+            return None
+        return OpcuaStoredValue(
+            self._target_node_id, self._variant_type, self._last_value
+        )
+
+    @property
     def node_value(self):
+        self._capture_value()
         value = (self.coordinator.data or {}).get(self._node_id)
+        if self._settings.get("always_available", False) and not self._value_is_live:
+            value = self._last_value if self._has_last_value else None
         if isinstance(value, bool) and self._settings.get("invert_state", False):
             return not value
+        precision = self._settings.get("precision")
+        if (
+            precision is not None
+            and self.coordinator.nodes[self._node_id]["variant_type"]
+            in {"Float", "Double"}
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+        ):
+            value = round(value, precision)
+            # Avoid displaying negative zero for small negative values.
+            if value == 0:
+                return 0.0
         return value
 
     async def _async_write_value(self, value):
         if self.coordinator._platforms.get(self._node_id) == "disabled":
             raise HomeAssistantError("This OPC UA entity is disabled or removed")
+        if self._settings.get("always_available", False) and not self._value_is_live:
+            raise HomeAssistantError(
+                "The OPC UA connection and a fresh node value are required to write"
+            )
         try:
             if isinstance(value, bool) and self._settings.get("invert_state", False):
                 value = not value
@@ -69,10 +181,12 @@ def async_setup_node_entities(
 
     @callback
     def add_discovered():
-        if coordinator._discovery_pending:
-            return
         entities = []
         for node_id, node in coordinator.nodes_for_platform(platform):
+            if coordinator._discovery_pending and not coordinator.node_settings.get(
+                node_id, {}
+            ).get("always_available", False):
+                continue
             if node_id not in added:
                 added.add(node_id)
                 entities.append(

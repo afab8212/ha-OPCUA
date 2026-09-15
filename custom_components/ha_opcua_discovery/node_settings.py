@@ -5,6 +5,7 @@ import math
 from asyncua import ua
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
+from .const import CONF_OFFLINE_NODES
 from .values import scalar_variant
 
 INTEGER_TYPES = {
@@ -54,6 +55,19 @@ def validate_settings(node, settings):
     if platform not in allowed_platforms(node):
         raise ValueError("incompatible_platform")
     result = {"platform": platform}
+    if "always_available" in settings:
+        if type(settings["always_available"]) is not bool:
+            raise ValueError("invalid_availability")
+        result["always_available"] = settings["always_available"]
+    precision = settings.get("precision")
+    if precision is not None:
+        if (
+            type(precision) is not int
+            or not 0 <= precision <= 10
+            or node["variant_type"] not in {"Float", "Double"}
+        ):
+            raise ValueError("invalid_precision")
+        result["precision"] = precision
     if "node_id" in settings:
         if not isinstance(settings["node_id"], str) or not settings["node_id"]:
             raise ValueError("invalid_node_id")
@@ -124,3 +138,16 @@ def effective_platform(node, settings):
             node["variant_type"], "sensor"
         )
     return "sensor"
+
+
+def update_offline_node(options, key, node, settings):
+    """Keep verified metadata for opted-in entities to start without discovery."""
+    if settings.get("always_available", False):
+        options.setdefault(CONF_OFFLINE_NODES, {})[key] = {
+            field: node[field]
+            for field in ("name", "node_id", "variant_type", "writable")
+        }
+    elif CONF_OFFLINE_NODES in options:
+        options[CONF_OFFLINE_NODES].pop(key, None)
+        if not options[CONF_OFFLINE_NODES]:
+            options.pop(CONF_OFFLINE_NODES)

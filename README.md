@@ -74,7 +74,7 @@ The project is now maintained independently at [xtimmy86x/ha-OPCUA](https://gith
 
 ---
 
-## OPC UA side panel (1.5.2)
+## OPC UA side panel (1.7.0)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
@@ -83,6 +83,8 @@ Each entity card shows its live Home Assistant state, including localized binary
 Click **Edit** on an entity to configure:
 
 - **Category**: automatic, sensor, binary sensor, switch, number, text, datetime or excluded, according to node type and write permissions. Excluded discovered nodes can be enabled here even if they have no registry entity yet.
+- **Always available**: keep the last known state if the connection is lost or disabled. Applies independently to any node entity; disabled/excluded entities stay excluded. `value_stale: true` indicates a retained or unknown value, and becomes false after a fresh read. Verified node metadata lets opted-in entities start offline; Home Assistant restores their last saved raw value on reload/restart when available. With no saved value the state is unknown, never a fabricated zero/off value. Writes require a connection and a fresh node reading; commands are not queued offline. Inversion and rounding are applied to the retained raw value. Default is off.
+- **Decimal places** for REAL/LREAL (OPC UA Float/Double) nodes: choose 0–10, or leave empty to disable rounding. Available for sensors and numbers, including manually added nodes. This rounds the Home Assistant state used by history and automations; the raw coordinator value and PLC writes are unchanged. For example, `12.345678` becomes `12.35` with 2 decimals. This does not force trailing zeros or change the number step. Existing nodes keep their original precision until configured.
 - **Number limits**: minimum, maximum and step, including decimals for Float/Double.
 - **Text limits**: minimum and maximum length (0–255 characters). Set the maximum to the actual PLC string capacity.
 - **Name**: stored in Home Assistant's entity registry; leave empty to restore the original name.
@@ -134,9 +136,9 @@ Each hub now provides two additional entities:
 
 The binary sensor includes endpoint, host, port, root NodeId, configured polling interval, security/authentication mode, negotiated session timeout in milliseconds, discovered/polled node counts, last connection/disconnection and successful read timestamps, and the last connection error **type**. Credentials and URL query/fragment are omitted. Timestamps describe the current integration session and reset on reload/restart.
 
-While disabled, node entities are unavailable and both entity writes and `opcua_set_value` are rejected without reconnecting. A request already in flight may finish before the session closes; queued requests cannot reopen it. Each switch affects only its own hub. The switch can be controlled by normal Home Assistant automations.
+While the connection is disabled, node entities are unavailable unless **Always available** is enabled for that node. Both entity writes and `opcua_set_value` are rejected without reconnecting. A request already in flight may finish before the session closes; queued requests cannot reopen it. Each switch affects only its own hub. The switch can be controlled by normal Home Assistant automations.
 
-Connection controls are also available when the PLC is offline at startup. Node entities are discovered and added when communication becomes available, without requiring a manual reload. During a disabled/offline restart, previously registered node entities remain unavailable until discovery succeeds. Existing node mappings and identities are preserved. A connection error clears stale values; node entities become available again after fresh reads. Individual invalid-node errors do not imply that the server session is disconnected. If there are no active nodes, an enabled hub probes server state to check connectivity; a disabled hub sends no probes.
+Connection controls are also available when the PLC is offline at startup. Node entities are discovered and added when communication becomes available, without requiring a manual reload. During a disabled/offline restart, previously registered node entities remain unavailable until discovery succeeds, except opted-in **Always available** entities with cached metadata. Existing node mappings and identities are preserved. A connection error clears the current read snapshot; entities following connection availability recover after fresh reads, while **Always available** entities retain their last known value. Individual invalid-node errors do not imply that the server session is disconnected. If there are no active nodes, an enabled hub probes server state to check connectivity; a disabled hub sends no probes.
 
 ## Per-node entity configuration (1.1.0)
 
