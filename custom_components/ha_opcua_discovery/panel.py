@@ -50,7 +50,7 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_inspect)
     websocket_api.async_register_command(hass, ws_create)
     websocket_api.async_register_command(hass, ws_remove)
-    hass.data[PANEL_DATA] = {"locks": {}}
+    hass.data[PANEL_DATA] = {"locks": {}, "version": version}
 
 
 def _coordinator(hass, entry):
@@ -138,6 +138,7 @@ def endpoint_snapshot(hass, entry):
 
 def panel_snapshot(hass):
     return {
+        "version": hass.data.get(PANEL_DATA, {}).get("version"),
         "endpoints": [
             endpoint_snapshot(hass, entry)
             for entry in hass.config_entries.async_entries(DOMAIN)

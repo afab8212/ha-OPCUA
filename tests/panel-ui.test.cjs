@@ -108,6 +108,7 @@ async function pageFor(width = 1280, admin = true) {
     ];
     window.calls = [];
     window.fixture = {
+      version: "1.5.1",
       endpoints: [
         {
           entry_id: "plc1",
@@ -212,6 +213,7 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
+  assert.equal(await page.locator(".version").textContent(), "Versione 1.5.1");
   await shot(page, "desktop.png");
   await page
     .getByRole("button", { name: "Sensori binari · 1", exact: true })

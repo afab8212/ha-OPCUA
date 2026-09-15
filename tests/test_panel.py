@@ -172,6 +172,7 @@ async def test_websocket_endpoints_require_admin(hass):
 
 
 async def test_panel_registration_is_once_and_versioned(hass):
+    await ar.async_load(hass)
     hass.http = Mock(async_register_static_paths=AsyncMock())
     with (
         patch(
@@ -192,6 +193,7 @@ async def test_panel_registration_is_once_and_versioned(hass):
     assert register.call_args.kwargs["require_admin"] is True
     assert register.call_args.kwargs["module_url"].endswith("?v=1.4.0")
     assert commands.call_count == 5
+    assert panel_snapshot(hass)["version"] == "1.4.0"
 
 
 async def test_panel_category_exclusion_and_restore_preserve_registry_metadata(
