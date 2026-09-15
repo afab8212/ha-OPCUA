@@ -1,6 +1,6 @@
 {
   "domain": "ha_opcua",
-  "name": "Home Assistant OPC-UA Discovery",
+  "name": "ha-OPCUA",
   "codeowners": [
     "@xtimmy86x"
   ],
@@ -11,7 +11,7 @@
   "requirements": [
     "asyncua==2.0.1"
   ],
-  "version": "2.0.0",
+  "version": "2.0.1",
   "platforms": [
     "sensor",
     "binary_sensor",

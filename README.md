@@ -44,7 +44,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 2. Add this repository: [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA)
 3. Select category: **Integration**
 4. Click **Add**
-5. Install the `Home Assistant OPC-UA Discovery` integration
+5. Install the `ha-OPCUA` integration
 6. Restart Home Assistant
 
 ### Option 2: Manual
@@ -59,7 +59,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 
 The project is maintained independently at [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA). Use this URL when adding the custom repository in HACS.
 
-Starting with 2.0.0, the integration directory and Home Assistant domain are **`ha_opcua`**. The repository name remains **ha-OPCUA**, and the integration still appears as **Home Assistant OPC-UA Discovery** in Home Assistant. Install it at `/config/custom_components/ha_opcua`; do not use a hyphen in the directory name.
+Starting with 2.0.0, the integration directory and Home Assistant domain are **`ha_opcua`**. The repository name remains **ha-OPCUA**, and the integration appears as **ha-OPCUA** in Home Assistant. Install it at `/config/custom_components/ha_opcua`; do not use a hyphen in the directory name.
 
 This is a fresh-install domain change with no automatic migration from the previous domain. If an older version was installed, remove its integration entries and old custom-component directory before installing this version, then configure the endpoints again. Existing entity references and automations may need updating. Direct service calls now use `ha_opcua.opcua_set_value`.
 
@@ -68,7 +68,7 @@ This is a fresh-install domain change with no automatic migration from the previ
 ### Setup via Home Assistant UI
 
 1. Go to **Settings > Devices & Services > Add Integration**
-2. Search for **OPC-UA Discovery**
+2. Search for **ha-OPCUA**
 3. Enter the required connection info:
 - **Server URL** (e.g., `opc.tcp://192.168.0.10:4840`)
 - **Username** (optional)
@@ -78,7 +78,7 @@ This is a fresh-install domain change with no automatic migration from the previ
 
 ---
 
-## OPC UA side panel (2.0.0)
+## OPC UA side panel (2.0.1)
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
@@ -146,7 +146,7 @@ Connection controls are also available when the PLC is offline at startup. Node 
 
 ## Per-node entity configuration (1.1.0)
 
-Open the **OPC UA** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and, for `number` or `text`, set its limits in the same form. Save to reload the endpoint. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → OPC-UA Discovery → Configure**. English and Italian translations are included.
+Open the **OPC UA** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and, for `number` or `text`, set its limits in the same form. Save to reload the endpoint. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → ha-OPCUA → Configure**. English and Italian translations are included.
 
 | Choice | Compatible nodes | Behavior |
 | --- | --- | --- |
