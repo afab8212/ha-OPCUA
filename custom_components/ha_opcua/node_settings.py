@@ -46,6 +46,11 @@ def number_defaults(node):
         "min": 0,
         "max": 100,
         "step": 1 if node["variant_type"] in INTEGER_TYPES else 0.1,
+        # Absolute OPC UA subscription deadband: suppresses push updates for a
+        # change smaller than this (e.g. float noise below the digit you care
+        # about). 0 disables it. Only takes effect while Auto-Subscription is
+        # on; polling always reads the exact value regardless.
+        "deadband": 1 if node["variant_type"] in INTEGER_TYPES else 0.01,
     }
 
 

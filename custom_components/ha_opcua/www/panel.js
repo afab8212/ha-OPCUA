@@ -11,6 +11,9 @@ const TEXT = {
       "REAL/LREAL: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
     invalid_precision:
       "Inserisci un numero intero da 0 a 10 per un nodo REAL/LREAL.",
+    deadband: "Deadband",
+    deadbandHelp:
+      "Solo Auto-Subscription: sopprime un aggiornamento push più piccolo di questa variazione assoluta (es. 0,01 nasconde il rumore in virgola mobile oltre la 2ª cifra decimale). 0 disattiva il filtro. Il polling non è interessato e legge sempre il valore esatto.",
     remove: "Rimuovi",
     removing: "Rimozione…",
     removeTitle: "Rimuovi nodo manuale",
@@ -71,6 +74,8 @@ const TEXT = {
     endpoint: "Endpoint",
     refresh: "Aggiorna",
     search: "Cerca nome o NodeId",
+    gridView: "Vista a riquadri",
+    listView: "Vista a elenco",
     all: "Tutte",
     sensor: "Sensori",
     binary_sensor: "Sensori binari",
@@ -137,6 +142,9 @@ const TEXT = {
     precisionHelp:
       "REAL/LREAL: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
     invalid_precision: "Enter an integer from 0 to 10 for a REAL/LREAL node.",
+    deadband: "Deadband",
+    deadbandHelp:
+      "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value.",
     remove: "Remove",
     removing: "Removing…",
     removeTitle: "Remove manual node",
@@ -194,6 +202,8 @@ const TEXT = {
     endpoint: "Endpoint",
     refresh: "Refresh",
     search: "Search name or NodeId",
+    gridView: "Tile view",
+    listView: "List view",
     all: "All",
     sensor: "Sensors",
     binary_sensor: "Binary sensors",
@@ -308,9 +318,11 @@ const CSS = `
 @media(prefers-reduced-motion:reduce){:host{--speed:0ms}}
 *{box-sizing:border-box}button,input,select{font:inherit}button{cursor:pointer;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:10px 15px;background:var(--card-background-color,#fff);color:inherit;min-height:42px}button:hover{border-color:var(--primary-color,#009ac0)}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--primary-color,#009ac0);outline-offset:2px}.primary{background:var(--primary-color,#008fac);border-color:transparent;color:var(--text-primary-color,#fff)}
 header{display:flex;gap:16px;align-items:center;padding:20px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:23px;margin:0 0 4px}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1;min-width:0}.titleRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.version{white-space:nowrap}.menu{display:none;border:0;background:none;font-size:22px;padding:4px 10px}.content{max-width:1400px;margin:auto;padding:24px 28px 48px;height:calc(100% - 92px);overflow:auto}.toolbar{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:18px;align-items:end;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:7px}.field>span{font-weight:600}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;overflow-wrap:anywhere;margin-bottom:20px;color:var(--secondary-text-color,#637487)}.badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;border-radius:30px;padding:5px 10px;background:var(--secondary-background-color,#e9eef5);color:var(--secondary-text-color,#637487)}[data-connection]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}@media(prefers-reduced-motion:no-preference){.online::before{animation:pulse 2.4s ease-in-out infinite}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;padding:5px;background:var(--secondary-background-color,#e9eef5);border-radius:12px;width:fit-content;max-width:100%}nav button{border:0;background:none;border-radius:8px;padding:8px 13px;min-height:auto;color:var(--secondary-text-color,#637487)}nav button:hover{border-color:transparent;background:color-mix(in srgb,var(--primary-text-color,#243346) 6%,transparent)}nav .selected,nav .selected:hover{background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);font-weight:600;box-shadow:0 1px 3px color-mix(in srgb,var(--primary-text-color,#243346) 14%,transparent)}
+.navRow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:22px}
+nav{display:flex;gap:6px;flex-wrap:wrap;padding:5px;background:var(--secondary-background-color,#e9eef5);border-radius:12px;width:fit-content;max-width:100%;margin-bottom:0}nav button{border:0;background:none;border-radius:8px;padding:8px 13px;min-height:auto;color:var(--secondary-text-color,#637487)}nav button:hover{border-color:transparent;background:color-mix(in srgb,var(--primary-text-color,#243346) 6%,transparent)}nav .selected,nav .selected:hover{background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);font-weight:600;box-shadow:0 1px 3px color-mix(in srgb,var(--primary-text-color,#243346) 14%,transparent)}
+.viewToggle{display:flex;gap:6px;flex-wrap:wrap;padding:5px;background:var(--secondary-background-color,#e9eef5);border-radius:12px;width:fit-content}.viewToggle button{border:0;background:none;border-radius:8px;padding:8px 11px;min-height:auto;font-size:16px;line-height:1;color:var(--secondary-text-color,#637487)}.viewToggle button:hover{border-color:transparent;background:color-mix(in srgb,var(--primary-text-color,#243346) 6%,transparent)}.viewToggle .selected,.viewToggle .selected:hover{background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);box-shadow:0 1px 3px color-mix(in srgb,var(--primary-text-color,#243346) 14%,transparent)}
 .group{margin-bottom:24px}.group>summary{cursor:pointer;font-size:17px;font-weight:600;padding:8px 0 14px;display:flex;align-items:center;gap:10px;list-style:none}.group>summary::-webkit-details-marker{display:none}.group>summary::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--accent,var(--secondary-text-color,#637487));flex-shrink:0}.group>summary::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--secondary-text-color,#8a97a8);border-bottom:2px solid var(--secondary-text-color,#8a97a8);transform:rotate(-45deg);transition:transform var(--speed) ease}.group:not([open])>summary::after{transform:rotate(45deg)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.card{position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:10px;padding:18px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.cardTop{display:flex;align-items:start;gap:8px;flex-wrap:wrap}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.manualTag{font-size:11px;font-weight:600;color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.entityState{margin-top:16px;padding:12px;border-radius:9px;background:var(--secondary-background-color,#f3f6fa);min-width:0}.stateLabel{display:block;font-size:12px;color:var(--secondary-text-color,#637487);margin-bottom:5px}.stateValue{display:block;font-size:20px;font-weight:500;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:16px;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.grid.list{grid-template-columns:1fr;gap:4px}.grid.list .card{padding:8px 16px}.grid.list .cardTop{align-items:baseline;flex-wrap:nowrap;gap:10px}.grid.list .cardTitle{display:flex;align-items:baseline;gap:10px;min-width:0;flex-wrap:wrap}.grid.list .card h3{margin:0;flex-shrink:0}.grid.list .address{line-height:1.4;font-size:11px}.grid.list .entityState{display:flex;align-items:baseline;gap:8px;margin-top:4px;padding:4px 10px}.grid.list .stateLabel{margin-bottom:0}.grid.list .stateValue{font-size:14px;max-height:1.6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.grid.list .cardBottom{margin-top:4px;gap:8px}.grid.list .actions button{padding:6px 12px;min-height:auto}.card{position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:10px;padding:18px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.cardTop{display:flex;align-items:start;gap:8px;flex-wrap:wrap}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.manualTag{font-size:11px;font-weight:600;color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.entityState{margin-top:16px;padding:12px;border-radius:9px;background:var(--secondary-background-color,#f3f6fa);min-width:0}.stateLabel{display:block;font-size:12px;color:var(--secondary-text-color,#637487);margin-bottom:5px}.stateValue{display:block;font-size:20px;font-weight:500;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:16px;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
 [data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease}dialog[open]{opacity:1;transform:none}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}
 @media(max-width:870px){.menu{display:inline-flex;align-items:center;justify-content:center}}
@@ -324,6 +336,13 @@ class OpcuaNodePanel extends HTMLElement {
     this._query = "";
     this._selected = "";
     this._generation = 0;
+    this._viewMode = "grid";
+    try {
+      const stored = localStorage.getItem("ha-opcua-view-mode");
+      if (stored === "grid" || stored === "list") this._viewMode = stored;
+    } catch {
+      /* private browsing / blocked storage: keep the default */
+    }
   }
   set hass(value) {
     this._hass = value;
@@ -504,7 +523,36 @@ class OpcuaNodePanel extends HTMLElement {
       button.setAttribute("aria-pressed", String(this._filter === group));
       nav.append(button);
     }
-    main.append(nav);
+    const navRow = element("div", undefined, { class: "navRow" });
+    navRow.append(nav);
+    const viewToggle = element("div", undefined, {
+      class: "viewToggle",
+      role: "group",
+      "aria-label": `${this._t("gridView")} / ${this._t("listView")}`,
+    });
+    for (const mode of ["grid", "list"]) {
+      const icon = mode === "grid" ? "⊞" : "☰";
+      const button = element("button", icon, {
+        type: "button",
+        class: this._viewMode === mode ? "selected" : "",
+        "aria-label": this._t(mode === "grid" ? "gridView" : "listView"),
+        title: this._t(mode === "grid" ? "gridView" : "listView"),
+        "aria-pressed": String(this._viewMode === mode),
+      });
+      button.addEventListener("click", () => {
+        if (this._viewMode === mode) return;
+        this._viewMode = mode;
+        try {
+          localStorage.setItem("ha-opcua-view-mode", mode);
+        } catch {
+          /* private browsing / blocked storage: not persisted this time */
+        }
+        this._render();
+      });
+      viewToggle.append(button);
+    }
+    navRow.append(viewToggle);
+    main.append(navRow);
     this._rows = element("section");
     main.append(this._rows);
     this._renderRows();
@@ -538,7 +586,9 @@ class OpcuaNodePanel extends HTMLElement {
         "data-platform": group,
       });
       details.append(element("summary", `${this._t(group)} · ${items.length}`));
-      const grid = element("div", undefined, { class: "grid" });
+      const grid = element("div", undefined, {
+        class: this._viewMode === "list" ? "grid list" : "grid",
+      });
       for (const row of items) {
         const card = element("article", undefined, {
           class: "card",
@@ -896,6 +946,9 @@ class OpcuaNodePanel extends HTMLElement {
       step: ["Float", "Double"].includes(selectedNode()?.variant_type)
         ? 0.1
         : 1,
+      deadband: ["Float", "Double"].includes(selectedNode()?.variant_type)
+        ? 0.01
+        : 1,
       min_length: 0,
       max_length: 255,
     };
@@ -935,6 +988,19 @@ class OpcuaNodePanel extends HTMLElement {
       class: "hint",
     });
     form.append(precisionField, precisionHelp);
+    const deadband = element("input", undefined, {
+      type: "number",
+      name: "deadband",
+      min: "0",
+      step: "any",
+    });
+    deadband.value = initial.deadband ?? defaults.deadband;
+    limitInputs.deadband = deadband;
+    const deadbandField = this._field("deadband", deadband);
+    const deadbandHelp = element("p", this._t("deadbandHelp"), {
+      class: "hint",
+    });
+    form.append(deadbandField, deadbandHelp);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     for (const cls of this._data.device_classes)
@@ -967,6 +1033,8 @@ class OpcuaNodePanel extends HTMLElement {
         "Double",
       ].includes(selectedNode()?.variant_type);
       precision.disabled = precisionField.hidden;
+      deadbandField.hidden = deadbandHelp.hidden = platform !== "number";
+      deadband.disabled = deadbandField.hidden;
       toggle.hidden = invertHelp.hidden =
         selectedNode()?.variant_type !== "Boolean";
       for (const [kind, group] of Object.entries(limitGroups)) {
@@ -1030,7 +1098,7 @@ class OpcuaNodePanel extends HTMLElement {
             ? {
                 limits: Object.fromEntries(
                   (effective() === "number"
-                    ? ["min", "max", "step"]
+                    ? ["min", "max", "step", "deadband"]
                     : ["min_length", "max_length"]
                   ).map((key) => [key, Number(limitInputs[key].value)]),
                 ),

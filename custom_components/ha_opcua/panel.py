@@ -126,6 +126,7 @@ def endpoint_snapshot(hass, entry):
                         "min",
                         "max",
                         "step",
+                        "deadband",
                         "min_length",
                         "max_length",
                         "precision",
@@ -277,7 +278,7 @@ def _entity_settings(node, msg, saved=None):
     limits = msg.get("limits", {})
     platform = effective_platform(node, proposed)
     allowed = (
-        {"min", "max", "step"}
+        {"min", "max", "step", "deadband"}
         if platform == "number"
         else {"min_length", "max_length"} if platform == "text" else set()
     )
@@ -290,7 +291,8 @@ def _entity_settings(node, msg, saved=None):
             {
                 key: value
                 for key, value in (saved or {}).items()
-                if key in ("min", "max", "step", "min_length", "max_length")
+                if key
+                in ("min", "max", "step", "deadband", "min_length", "max_length")
             }
         )
     return result

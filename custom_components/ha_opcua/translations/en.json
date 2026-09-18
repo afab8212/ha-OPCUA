@@ -61,7 +61,11 @@
         "data": {
           "min": "Minimum",
           "max": "Maximum",
-          "step": "Step"
+          "step": "Step",
+          "deadband": "Deadband"
+        },
+        "data_description": {
+          "deadband": "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value."
         }
       },
       "text": {

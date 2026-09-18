@@ -455,10 +455,31 @@ class OpcuaHub:
                 self.last_successful_read = dt_util.utcnow()
         return result
 
-    async def ensure_subscription(self, node_ids: list[str]) -> None:
-        """Create/update a native OPC UA subscription so pushed changes bypass polling."""
+    @property
+    def subscription_active(self) -> bool:
+        """Whether a push subscription is actually running right now.
+
+        Distinct from the user's subscription_enabled *setting*: a rejected
+        or failed subscription falls back to polling-only while the setting
+        stays on, so this is the only reliable way to tell the two apart.
+        """
+        return self._subscription is not None
+
+    async def ensure_subscription(
+        self, node_ids: list[str], deadbands: dict[str, float] | None = None
+    ) -> None:
+        """Create/update a native OPC UA subscription so pushed changes bypass polling.
+
+        deadbands maps a NodeId to an absolute OPC UA deadband: the server
+        then only reports a change once the value has moved by at least that
+        amount, instead of on every change. A node with no entry (or a falsy
+        value) is subscribed unfiltered, as before. If the server rejects the
+        deadband filter for one node, that node alone is retried without it
+        rather than losing push updates for every node.
+        """
         if self.on_data_change is None:
             return
+        deadbands = deadbands or {}
         try:
             async with self._session() as client:
                 target = set(node_ids)
@@ -479,21 +500,36 @@ class OpcuaHub:
                         await self._subscription.unsubscribe(handles)
                     self._subscribed_node_ids -= to_remove
                 to_add = target - self._subscribed_node_ids
-                if to_add:
-                    add_list = list(to_add)
-                    nodes = [client.get_node(nid) for nid in add_list]
-                    handles = await self._subscription.subscribe_data_change(nodes)
-                    if not isinstance(handles, list):
-                        handles = [handles]
-                    for nid, handle in zip(add_list, handles):
-                        self._sub_handles[nid] = handle
-                    self._subscribed_node_ids |= to_add
+                for nid in to_add:
+                    node = client.get_node(nid)
+                    deadband = deadbands.get(nid)
+                    handle = None
+                    if deadband:
+                        try:
+                            handle = await self._subscription.deadband_monitor(
+                                node, deadband_val=deadband, deadbandtype=1
+                            )
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as err:
+                            _LOGGER.warning(
+                                "OPC UA server for '%s' rejected deadband %.6g on "
+                                "%s, subscribing without a filter instead: %s",
+                                self._hub_name,
+                                deadband,
+                                nid,
+                                err,
+                            )
+                    if handle is None:
+                        handle = await self._subscription.subscribe_data_change(node)
+                    self._sub_handles[nid] = handle
+                    self._subscribed_node_ids.add(nid)
         except asyncio.CancelledError:
             raise
         except Exception as err:
             # Subscriptions are a latency optimization; polling must keep working
             # even against a server that rejects or does not support them.
-            _LOGGER.debug(
+            _LOGGER.warning(
                 "OPC UA subscription unavailable for '%s', falling back to polling only: %s",
                 self._hub_name,
                 err,
@@ -682,6 +718,18 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             dict.fromkeys(self.nodes[key]["target_node_id"] for key in active_nodes)
         )
 
+    def _target_deadbands(self) -> dict[str, float]:
+        """Map each subscribed NodeId to its configured absolute deadband, if any."""
+        result: dict[str, float] = {}
+        for node_id, settings in self.node_settings.items():
+            deadband = settings.get("deadband")
+            if not deadband or self._platforms.get(node_id) == "disabled":
+                continue
+            node = self.nodes.get(node_id)
+            if node is not None:
+                result[node["target_node_id"]] = deadband
+        return result
+
     async def async_set_subscription_enabled(self, enabled, *, persist=True):
         """Toggle the push subscription live; polling is entirely unaffected."""
         async with self._control_lock:
@@ -697,7 +745,9 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                     },
                 )
             if enabled:
-                await self._hub.ensure_subscription(self._active_target_ids())
+                await self._hub.ensure_subscription(
+                    self._active_target_ids(), self._target_deadbands()
+                )
             else:
                 await self._hub.disable_subscription()
             self.async_update_listeners()
@@ -820,7 +870,9 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             # for the next timer tick. Polling itself is untouched either way, so a
             # value that never changes is still re-read on every configured interval.
             if self.subscription_enabled:
-                await self._hub.ensure_subscription(target_ids)
+                await self._hub.ensure_subscription(
+                    target_ids, self._target_deadbands()
+                )
             else:
                 await self._hub.disable_subscription()
         except Exception as err:
