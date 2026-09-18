@@ -23,6 +23,11 @@ const TEXT = {
     deleteHelp:
       "Il PLC non fornisce più questo nodo dopo una rilevazione completa, oppure l’entità è rimasta da un cambio di categoria. L’entità Home Assistant e le sue impostazioni salvate verranno eliminate. Le automazioni e le dashboard che la usano dovranno essere aggiornate. Il PLC non viene modificato.",
     deleted: "Entità orfana eliminata.",
+    deleteAll: "Elimina tutte le mancanti",
+    deleteAllTitle: "Elimina tutte le entità orfane",
+    deleteAllHelp:
+      "Tutte le entità il cui nodo non è più fornito dal PLC dopo una rilevazione completa, e quelle rimaste da un cambio di categoria, verranno eliminate con le relative impostazioni salvate. Le automazioni e le dashboard che le usano dovranno essere aggiornate. Il PLC non viene modificato.",
+    deletedAll: "Entità orfane eliminate.",
     not_orphan:
       "L’entità non è più orfana o non può essere verificata ora (connessione assente o rilevazione incompleta). Nulla è stato eliminato.",
     remove: "Rimuovi",
@@ -176,6 +181,11 @@ const TEXT = {
     deleteHelp:
       "The PLC no longer provides this node after a complete discovery, or the entity was left behind by a category change. The Home Assistant entity and its saved node settings will be deleted. Automations and dashboards using it will need updating. The PLC is unchanged.",
     deleted: "Orphaned entity deleted.",
+    deleteAll: "Delete all missing",
+    deleteAllTitle: "Delete all orphaned entities",
+    deleteAllHelp:
+      "Every entity whose node the PLC no longer provides after a complete discovery, and every entity left behind by a category change, will be deleted together with its saved node settings. Automations and dashboards using them will need updating. The PLC is unchanged.",
+    deletedAll: "Orphaned entities deleted.",
     not_orphan:
       "This entity is no longer orphaned or cannot be verified right now (connection down or discovery incomplete). Nothing was deleted.",
     node_in_use:
@@ -550,6 +560,18 @@ class OpcuaNodePanel extends HTMLElement {
     });
     rediscover.disabled = !endpoint.loaded;
     meta.append(add, rediscover);
+    // A root change or a PLC provider switch can orphan dozens of entities
+    // at once; offer one cleanup for all of them next to the rediscover.
+    const orphans = endpoint.rows.filter((r) => r.orphan);
+    if (orphans.length) {
+      const deleteAll = this._button(
+        "deleteAll",
+        () => this._removeAllOrphans(orphans.length),
+        "danger",
+      );
+      deleteAll.textContent = `${this._t("deleteAll")} (${orphans.length})`;
+      meta.append(deleteAll);
+    }
     main.append(meta);
     const nav = element("nav", undefined, { "aria-label": this._t("all") });
     for (const group of ["all", ...GROUPS]) {
@@ -750,6 +772,60 @@ class OpcuaNodePanel extends HTMLElement {
       badge.textContent = this._t(online ? "connected" : "disconnected");
       badge.classList.toggle("online", online);
     }
+  }
+  _removeAllOrphans(count) {
+    const endpoint = this._endpoint();
+    const dialog = element("dialog");
+    this._dialog = dialog;
+    const form = element("form");
+    dialog.append(form);
+    const error = element("div", "", { class: "error", role: "alert" });
+    const cancel = this._button("cancel", () => dialog.close());
+    const remove = element("button", `${this._t("deleteAll")} (${count})`, {
+      type: "submit",
+      class: "danger",
+    });
+    const footer = element("footer");
+    footer.append(cancel, remove);
+    form.append(
+      element("h2", this._t("deleteAllTitle")),
+      element("p", this._t("deleteAllHelp")),
+      error,
+      footer,
+    );
+    let busy = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      busy = true;
+      remove.disabled = cancel.disabled = true;
+      remove.textContent = this._t("deleting");
+      error.textContent = "";
+      try {
+        await this._hass.callWS({
+          type: "ha_opcua/entity/remove_orphans",
+          entry_id: endpoint.entry_id,
+          revision: endpoint.revision,
+        });
+        this._notice = this._t("deletedAll");
+        dialog.close();
+        await this._load();
+      } catch (err) {
+        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        busy = false;
+        remove.disabled = cancel.disabled = false;
+        remove.textContent = `${this._t("deleteAll")} (${count})`;
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
   }
   _removeOrphan(row) {
     const endpoint = this._endpoint();

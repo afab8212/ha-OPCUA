@@ -65,6 +65,12 @@ _CONNECTION_STATUS_CODES = {
     ua.StatusCodes.BadCommunicationError,
     ua.StatusCodes.BadTimeout,
 }
+# Read denied by the server's access rights for this user: the node exists
+# and is enumerable, it just cannot be read. See OpcuaHub.discover_nodes.
+_PERMISSION_STATUS_CODES = {
+    ua.StatusCodes.BadUserAccessDenied,
+    ua.StatusCodes.BadNotReadable,
+}
 
 SERVICE_SET_VALUE_SCHEMA = vol.Schema(
     {
@@ -424,8 +430,21 @@ class OpcuaHub:
                 except ua.UaStatusCodeError as err:
                     if _connection_error(err):
                         raise
-                    self.discovery_complete = False
-                    _LOGGER.warning("Skipping unreadable node %s: %s", node_id, err)
+                    if err.code in _PERMISSION_STATUS_CODES:
+                        # Browse found the node; only this user's read is
+                        # denied (e.g. a write-only symbol). That is a
+                        # deterministic server setting, not a transient
+                        # failure, so the pass still counts as complete -
+                        # otherwise one write-only variable would block
+                        # orphan detection and baseline pruning forever.
+                        _LOGGER.warning(
+                            "Skipping node %s without read permission: %s",
+                            node_id,
+                            err,
+                        )
+                    else:
+                        self.discovery_complete = False
+                        _LOGGER.warning("Skipping unreadable node %s: %s", node_id, err)
 
             if node_class in (
                 ua.NodeClass.Object,

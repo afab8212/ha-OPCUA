@@ -72,6 +72,7 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_remove)
     websocket_api.async_register_command(hass, ws_rediscover)
     websocket_api.async_register_command(hass, ws_remove_orphan)
+    websocket_api.async_register_command(hass, ws_remove_orphans)
     hass.data[PANEL_DATA] = {"locks": {}, "version": version}
 
 
@@ -393,6 +394,33 @@ async def async_remove_orphan_entity(hass, msg):
         return {"removed": True, "entity_id": entity.entity_id}
 
 
+async def async_remove_all_orphans(hass, msg):
+    """Delete every currently orphaned entity of one endpoint in a single step.
+
+    Needed when a root NodeId change or a provider switch on the PLC orphans
+    dozens of entities at once - clicking through Repairs one by one is not
+    practical. Same revision check and per-entity re-validation as the
+    single-entity variant.
+    """
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        if endpoint_snapshot(hass, entry)["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        registry = er.async_get(hass)
+        removed = []
+        for entity in list(er.async_entries_for_config_entry(registry, entry.entry_id)):
+            if is_orphan(hass, entry, entity):
+                removed.append(entity.entity_id)
+                async_remove_orphan(hass, entry, entity)
+        async_sync_orphan_repairs(hass, entry)
+        return {"removed": removed}
+
+
 async def async_inspect_node(hass, msg):
     entry, c = _loaded_endpoint(hass, msg["entry_id"])
     node = await _inspect(c, msg["node_id"])
@@ -543,6 +571,24 @@ async def ws_rediscover(hass, connection, msg):
 async def ws_remove_orphan(hass, connection, msg):
     try:
         result = await async_remove_orphan_entity(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/entity/remove_orphans",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_remove_orphans(hass, connection, msg):
+    try:
+        result = await async_remove_all_orphans(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
     else:
