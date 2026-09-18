@@ -9,7 +9,8 @@
           "username": "Username",
           "password": "Password",
           "scan_interval": "Polling interval (seconds)",
-          "hub_root": "Root NodeId"
+          "hub_root": "Root NodeId",
+          "subscription_enabled": "Auto-Subscription (instant updates)"
         }
       }
     },
@@ -32,7 +33,12 @@
           "username": "Username",
           "password": "Password",
           "scan_interval": "Polling interval (seconds)",
-          "hub_root": "Root NodeId"
+          "hub_root": "Root NodeId",
+          "subscription_enabled": "Auto-Subscription (instant updates)"
+        },
+        "data_description": {
+          "scan_interval": "Values are always re-read on this interval, whether or not Auto-Subscription below is enabled.",
+          "subscription_enabled": "When on, changed values are pushed the instant the PLC reports them, on top of the regular polling interval. Turn off to use polling only."
         }
       },
       "nodes": {
@@ -119,6 +125,9 @@
     "switch": {
       "connection_enabled": {
         "name": "Connection enabled"
+      },
+      "subscription_enabled": {
+        "name": "Auto-Subscription"
       }
     },
     "binary_sensor": {

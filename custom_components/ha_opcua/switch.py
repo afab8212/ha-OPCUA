@@ -10,7 +10,12 @@ from .entity import OpcuaEntity, async_setup_node_entities
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.data["hub_id"]]
-    async_add_entities([OpcuaConnectionSwitch(coordinator, entry)])
+    async_add_entities(
+        [
+            OpcuaConnectionSwitch(coordinator, entry),
+            OpcuaSubscriptionSwitch(coordinator, entry),
+        ]
+    )
     async_setup_node_entities(
         coordinator, entry, async_add_entities, "switch", AsyncuaSwitch
     )
@@ -53,3 +58,24 @@ class OpcuaConnectionSwitch(OpcuaConnectionEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs):
         await self.coordinator.async_set_connection_enabled(False)
+
+
+class OpcuaSubscriptionSwitch(OpcuaConnectionEntity, SwitchEntity):
+    """Toggle the native OPC UA push subscription; polling runs either way."""
+
+    _attr_translation_key = "subscription_enabled"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:transit-connection-variant"
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry, "subscription_enabled")
+
+    @property
+    def is_on(self):
+        return self.coordinator.subscription_enabled
+
+    async def async_turn_on(self, **kwargs):
+        await self.coordinator.async_set_subscription_enabled(True)
+
+    async def async_turn_off(self, **kwargs):
+        await self.coordinator.async_set_subscription_enabled(False)

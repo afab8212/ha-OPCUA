@@ -31,6 +31,7 @@ from .const import (
     CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
+    CONF_SUBSCRIPTION_ENABLED,
     DOMAIN,
     FIELD_NODE_HUB,
     FIELD_NODE_ID,
@@ -102,6 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hub,
         timedelta(seconds=settings.get(CONF_HUB_SCAN_INTERVAL, 10)),
         config_entry=entry,
+        subscription_enabled=settings.get(CONF_SUBSCRIPTION_ENABLED, True),
     )
     try:
         async_register_device(hass, entry)
@@ -160,13 +162,16 @@ async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None
     options = {
         key: value
         for key, value in entry.options.items()
-        if key != CONF_CONNECTION_ENABLED
+        if key not in (CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED)
     }
     if options != coordinator.reload_options:
         await hass.config_entries.async_reload(entry.entry_id)
     else:
         await coordinator.async_set_connection_enabled(
             entry.options.get(CONF_CONNECTION_ENABLED, True), persist=False
+        )
+        await coordinator.async_set_subscription_enabled(
+            entry.options.get(CONF_SUBSCRIPTION_ENABLED, True), persist=False
         )
 
 
@@ -249,6 +254,10 @@ class OpcuaHub:
         self.last_error_type = None
         self.session_timeout_ms = None
         self._lock = asyncio.Lock()
+        self.on_data_change = None
+        self._subscription = None
+        self._subscribed_node_ids: set[str] = set()
+        self._sub_handles: dict[str, Any] = {}
 
     def _set_connected(self, connected):
         if self._connected == connected:
@@ -269,6 +278,10 @@ class OpcuaHub:
     async def _disconnect_locked(self) -> None:
         client, self.client = self.client, None
         self._set_connected(False)
+        # The subscription lives inside the closed session; it cannot be reused.
+        self._subscription = None
+        self._subscribed_node_ids = set()
+        self._sub_handles = {}
         if client is not None:
             try:
                 await client.disconnect()
@@ -442,6 +455,69 @@ class OpcuaHub:
                 self.last_successful_read = dt_util.utcnow()
         return result
 
+    async def ensure_subscription(self, node_ids: list[str]) -> None:
+        """Create/update a native OPC UA subscription so pushed changes bypass polling."""
+        if self.on_data_change is None:
+            return
+        try:
+            async with self._session() as client:
+                target = set(node_ids)
+                if self._subscription is None:
+                    self._subscription = await client.create_subscription(
+                        500, _OpcuaDataChangeHandler(self.on_data_change)
+                    )
+                    self._subscribed_node_ids = set()
+                    self._sub_handles = {}
+                to_remove = self._subscribed_node_ids - target
+                if to_remove:
+                    handles = [
+                        self._sub_handles.pop(nid)
+                        for nid in to_remove
+                        if nid in self._sub_handles
+                    ]
+                    if handles:
+                        await self._subscription.unsubscribe(handles)
+                    self._subscribed_node_ids -= to_remove
+                to_add = target - self._subscribed_node_ids
+                if to_add:
+                    add_list = list(to_add)
+                    nodes = [client.get_node(nid) for nid in add_list]
+                    handles = await self._subscription.subscribe_data_change(nodes)
+                    if not isinstance(handles, list):
+                        handles = [handles]
+                    for nid, handle in zip(add_list, handles):
+                        self._sub_handles[nid] = handle
+                    self._subscribed_node_ids |= to_add
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            # Subscriptions are a latency optimization; polling must keep working
+            # even against a server that rejects or does not support them.
+            _LOGGER.debug(
+                "OPC UA subscription unavailable for '%s', falling back to polling only: %s",
+                self._hub_name,
+                err,
+            )
+            self._subscription = None
+            self._subscribed_node_ids = set()
+            self._sub_handles = {}
+
+    async def disable_subscription(self) -> None:
+        """Tear down any active push subscription; polling keeps working on its own."""
+        if self._subscription is None:
+            return
+        subscription, self._subscription = self._subscription, None
+        self._subscribed_node_ids = set()
+        self._sub_handles = {}
+        try:
+            await subscription.delete()
+        except Exception as err:
+            _LOGGER.debug(
+                "Error deleting OPC UA subscription for '%s': %s",
+                self._hub_name,
+                err,
+            )
+
     async def set_value(self, nodeid: str, value: Any) -> bool:
         """Write exactly once; a missing acknowledgement has an unknown outcome."""
         async with self._session() as client:
@@ -455,6 +531,20 @@ class OpcuaHub:
         return True
 
 
+class _OpcuaDataChangeHandler:
+    """asyncua subscription callback: forward NodeId + new value, nothing else."""
+
+    def __init__(self, callback):
+        self._callback = callback
+
+    def datachange_notification(self, node, val, data):
+        try:
+            node_id = node.nodeid.to_string()
+        except Exception:  # pragma: no cover - defensive, node is library-provided
+            return
+        self._callback(node_id, val)
+
+
 class AsyncuaCoordinator(DataUpdateCoordinator):
     """Expose polling failures and keep values indexed by NodeId."""
 
@@ -466,8 +556,10 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         update_interval_in_second=timedelta(seconds=10),
         *,
         config_entry=None,
+        subscription_enabled=True,
     ):
         self._hub = hub
+        self.subscription_enabled = subscription_enabled
         self.enabled = (
             config_entry.options.get(CONF_CONNECTION_ENABLED, True)
             if config_entry
@@ -478,7 +570,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         self.reload_options = {
             key: value
             for key, value in (config_entry.options if config_entry else {}).items()
-            if key != CONF_CONNECTION_ENABLED
+            if key not in (CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED)
         }
         self._control_lock = asyncio.Lock()
         self._discovery_pending = config_entry is not None
@@ -511,6 +603,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             config_entry=config_entry,
         )
         self._hub.on_connection_state_change = self._connection_state_changed
+        self._hub.on_data_change = self._on_subscription_data
         if self.offline_nodes:
             self.set_nodes([])
             # Cached metadata must not suppress normal discovery on reconnection.
@@ -521,6 +614,35 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         if not self._hub.is_connected:
             self.data = {}
         self.async_update_listeners()
+
+    def _on_subscription_data(self, target_node_id, value):
+        """Push a server-reported change straight to entities, bypassing the poll timer.
+
+        Deliberately does NOT call async_set_updated_data(): that method also
+        cancels and reschedules this coordinator's own poll timer, and with
+        frequently-changing nodes the push events arrive faster than
+        update_interval, so the timer would keep getting deferred and the
+        regular poll would never fire again. Setting the data and notifying
+        listeners directly leaves the poll timer untouched, so a node that
+        never changes (and so never triggers a push) still gets refreshed on
+        schedule.
+        """
+        if not self.enabled:
+            return
+        updated = dict(self.data or {})
+        changed = False
+        for node_id, node in self.nodes.items():
+            if (
+                node["target_node_id"] == target_node_id
+                and self._platforms.get(node_id) not in (None, "disabled")
+            ):
+                updated[node_id] = value
+                changed = True
+        if changed:
+            self._hub.last_successful_read = dt_util.utcnow()
+            self.data = updated
+            self.last_update_success = True
+            self.async_update_listeners()
 
     @property
     def hub(self) -> OpcuaHub:
@@ -549,6 +671,36 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             else:
                 await self._hub.pause()
                 self.async_set_updated_data({})
+
+    def _active_target_ids(self) -> list[str]:
+        active_nodes = [
+            node_id
+            for node_id in self.nodes
+            if self._platforms.get(node_id) != "disabled"
+        ]
+        return list(
+            dict.fromkeys(self.nodes[key]["target_node_id"] for key in active_nodes)
+        )
+
+    async def async_set_subscription_enabled(self, enabled, *, persist=True):
+        """Toggle the push subscription live; polling is entirely unaffected."""
+        async with self._control_lock:
+            if self.subscription_enabled == enabled:
+                return
+            self.subscription_enabled = enabled
+            if persist and self.config_entry:
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    options={
+                        **self.config_entry.options,
+                        CONF_SUBSCRIPTION_ENABLED: enabled,
+                    },
+                )
+            if enabled:
+                await self._hub.ensure_subscription(self._active_target_ids())
+            else:
+                await self._hub.disable_subscription()
+            self.async_update_listeners()
 
     def set_nodes(self, nodes):
         self._discovery_pending = False
@@ -656,15 +808,21 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 for node_id in self.nodes
                 if self._platforms[node_id] != "disabled"
             ]
-            target_ids = list(
-                dict.fromkeys(self.nodes[key]["target_node_id"] for key in active_nodes)
-            )
+            target_ids = self._active_target_ids()
             raw_values = await self._hub.get_values(target_ids)
             values = {
                 key: raw_values[self.nodes[key]["target_node_id"]]
                 for key in active_nodes
                 if self.nodes[key]["target_node_id"] in raw_values
             }
+            # Keep the push subscription's node set aligned with what we just polled;
+            # future changes to these nodes then arrive immediately instead of waiting
+            # for the next timer tick. Polling itself is untouched either way, so a
+            # value that never changes is still re-read on every configured interval.
+            if self.subscription_enabled:
+                await self._hub.ensure_subscription(target_ids)
+            else:
+                await self._hub.disable_subscription()
         except Exception as err:
             # A pause can overtake an already scheduled read. It is not a failure.
             if not self.enabled:

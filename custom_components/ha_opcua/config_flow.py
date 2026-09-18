@@ -24,6 +24,7 @@ from .const import (
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
     CONF_NODE_SETTINGS,
+    CONF_SUBSCRIPTION_ENABLED,
     DOMAIN,
 )
 from .node_settings import allowed_platforms, number_defaults, validate_settings
@@ -56,6 +57,9 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                     ),
                     CONF_HUB_ROOT_NODE: user_input.get(CONF_HUB_ROOT_NODE, "").strip(),
+                    CONF_SUBSCRIPTION_ENABLED: user_input.get(
+                        CONF_SUBSCRIPTION_ENABLED, True
+                    ),
                 },
             )
 
@@ -67,6 +71,7 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_PASSWORD): str,
                 vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
                 vol.Required(CONF_HUB_ROOT_NODE, default="ns=2;i=1"): str,
+                vol.Optional(CONF_SUBSCRIPTION_ENABLED, default=True): bool,
             }
         )
 
@@ -134,6 +139,10 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                         CONF_HUB_ROOT_NODE,
                         default=current.get(CONF_HUB_ROOT_NODE, "ns=2;i=1"),
                     ): str,
+                    vol.Optional(
+                        CONF_SUBSCRIPTION_ENABLED,
+                        default=current.get(CONF_SUBSCRIPTION_ENABLED, True),
+                    ): bool,
                 }
             ),
         )
