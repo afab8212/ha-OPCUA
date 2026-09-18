@@ -11,9 +11,20 @@ const TEXT = {
       "REAL/LREAL: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
     invalid_precision:
       "Inserisci un numero intero da 0 a 10 per un nodo REAL/LREAL.",
+    invalid_deadband:
+      "Usa un deadband finito maggiore o uguale a 0 (intero per i tipi interi).",
     deadband: "Deadband",
     deadbandHelp:
       "Solo Auto-Subscription: sopprime un aggiornamento push più piccolo di questa variazione assoluta (es. 0,01 nasconde il rumore in virgola mobile oltre la 2ª cifra decimale). 0 disattiva il filtro. Il polling non è interessato e legge sempre il valore esatto.",
+    orphan: "Nodo mancante",
+    deleteEntity: "Elimina entità",
+    deleting: "Eliminazione…",
+    deleteTitle: "Elimina entità orfana",
+    deleteHelp:
+      "Il PLC non fornisce più questo nodo dopo una rilevazione completa, oppure l’entità è rimasta da un cambio di categoria. L’entità Home Assistant e le sue impostazioni salvate verranno eliminate. Le automazioni e le dashboard che la usano dovranno essere aggiornate. Il PLC non viene modificato.",
+    deleted: "Entità orfana eliminata.",
+    not_orphan:
+      "L’entità non è più orfana o non può essere verificata ora (connessione assente o rilevazione incompleta). Nulla è stato eliminato.",
     remove: "Rimuovi",
     removing: "Rimozione…",
     removeTitle: "Rimuovi nodo manuale",
@@ -74,6 +85,9 @@ const TEXT = {
     endpoint: "Endpoint",
     refresh: "Aggiorna",
     search: "Cerca nome o NodeId",
+    rediscover: "Rileva di nuovo",
+    rediscovering: "Rilevamento…",
+    rediscovered: "Nuova rilevazione dei nodi PLC completata.",
     gridView: "Vista a riquadri",
     listView: "Vista a elenco",
     all: "Tutte",
@@ -142,6 +156,8 @@ const TEXT = {
     precisionHelp:
       "REAL/LREAL: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
     invalid_precision: "Enter an integer from 0 to 10 for a REAL/LREAL node.",
+    invalid_deadband:
+      "Use a finite deadband of 0 or more (an integer for integer node types).",
     deadband: "Deadband",
     deadbandHelp:
       "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value.",
@@ -153,6 +169,15 @@ const TEXT = {
     removed: "Manual node removed.",
     removedReloading: "Manual node removed. The endpoint is reloading.",
     not_manual_node: "Only manually configured nodes can be removed here.",
+    orphan: "Node missing",
+    deleteEntity: "Delete entity",
+    deleting: "Deleting…",
+    deleteTitle: "Delete orphaned entity",
+    deleteHelp:
+      "The PLC no longer provides this node after a complete discovery, or the entity was left behind by a category change. The Home Assistant entity and its saved node settings will be deleted. Automations and dashboards using it will need updating. The PLC is unchanged.",
+    deleted: "Orphaned entity deleted.",
+    not_orphan:
+      "This entity is no longer orphaned or cannot be verified right now (connection down or discovery incomplete). Nothing was deleted.",
     node_in_use:
       "Other entities are associated with this node. Reassign them before removing it, including excluded entities.",
     add: "Add entity",
@@ -202,6 +227,9 @@ const TEXT = {
     endpoint: "Endpoint",
     refresh: "Refresh",
     search: "Search name or NodeId",
+    rediscover: "Rediscover",
+    rediscovering: "Discovering…",
+    rediscovered: "PLC nodes rediscovered.",
     gridView: "Tile view",
     listView: "List view",
     all: "All",
@@ -325,6 +353,9 @@ nav{display:flex;gap:6px;flex-wrap:wrap;padding:5px;background:var(--secondary-b
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.grid.list{grid-template-columns:1fr;gap:4px}.grid.list .card{padding:8px 16px}.grid.list .cardTop{align-items:baseline;flex-wrap:nowrap;gap:10px}.grid.list .cardTitle{display:flex;align-items:baseline;gap:10px;min-width:0;flex-wrap:wrap}.grid.list .card h3{margin:0;flex-shrink:0}.grid.list .address{line-height:1.4;font-size:11px}.grid.list .entityState{display:flex;align-items:baseline;gap:8px;margin-top:4px;padding:4px 10px}.grid.list .stateLabel{margin-bottom:0}.grid.list .stateValue{font-size:14px;max-height:1.6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.grid.list .cardBottom{margin-top:4px;gap:8px}.grid.list .actions button{padding:6px 12px;min-height:auto}.card{position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:10px;padding:18px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.cardTop{display:flex;align-items:start;gap:8px;flex-wrap:wrap}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.manualTag{font-size:11px;font-weight:600;color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.entityState{margin-top:16px;padding:12px;border-radius:9px;background:var(--secondary-background-color,#f3f6fa);min-width:0}.stateLabel{display:block;font-size:12px;color:var(--secondary-text-color,#637487);margin-bottom:5px}.stateValue{display:block;font-size:20px;font-weight:500;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:16px;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
 [data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease}dialog[open]{opacity:1;transform:none}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}
+.orphanTag{font-size:11px;font-weight:600;color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}
+.card.orphan{border-left-color:var(--error-color,#be3131);border-style:dashed}
+.card.orphan .cardTitle h3{color:var(--secondary-text-color,#637487)}
 @media(max-width:870px){.menu{display:inline-flex;align-items:center;justify-content:center}}
 @media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:18px 12px}.toolbar{grid-template-columns:1fr;gap:12px}.grid{grid-template-columns:1fr}nav button{padding:8px 10px}.card{padding:15px}form{padding:20px}.headerText p{font-size:12px}}
 `;
@@ -503,7 +534,22 @@ class OpcuaNodePanel extends HTMLElement {
     meta.append(status, element("span", endpoint.endpoint || endpoint.title));
     const add = this._button("add", () => this._add(), "primary");
     add.disabled = !endpoint.loaded;
-    meta.append(add);
+    const rediscover = this._button("rediscover", async () => {
+      rediscover.disabled = true;
+      rediscover.textContent = this._t("rediscovering");
+      try {
+        await this._hass.callWS({
+          type: "ha_opcua/endpoint/rediscover",
+          entry_id: endpoint.entry_id,
+        });
+        this._notice = this._t("rediscovered");
+      } catch (err) {
+        this._error = this._t(err.code in TEXT.en ? err.code : "error");
+      }
+      await this._load();
+    });
+    rediscover.disabled = !endpoint.loaded;
+    meta.append(add, rediscover);
     main.append(meta);
     const nav = element("nav", undefined, { "aria-label": this._t("all") });
     for (const group of ["all", ...GROUPS]) {
@@ -591,7 +637,7 @@ class OpcuaNodePanel extends HTMLElement {
       });
       for (const row of items) {
         const card = element("article", undefined, {
-          class: "card",
+          class: row.orphan ? "card orphan" : "card",
           "data-platform": row.platform,
         });
         const top = element("div", undefined, { class: "cardTop" });
@@ -600,7 +646,14 @@ class OpcuaNodePanel extends HTMLElement {
           element("h3", row.name || row.node_id),
           element("div", row.node_id, { class: "address" }),
         );
-        top.append(text, element("span", row.variant_type, { class: "badge" }));
+        top.append(text);
+        // An orphan row may have no cached type (node gone, never "always available").
+        if (row.variant_type)
+          top.append(element("span", row.variant_type, { class: "badge" }));
+        if (row.orphan)
+          top.append(
+            element("span", this._t("orphan"), { class: "orphanTag" }),
+          );
         if (row.manual)
           top.append(
             element("span", this._t("manual"), { class: "manualTag" }),
@@ -610,15 +663,26 @@ class OpcuaNodePanel extends HTMLElement {
           this._data.areas.find((a) => a.id === row.area_id)?.name ||
           this._t("inherit");
         bottom.append(element("span", area, { class: "meta" }));
-        const edit = this._button("edit", () => this._edit(row));
-        edit.disabled = !row.editable;
-        if (!row.editable) edit.title = this._t("notReady");
         const actions = element("div", undefined, { class: "actions" });
-        actions.append(edit);
-        if (row.manual)
+        if (row.orphan) {
+          // Nothing left to edit: the only sensible action is cleanup.
           actions.append(
-            this._button("remove", () => this._remove(row), "danger"),
+            this._button(
+              "deleteEntity",
+              () => this._removeOrphan(row),
+              "danger",
+            ),
           );
+        } else {
+          const edit = this._button("edit", () => this._edit(row));
+          edit.disabled = !row.editable;
+          if (!row.editable) edit.title = this._t("notReady");
+          actions.append(edit);
+          if (row.manual)
+            actions.append(
+              this._button("remove", () => this._remove(row), "danger"),
+            );
+        }
         bottom.append(actions);
         const state = element("div", undefined, { class: "entityState" });
         state.append(
@@ -686,6 +750,64 @@ class OpcuaNodePanel extends HTMLElement {
       badge.textContent = this._t(online ? "connected" : "disconnected");
       badge.classList.toggle("online", online);
     }
+  }
+  _removeOrphan(row) {
+    const endpoint = this._endpoint();
+    const dialog = element("dialog");
+    this._dialog = dialog;
+    const form = element("form");
+    dialog.append(form);
+    const error = element("div", "", { class: "error", role: "alert" });
+    const cancel = this._button("cancel", () => dialog.close());
+    const remove = element("button", this._t("deleteEntity"), {
+      type: "submit",
+      class: "danger",
+    });
+    const footer = element("footer");
+    footer.append(cancel, remove);
+    form.append(
+      element("h2", this._t("deleteTitle")),
+      element("strong", row.name || row.node_id),
+      element("div", row.entity_id, { class: "address" }),
+      element("div", row.node_id, { class: "address" }),
+      element("p", this._t("deleteHelp")),
+      error,
+      footer,
+    );
+    let busy = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      busy = true;
+      remove.disabled = cancel.disabled = true;
+      remove.textContent = this._t("deleting");
+      error.textContent = "";
+      try {
+        await this._hass.callWS({
+          type: "ha_opcua/entity/remove_orphan",
+          entry_id: endpoint.entry_id,
+          revision: endpoint.revision,
+          entity_id: row.entity_id,
+        });
+        this._notice = this._t("deleted");
+        dialog.close();
+        await this._load();
+      } catch (err) {
+        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        busy = false;
+        remove.disabled = cancel.disabled = false;
+        remove.textContent = this._t("deleteEntity");
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
   }
   _remove(row) {
     const endpoint = this._endpoint();
@@ -995,7 +1117,6 @@ class OpcuaNodePanel extends HTMLElement {
       step: "any",
     });
     deadband.value = initial.deadband ?? defaults.deadband;
-    limitInputs.deadband = deadband;
     const deadbandField = this._field("deadband", deadband);
     const deadbandHelp = element("p", this._t("deadbandHelp"), {
       class: "hint",
@@ -1033,7 +1154,12 @@ class OpcuaNodePanel extends HTMLElement {
         "Double",
       ].includes(selectedNode()?.variant_type);
       precision.disabled = precisionField.hidden;
-      deadbandField.hidden = deadbandHelp.hidden = platform !== "number";
+      // Any numeric node shown as number or sensor: a read-only float has
+      // exactly the same push-noise problem as a writable one.
+      deadbandField.hidden = deadbandHelp.hidden = !(
+        ["number", "sensor"].includes(platform) &&
+        NUMERIC.has(selectedNode()?.variant_type)
+      );
       deadband.disabled = deadbandField.hidden;
       toggle.hidden = invertHelp.hidden =
         selectedNode()?.variant_type !== "Boolean";
@@ -1098,10 +1224,15 @@ class OpcuaNodePanel extends HTMLElement {
             ? {
                 limits: Object.fromEntries(
                   (effective() === "number"
-                    ? ["min", "max", "step", "deadband"]
+                    ? ["min", "max", "step"]
                     : ["min_length", "max_length"]
                   ).map((key) => [key, Number(limitInputs[key].value)]),
                 ),
+              }
+            : {}),
+          ...(!deadband.disabled
+            ? {
+                deadband: deadband.value === "" ? null : Number(deadband.value),
               }
             : {}),
           ...(!precision.disabled || initial.precision != null

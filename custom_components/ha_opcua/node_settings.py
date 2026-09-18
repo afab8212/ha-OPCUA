@@ -46,12 +46,22 @@ def number_defaults(node):
         "min": 0,
         "max": 100,
         "step": 1 if node["variant_type"] in INTEGER_TYPES else 0.1,
-        # Absolute OPC UA subscription deadband: suppresses push updates for a
-        # change smaller than this (e.g. float noise below the digit you care
-        # about). 0 disables it. Only takes effect while Auto-Subscription is
-        # on; polling always reads the exact value regardless.
-        "deadband": 1 if node["variant_type"] in INTEGER_TYPES else 0.01,
     }
+
+
+def deadband_default(node):
+    """Absolute OPC UA subscription deadband applied when none is saved.
+
+    Suppresses push updates for a change smaller than this (e.g. float noise
+    below the digit you care about). 0 disables it. Only takes effect while
+    Auto-Subscription is on; polling always reads the exact value regardless.
+    """
+    return 1 if node["variant_type"] in INTEGER_TYPES else 0.01
+
+
+def supports_deadband(node, platform):
+    """Deadband applies to any numeric node exposed as a number or sensor."""
+    return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
 
 
 def validate_settings(node, settings):
@@ -73,6 +83,28 @@ def validate_settings(node, settings):
         ):
             raise ValueError("invalid_precision")
         result["precision"] = precision
+    # Deadband is independent of the number limits: a read-only float sensor
+    # has exactly the same float-noise problem as a writable number. It is
+    # silently dropped (not rejected) for platforms/types it cannot apply to,
+    # so a node that is switched to "disabled" or "sensor"-on-Boolean keeps
+    # loading even if an old deadband value is still stored.
+    if supports_deadband(node, effective_platform(node, settings)):
+        raw = settings.get("deadband")
+        if raw is None:
+            raw = deadband_default(node)
+        if isinstance(raw, bool):
+            raise ValueError("invalid_deadband")
+        try:
+            deadband = float(raw)
+        except (ValueError, TypeError, OverflowError) as err:
+            raise ValueError("invalid_deadband") from err
+        if not math.isfinite(deadband) or deadband < 0:
+            raise ValueError("invalid_deadband")
+        if node["variant_type"] in INTEGER_TYPES:
+            if not deadband.is_integer():
+                raise ValueError("invalid_deadband")
+            deadband = int(deadband)
+        result["deadband"] = deadband
     if "node_id" in settings:
         if not isinstance(settings["node_id"], str) or not settings["node_id"]:
             raise ValueError("invalid_node_id")

@@ -68,6 +68,16 @@
           "deadband": "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value."
         }
       },
+      "sensor": {
+        "title": "Sensor options",
+        "description": "Node: {node}. A read-only numeric node has no editable range, but its push updates can still be filtered.",
+        "data": {
+          "deadband": "Deadband"
+        },
+        "data_description": {
+          "deadband": "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value."
+        }
+      },
       "text": {
         "title": "Text limits",
         "description": "Node: {node}. Set the maximum to the string capacity configured in the PLC (up to 255 characters for Home Assistant). Capacity is not discovered automatically. Spaces are preserved.",
@@ -84,7 +94,8 @@
       "integer_limits_required": "This node requires integer limits and step.",
       "unsafe_integer_limits": "Integer limits must be within ±9007199254740991 for exact representation in the interface.",
       "limits_outside_type": "The limits exceed the OPC UA data type range.",
-      "invalid_text_limits": "Use integer lengths with 0 ≤ minimum ≤ maximum ≤ 255."
+      "invalid_text_limits": "Use integer lengths with 0 ≤ minimum ≤ maximum ≤ 255.",
+      "invalid_deadband": "Use a finite deadband of 0 or more (an integer for integer node types)."
     },
     "abort": {
       "integration_not_loaded": "Load the integration before configuring its discovered nodes.",
@@ -143,7 +154,7 @@
   "issues": {
     "orphan_entity": {
       "title": "Remove orphaned entity: {entity_id}",
-      "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry. Before confirming, update any automations, scripts and dashboards that reference it. The PLC node, settings and other entities are not changed.",
+      "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry together with its saved node settings. Before confirming, update any automations, scripts and dashboards that reference it. The PLC and other entities are not changed.",
       "fix_flow": {
         "step": {
           "confirm": {

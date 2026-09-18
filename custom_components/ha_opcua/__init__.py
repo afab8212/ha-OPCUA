@@ -28,6 +28,7 @@ from .const import (
     CONF_HUB_SCAN_INTERVAL,
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
+    CONF_KNOWN_NODE_IDS,
     CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
@@ -39,7 +40,12 @@ from .const import (
     SERVICE_SET_VALUE,
 )
 from .device import async_register_device
-from .node_settings import SCALAR_TYPES, effective_platform, validate_settings
+from .node_settings import (
+    NUMERIC_TYPES,
+    SCALAR_TYPES,
+    effective_platform,
+    validate_settings,
+)
 from .orphans import (
     async_clear_orphan_repairs,
     async_setup_orphan_repairs,
@@ -112,6 +118,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_refresh()
         hass.data[DOMAIN][hub_id] = coordinator
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        # Only now is it safe for the coordinator to persist newly discovered
+        # nodes (which can trigger a config entry reload): forwarding entry
+        # setups above must finish first, or that reload races the still
+        # in-progress initial setup and registers duplicate entity IDs.
+        coordinator.entities_ready = True
     except BaseException as err:
         hass.data[DOMAIN].pop(hub_id, None)
         await coordinator.async_shutdown()
@@ -609,6 +620,9 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             if key not in (CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED)
         }
         self._control_lock = asyncio.Lock()
+        # Flipped to True by async_setup_entry once async_forward_entry_setups
+        # has returned. Guards _persist_discovery_state: see its docstring.
+        self.entities_ready = False
         self._discovery_pending = config_entry is not None
         self.nodes = {}
         self.discovered_nodes = {}
@@ -617,6 +631,17 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             if config_entry
             else {}
         )
+        # Node IDs ever seen by this hub. Absent (None) means this entry has
+        # never run under the code that tracks this: its next discovery seeds
+        # the baseline from whatever is currently found, without treating any
+        # of it as "new" - this is what keeps a pre-existing installation's
+        # entities from silently changing domain (sensor -> number) the first
+        # time it loads under the newer code.
+        raw_known_ids = (
+            config_entry.options.get(CONF_KNOWN_NODE_IDS) if config_entry else None
+        )
+        self._known_node_ids_initialized = raw_known_ids is not None
+        self.known_node_ids: set[str] = set(raw_known_ids or [])
         self.manual_nodes = (
             dict(config_entry.options.get(CONF_MANUAL_NODES, {}))
             if config_entry
@@ -641,7 +666,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         self._hub.on_connection_state_change = self._connection_state_changed
         self._hub.on_data_change = self._on_subscription_data
         if self.offline_nodes:
-            self.set_nodes([])
+            # persist=False: this pre-connection pass only has offline/manual
+            # nodes, not a real discovery snapshot - it must never seed or
+            # grow known_node_ids, or the real discovery right after would
+            # wrongly treat its nodes as "new".
+            self.set_nodes([], persist=False)
             # Cached metadata must not suppress normal discovery on reconnection.
             self._discovery_pending = config_entry is not None
 
@@ -668,10 +697,9 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         updated = dict(self.data or {})
         changed = False
         for node_id, node in self.nodes.items():
-            if (
-                node["target_node_id"] == target_node_id
-                and self._platforms.get(node_id) not in (None, "disabled")
-            ):
+            if node["target_node_id"] == target_node_id and self._platforms.get(
+                node_id
+            ) not in (None, "disabled"):
                 updated[node_id] = value
                 changed = True
         if changed:
@@ -679,6 +707,15 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             self.data = updated
             self.last_update_success = True
             self.async_update_listeners()
+
+    async def async_request_rediscovery(self) -> None:
+        """Force the next poll to re-run discovery, picking up new/removed PLC nodes.
+
+        Reuses the existing connection (no reconnect/disconnect), unlike a
+        full config entry reload.
+        """
+        self._discovery_pending = True
+        await self.async_request_refresh()
 
     @property
     def hub(self) -> OpcuaHub:
@@ -752,7 +789,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 await self._hub.disable_subscription()
             self.async_update_listeners()
 
-    def set_nodes(self, nodes):
+    def set_nodes(self, nodes, *, persist=True, full_discovery=False):
         self._discovery_pending = False
         self.discovered_nodes = {node["node_id"]: node for node in nodes}
         # Keep saved manual entities visible even if temporarily unreadable.
@@ -766,6 +803,15 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             target = self.discovered_nodes.get(settings.get("node_id"))
             if entity_key not in candidates and target is not None:
                 candidates[entity_key] = {**target, "node_id": entity_key}
+        # A node counts as "new" only once we have a real discovery baseline to
+        # compare against (see known_node_ids docstring in __init__); until then
+        # nothing is new, so an upgrading installation is never auto-reassigned.
+        new_ids = (
+            set(candidates) - self.known_node_ids
+            if self._known_node_ids_initialized
+            else set()
+        )
+        newly_assigned = {}
         self.nodes = {}
         self._platforms = {}
         for node_id, original in candidates.items():
@@ -787,6 +833,22 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 "target_node_id": target_id,
             }
             self.nodes[node_id] = node
+            # A brand-new writable numeric/string node defaults to an editable
+            # control instead of the usual conservative read-only sensor.
+            # Never applies to a node that already has any saved settings
+            # (including one from a previous run of this same logic), and
+            # never retroactively to nodes that existed before this feature
+            # started tracking known_node_ids.
+            if (
+                not saved
+                and node_id in new_ids
+                and target is not None
+                and node["writable"]
+            ):
+                if node["variant_type"] in NUMERIC_TYPES:
+                    saved = {"platform": "number"}
+                elif node["variant_type"] == "String":
+                    saved = {"platform": "text"}
             try:
                 if target is None:
                     raise ValueError("node_not_found")
@@ -807,6 +869,76 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 self._platforms[node_id] = effective_platform(node, settings)
                 if node_id in self.node_settings:
                     self.node_settings[node_id] = settings
+                elif saved:
+                    self.node_settings[node_id] = settings
+                    newly_assigned[node_id] = settings
+        if persist:
+            self._persist_discovery_state(
+                set(candidates), newly_assigned, full_discovery=full_discovery
+            )
+
+    def _persist_discovery_state(self, seen_ids, newly_assigned, *, full_discovery):
+        """Record newly auto-configured nodes and update the known-node baseline.
+
+        Both changes go into the config entry so they survive a restart and
+        are never redecided later - an auto-assigned platform behaves exactly
+        like a manually chosen one from this point on.
+
+        Writing options can trigger a config entry reload (via
+        async_options_updated). Before entities_ready, that reload would race
+        this same entry's still-in-progress initial setup and register
+        duplicate entity IDs - see async_setup_entry. Skipping the write here
+        only delays it to the next refresh, a few seconds later at most.
+
+        After a *complete* discovery pass, seen_ids is the ground truth of
+        what currently exists (plus manual/offline entries, which are always
+        part of candidates regardless of live discovery), so the baseline is
+        pruned down to exactly that - a PLC variable that was renamed or
+        removed stops accumulating as dead weight. A partial pass (some node
+        skipped after a transient read error) only ever adds to the baseline,
+        never removes: shrinking it there would make an unreadable-this-cycle
+        node look "new" again next time, which is exactly what this baseline
+        exists to prevent.
+        """
+        if not self.config_entry or not self.entities_ready:
+            return
+        updated_known = (
+            set(seen_ids) if full_discovery else self.known_node_ids | seen_ids
+        )
+        changed = (
+            not self._known_node_ids_initialized or updated_known != self.known_node_ids
+        )
+        if not newly_assigned and not changed:
+            return
+        options = dict(self.config_entry.options)
+        if newly_assigned:
+            node_settings_opt = dict(options.get(CONF_NODE_SETTINGS, {}))
+            node_settings_opt.update(newly_assigned)
+            options[CONF_NODE_SETTINGS] = node_settings_opt
+        if changed:
+            options[CONF_KNOWN_NODE_IDS] = sorted(updated_known)
+            self.known_node_ids = updated_known
+            self._known_node_ids_initialized = True
+        # This entry's running coordinator already reflects the new state in
+        # memory (nodes/_platforms were just recomputed from it) - reloading
+        # would only rebuild the same thing, while racing this same reload
+        # against the poll cycle that is still in flight: the unload closes
+        # the hub under the running read, and an entity added by a listener
+        # in that window survives the platform unload as a zombie, so the
+        # fresh setup then fails with a duplicate unique_id. Syncing
+        # reload_options to what is about to be written makes
+        # async_options_updated's comparison see no difference, so it takes
+        # its "apply live, don't reload" branch instead.
+        #
+        # This MUST happen before async_update_entry: HA starts update
+        # listeners eagerly, so async_options_updated runs synchronously
+        # inside that call up to its first await - including the comparison.
+        self.reload_options = {
+            key: value
+            for key, value in options.items()
+            if key not in (CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED)
+        }
+        self.hass.config_entries.async_update_entry(self.config_entry, options=options)
 
     def nodes_for_platform(self, platform):
         return (
@@ -845,7 +977,13 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                     nodes.append(metadata)
                     self._manual_pending.discard(node_id)
             if discovering or pending:
-                self.set_nodes(nodes)
+                # Only a discovery pass that ran to completion (nothing
+                # skipped after a read error) is trustworthy ground truth for
+                # pruning known_node_ids; see _persist_discovery_state.
+                self.set_nodes(
+                    nodes,
+                    full_discovery=discovering and self._hub.discovery_complete,
+                )
             if discovering:
                 try:
                     if self.config_entry and nodes:

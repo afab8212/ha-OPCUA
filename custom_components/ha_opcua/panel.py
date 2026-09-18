@@ -17,7 +17,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_integration
 
 from .connection import connection_attributes
-from .const import CONF_HUB_ID, CONF_MANUAL_NODES, CONF_NODE_SETTINGS, DOMAIN
+from .const import (
+    CONF_HUB_ID,
+    CONF_MANUAL_NODES,
+    CONF_NODE_SETTINGS,
+    CONF_OFFLINE_NODES,
+    DOMAIN,
+)
 from .device import async_register_device
 from .node_settings import (
     allowed_platforms,
@@ -25,7 +31,19 @@ from .node_settings import (
     update_offline_node,
     validate_settings,
 )
-from .orphans import async_sync_orphan_repairs
+from .orphans import async_remove_orphan, async_sync_orphan_repairs, is_orphan
+
+SNAPSHOT_SETTINGS = (
+    "platform",
+    "min",
+    "max",
+    "step",
+    "deadband",
+    "min_length",
+    "max_length",
+    "precision",
+    "always_available",
+)
 
 PANEL_PATH = "opcua-nodes"
 PANEL_DATA = f"{DOMAIN}_panel"
@@ -52,6 +70,8 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_inspect)
     websocket_api.async_register_command(hass, ws_create)
     websocket_api.async_register_command(hass, ws_remove)
+    websocket_api.async_register_command(hass, ws_rediscover)
+    websocket_api.async_register_command(hass, ws_remove_orphan)
     hass.data[PANEL_DATA] = {"locks": {}, "version": version}
 
 
@@ -118,22 +138,42 @@ def endpoint_snapshot(hass, entry):
                     in available_nodes
                 ),
                 "settings": {
-                    k: v
-                    for k, v in settings.items()
-                    if k
-                    in (
-                        "platform",
-                        "min",
-                        "max",
-                        "step",
-                        "deadband",
-                        "min_length",
-                        "max_length",
-                        "precision",
-                        "always_available",
-                    )
+                    k: v for k, v in settings.items() if k in SNAPSHOT_SETTINGS
                 },
                 "manual": key in manual,
+                "orphan": False,
+            }
+        )
+    # Entities whose node vanished from the PLC (or that a category change
+    # left behind) are not in c.nodes and would otherwise silently disappear
+    # from the panel. List them as read-only "orphan" rows with a delete
+    # action, so the user sees the result of a rediscover right here.
+    listed_entities = {row["entity_id"] for row in rows}
+    prefix = f"{entry.entry_id}:"
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.entity_id in listed_entities or not is_orphan(hass, entry, entity):
+            continue
+        key = entity.unique_id[len(prefix) :]
+        settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
+        cached = entry.options.get(CONF_OFFLINE_NODES, {}).get(key, {})
+        rows.append(
+            {
+                "key": key,
+                "entity_id": entity.entity_id,
+                "platform": entity.domain,
+                "name": entity.name or entity.original_name or entity.entity_id,
+                "custom_name": entity.name,
+                "area_id": entity.area_id,
+                "node_id": settings.get("node_id", key),
+                "variant_type": cached.get("variant_type"),
+                "device_class": entity.device_class or settings.get("device_class"),
+                "invert_state": settings.get("invert_state", False),
+                "editable": False,
+                "settings": {
+                    k: v for k, v in settings.items() if k in SNAPSHOT_SETTINGS
+                },
+                "manual": False,
+                "orphan": True,
             }
         )
     revision = hashlib.sha256(
@@ -272,7 +312,7 @@ def _entity_settings(node, msg, saved=None):
     }
     if "platform" in msg:
         proposed["platform"] = msg["platform"]
-    for field in ("precision", "always_available"):
+    for field in ("precision", "deadband", "always_available"):
         if field in msg:
             proposed[field] = msg[field]
     limits = msg.get("limits", {})
@@ -291,8 +331,7 @@ def _entity_settings(node, msg, saved=None):
             {
                 key: value
                 for key, value in (saved or {}).items()
-                if key
-                in ("min", "max", "step", "deadband", "min_length", "max_length")
+                if key in ("min", "max", "step", "deadband", "min_length", "max_length")
             }
         )
     return result
@@ -317,6 +356,41 @@ async def _inspect(c, node_id):
         raise ValueError("node_unreadable") from err
     except (ConnectionError, TimeoutError, OSError, HomeAssistantError) as err:
         raise ValueError("connection_failed") from err
+
+
+async def async_rediscover(hass, msg):
+    """Force a fresh OPC UA discovery pass without a full config entry reload."""
+    entry, c = _loaded_endpoint(hass, msg["entry_id"])
+    await c.async_request_rediscovery()
+    return {"rediscovered": True}
+
+
+async def async_remove_orphan_entity(hass, msg):
+    """Delete one orphaned entity (node gone / stale domain) from the panel.
+
+    Re-validates orphan status under the endpoint lock right before deleting,
+    exactly like the Repairs fix flow does.
+    """
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        if endpoint_snapshot(hass, entry)["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        registry = er.async_get(hass)
+        entity = registry.async_get(msg["entity_id"])
+        if (
+            entity is None
+            or entity.config_entry_id != entry.entry_id
+            or not is_orphan(hass, entry, entity)
+        ):
+            raise ValueError("not_orphan")
+        async_remove_orphan(hass, entry, entity)
+        async_sync_orphan_repairs(hass, entry)
+        return {"removed": True, "entity_id": entity.entity_id}
 
 
 async def async_inspect_node(hass, msg):
@@ -441,6 +515,42 @@ async def async_remove_manual_node(hass, msg):
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/endpoint/rediscover",
+        vol.Required("entry_id"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_rediscover(hass, connection, msg):
+    try:
+        result = await async_rediscover(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/entity/remove_orphan",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+        vol.Required("entity_id"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_remove_orphan(hass, connection, msg):
+    try:
+        result = await async_remove_orphan_entity(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/node/remove",
         vol.Required("entry_id"): str,
         vol.Required("revision"): str,
@@ -485,6 +595,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Required("platform"): str,
         vol.Optional("limits"): dict,
         vol.Optional("precision"): vol.Any(int, None),
+        vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
@@ -519,6 +630,7 @@ async def ws_snapshot(hass, connection, msg):
         vol.Optional("platform"): str,
         vol.Optional("limits"): dict,
         vol.Optional("precision"): vol.Any(int, None),
+        vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
