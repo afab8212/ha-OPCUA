@@ -858,16 +858,19 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             # (including one from a previous run of this same logic), and
             # never retroactively to nodes that existed before this feature
             # started tracking known_node_ids.
-            if (
-                not saved
-                and node_id in new_ids
-                and target is not None
-                and node["writable"]
-            ):
-                if node["variant_type"] in NUMERIC_TYPES:
-                    saved = {"platform": "number"}
-                elif node["variant_type"] == "String":
-                    saved = {"platform": "text"}
+            if not saved and node_id in new_ids and target is not None:
+                if node["writable"]:
+                    if node["variant_type"] in NUMERIC_TYPES:
+                        saved = {"platform": "number"}
+                    elif node["variant_type"] == "String":
+                        saved = {"platform": "text"}
+                # A brand-new REAL/LREAL node - number or sensor, writable or
+                # not - defaults to 2 decimal places instead of no rounding.
+                # Persisted immediately (like the platform above) so the
+                # panel shows "2" the first time it's opened, not a blank
+                # field silently falling back to the raw float.
+                if node["variant_type"] in {"Float", "Double"}:
+                    saved = {**saved, "precision": 2}
             try:
                 if target is None:
                     raise ValueError("node_not_found")
