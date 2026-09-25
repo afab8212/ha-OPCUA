@@ -192,7 +192,7 @@ async def test_panel_registration_is_once_and_versioned(hass):
     register.assert_awaited_once()
     assert register.call_args.kwargs["require_admin"] is True
     assert register.call_args.kwargs["module_url"].endswith("?v=1.4.0")
-    assert commands.call_count == 5
+    assert commands.call_count == 8
     assert panel_snapshot(hass)["version"] == "1.4.0"
 
 

@@ -6,7 +6,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
-from .orphans import ISSUE_PREFIX, is_orphan
+from .orphans import ISSUE_PREFIX, async_remove_orphan, is_orphan
 
 
 class OrphanEntityRepairFlow(RepairsFlow):
@@ -42,9 +42,9 @@ class OrphanEntityRepairFlow(RepairsFlow):
             return self.async_abort(reason="no_longer_orphan")
         if user_input is not None:
             # No await between the final check and deletion: a panel save cannot
-            # switch this node back to its previous type in between.
-            registry.async_remove(entity.entity_id)
-            ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
+            # switch this node back to its previous type in between. Removes
+            # the entity, its issue and its saved node settings in one go.
+            async_remove_orphan(self.hass, entry, entity)
             return self.async_create_entry(data={})
         return self.async_show_form(
             step_id="confirm",

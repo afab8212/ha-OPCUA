@@ -174,6 +174,10 @@ async def test_offline_startup_can_repair_explicit_replacement(hass, entry):
         "type"
     ] == FlowResultType.CREATE_ENTRY
     assert registry.async_get(old.entity_id) is None
+    # The settings describe the *replacement* binary_sensor, not the removed
+    # switch - they must survive even though that replacement was never
+    # created (the PLC never came online in this test).
+    assert entry.options[CONF_NODE_SETTINGS][KEY]["platform"] == "binary_sensor"
     await c.async_shutdown()
     await restored.async_shutdown()
 
@@ -201,8 +205,18 @@ async def test_discovery_requires_complete_current_results_and_protects_configur
     assert (await manager.async_configure(flow_id, {}))["type"] == FlowResultType.ABORT
     assert registry.async_get(old.entity_id) is not None
     c.hub._connected = True
+    # Saved settings alone no longer protect a node that a complete discovery
+    # shows as gone - otherwise every auto-assigned platform would keep dead
+    # entities forever. Only manual nodes, exclusions and "always available"
+    # entities are designed to outlive the live node.
     for options in (
         {CONF_NODE_SETTINGS: {KEY: {"platform": "auto"}}},
+        {CONF_NODE_SETTINGS: {KEY: {"platform": "switch"}}},
+    ):
+        hass.config_entries.async_update_entry(entry, options=options)
+        c.reload_options = options
+        assert is_orphan(hass, entry, old)
+    for options in (
         {CONF_MANUAL_NODES: {KEY: NODE}},
         {CONF_NODE_SETTINGS: {KEY: {"platform": "disabled"}}},
         {CONF_NODE_SETTINGS: {KEY: {"platform": "auto", "always_available": True}}},
