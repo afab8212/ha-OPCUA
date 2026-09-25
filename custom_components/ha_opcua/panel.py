@@ -126,6 +126,7 @@ def endpoint_snapshot(hass, entry):
                         "min",
                         "max",
                         "step",
+                        "deadband",
                         "min_length",
                         "max_length",
                         "precision",
@@ -271,13 +272,13 @@ def _entity_settings(node, msg, saved=None):
     }
     if "platform" in msg:
         proposed["platform"] = msg["platform"]
-    for field in ("precision", "always_available"):
+    for field in ("precision", "deadband", "always_available"):
         if field in msg:
             proposed[field] = msg[field]
     limits = msg.get("limits", {})
     platform = effective_platform(node, proposed)
     allowed = (
-        {"min", "max", "step"}
+        {"min", "max", "step", "deadband"}
         if platform == "number"
         else {"min_length", "max_length"} if platform == "text" else set()
     )
@@ -290,7 +291,7 @@ def _entity_settings(node, msg, saved=None):
             {
                 key: value
                 for key, value in (saved or {}).items()
-                if key in ("min", "max", "step", "min_length", "max_length")
+                if key in ("min", "max", "step", "deadband", "min_length", "max_length")
             }
         )
     return result
@@ -483,6 +484,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Required("platform"): str,
         vol.Optional("limits"): dict,
         vol.Optional("precision"): vol.Any(int, None),
+        vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
@@ -517,6 +519,7 @@ async def ws_snapshot(hass, connection, msg):
         vol.Optional("platform"): str,
         vol.Optional("limits"): dict,
         vol.Optional("precision"): vol.Any(int, None),
+        vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),

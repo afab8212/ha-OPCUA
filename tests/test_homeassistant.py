@@ -24,7 +24,13 @@ pytestmark = pytest.mark.asyncio
 
 
 def coordinator(hass):
-    hub = Mock(get_values=AsyncMock(), set_value=AsyncMock(), disconnect=AsyncMock())
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+    )
     result = AsyncuaCoordinator(hass, "PLC", hub)
     result.set_nodes(
         [

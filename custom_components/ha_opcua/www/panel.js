@@ -11,6 +11,11 @@ const TEXT = {
       "REAL/LREAL: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
     invalid_precision:
       "Inserisci un numero intero da 0 a 10 per un nodo REAL/LREAL.",
+    invalid_deadband:
+      "Usa un deadband finito maggiore o uguale a 0 (intero per i tipi interi).",
+    deadband: "Deadband",
+    deadbandHelp:
+      "Solo Auto-Subscription: sopprime un aggiornamento push più piccolo di questa variazione assoluta (es. 0,01 nasconde il rumore in virgola mobile oltre la 2ª cifra decimale). 0 disattiva il filtro. Il polling non è interessato e legge sempre il valore esatto.",
     remove: "Rimuovi",
     removing: "Rimozione…",
     removeTitle: "Rimuovi nodo manuale",
@@ -139,6 +144,11 @@ const TEXT = {
     precisionHelp:
       "REAL/LREAL: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
     invalid_precision: "Enter an integer from 0 to 10 for a REAL/LREAL node.",
+    invalid_deadband:
+      "Use a finite deadband of 0 or more (an integer for integer node types).",
+    deadband: "Deadband",
+    deadbandHelp:
+      "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value.",
     remove: "Remove",
     removing: "Removing…",
     removeTitle: "Remove manual node",
@@ -940,6 +950,9 @@ class OpcuaNodePanel extends HTMLElement {
       step: ["Float", "Double"].includes(selectedNode()?.variant_type)
         ? 0.1
         : 1,
+      deadband: ["Float", "Double"].includes(selectedNode()?.variant_type)
+        ? 0.01
+        : 1,
       min_length: 0,
       max_length: 255,
     };
@@ -979,6 +992,18 @@ class OpcuaNodePanel extends HTMLElement {
       class: "hint",
     });
     form.append(precisionField, precisionHelp);
+    const deadband = element("input", undefined, {
+      type: "number",
+      name: "deadband",
+      min: "0",
+      step: "any",
+    });
+    deadband.value = initial.deadband ?? defaults.deadband;
+    const deadbandField = this._field("deadband", deadband);
+    const deadbandHelp = element("p", this._t("deadbandHelp"), {
+      class: "hint",
+    });
+    form.append(deadbandField, deadbandHelp);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     for (const cls of this._data.device_classes)
@@ -1011,6 +1036,13 @@ class OpcuaNodePanel extends HTMLElement {
         "Double",
       ].includes(selectedNode()?.variant_type);
       precision.disabled = precisionField.hidden;
+      // Any numeric node shown as number or sensor: a read-only float has
+      // exactly the same push-noise problem as a writable one.
+      deadbandField.hidden = deadbandHelp.hidden = !(
+        ["number", "sensor"].includes(platform) &&
+        NUMERIC.has(selectedNode()?.variant_type)
+      );
+      deadband.disabled = deadbandField.hidden;
       toggle.hidden = invertHelp.hidden =
         selectedNode()?.variant_type !== "Boolean";
       for (const [kind, group] of Object.entries(limitGroups)) {
@@ -1078,6 +1110,11 @@ class OpcuaNodePanel extends HTMLElement {
                     : ["min_length", "max_length"]
                   ).map((key) => [key, Number(limitInputs[key].value)]),
                 ),
+              }
+            : {}),
+          ...(!deadband.disabled
+            ? {
+                deadband: deadband.value === "" ? null : Number(deadband.value),
               }
             : {}),
           ...(!precision.disabled || initial.precision != null

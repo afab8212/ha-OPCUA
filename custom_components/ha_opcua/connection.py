@@ -21,6 +21,7 @@ def connection_attributes(coordinator):
         hostname = port = endpoint = None
     return {
         "connection_enabled": coordinator.enabled,
+        "subscription_active": hub.subscription_active,
         "endpoint": endpoint,
         "host": hostname,
         "port": port,

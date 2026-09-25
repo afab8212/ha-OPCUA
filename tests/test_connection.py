@@ -21,7 +21,10 @@ from custom_components.ha_opcua.const import (
     DOMAIN,
     SERVICE_SET_VALUE,
 )
-from custom_components.ha_opcua.switch import OpcuaConnectionSwitch
+from custom_components.ha_opcua.switch import (
+    OpcuaConnectionSwitch,
+    OpcuaSubscriptionSwitch,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -53,12 +56,13 @@ async def test_offline_startup_recovery_pause_and_native_controls(
         patch("custom_components.ha_opcua.OpcuaHub", return_value=hub),
         patch.object(hass.config_entries, "async_forward_entry_setups", new=forward),
     ):
-        # The endpoint is not listening yet. Setup must still expose both controls.
+        # The endpoint is not listening yet. Setup must still expose all controls.
         assert await async_setup_entry(hass, entry)
     c = hass.data[DOMAIN]["PLC"]
     switch = next(e for e in entities if isinstance(e, OpcuaConnectionSwitch))
     sensor = next(e for e in entities if isinstance(e, OpcuaConnectionSensor))
-    assert len(entities) == 2
+    sub_switch = next(e for e in entities if isinstance(e, OpcuaSubscriptionSwitch))
+    assert len(entities) == 3
     assert switch.available and switch.is_on
     assert sensor.available and not sensor.is_on
     assert not c.last_update_success
@@ -66,11 +70,11 @@ async def test_offline_startup_recovery_pause_and_native_controls(
     try:
         await c.async_refresh()
         assert sensor.is_on and c.last_update_success
-        assert len(entities) == 3
-        text = next(e for e in entities if e not in (switch, sensor))
+        assert len(entities) == 4
+        text = next(e for e in entities if e not in (switch, sensor, sub_switch))
         assert text.native_value == "initial" and text.available
         await c.async_refresh()
-        assert len(entities) == 3  # Deferred discovery never duplicates entities.
+        assert len(entities) == 4  # Deferred discovery never duplicates entities.
         await text.async_set_value(" [A,B] ")
         assert await recipe.read_value() == " [A,B] "
         info = sensor.extra_state_attributes
