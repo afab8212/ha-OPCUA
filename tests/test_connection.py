@@ -11,6 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 from custom_components.ha_opcua import (
     AsyncuaCoordinator,
     OpcuaHub,
+    async_options_updated,
     async_setup_entry,
 )
 from custom_components.ha_opcua.binary_sensor import OpcuaConnectionSensor
@@ -18,6 +19,7 @@ from custom_components.ha_opcua.connection import connection_attributes
 from custom_components.ha_opcua.const import (
     CONF_CONNECTION_ENABLED,
     CONF_NODE_SETTINGS,
+    CONF_SUBSCRIPTION_ENABLED,
     DOMAIN,
     SERVICE_SET_VALUE,
 )
@@ -214,4 +216,32 @@ async def test_connection_attributes_redact_url_credentials(hass):
     assert attrs["authentication"] == "username"
     assert "alice" not in str(attrs) and "secret" not in str(attrs)
     assert attrs["session_timeout_ms"] is None
+    await c.async_shutdown()
+
+
+async def test_subscription_setting_survives_unrelated_options_update(hass, entry):
+    """subscription_enabled chosen at initial setup lives in entry.data alone
+    until the options flow ever touches it. An unrelated live options update
+    (e.g. toggling the connection switch) must not silently re-enable it by
+    reading only entry.options and defaulting to True.
+    """
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, CONF_SUBSCRIPTION_ENABLED: False}
+    )
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+        enabled=True,
+        pause=AsyncMock(),
+    )
+    c = AsyncuaCoordinator(
+        hass, "PLC", hub, config_entry=entry, subscription_enabled=False
+    )
+    hass.data.setdefault(DOMAIN, {})[entry.data["hub_id"]] = c
+    await c.async_set_connection_enabled(False, persist=True)
+    await async_options_updated(hass, entry)
+    assert c.subscription_enabled is False
     await c.async_shutdown()

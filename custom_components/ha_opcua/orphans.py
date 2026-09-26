@@ -10,6 +10,7 @@ from .const import (
     CONF_HUB_ID,
     CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
+    CONF_SUBSCRIPTION_ENABLED,
     DOMAIN,
 )
 from .node_settings import effective_platform, validate_settings
@@ -44,7 +45,11 @@ def is_orphan(hass, entry, entity):
         return entity.domain != requested
 
     c = hass.data.get(DOMAIN, {}).get(entry.data[CONF_HUB_ID])
-    options = {k: v for k, v in entry.options.items() if k != CONF_CONNECTION_ENABLED}
+    options = {
+        k: v
+        for k, v in entry.options.items()
+        if k not in (CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED)
+    }
     if (
         c is None
         or c.config_entry is not entry

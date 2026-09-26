@@ -170,8 +170,13 @@ async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None
         await coordinator.async_set_connection_enabled(
             entry.options.get(CONF_CONNECTION_ENABLED, True), persist=False
         )
+        # subscription_enabled can still live in entry.data alone (set by the
+        # initial config flow and never touched since); entry.options.get()
+        # would silently fall back to True and re-enable it on any unrelated
+        # options update (e.g. toggling the connection switch).
         await coordinator.async_set_subscription_enabled(
-            entry.options.get(CONF_SUBSCRIPTION_ENABLED, True), persist=False
+            {**entry.data, **entry.options}.get(CONF_SUBSCRIPTION_ENABLED, True),
+            persist=False,
         )
 
 
