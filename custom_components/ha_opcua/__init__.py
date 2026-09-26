@@ -129,6 +129,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # setups above must finish first, or that reload races the still
         # in-progress initial setup and registers duplicate entity IDs.
         coordinator.entities_ready = True
+        # The discovery pass inside async_refresh() above ran before this
+        # point, so anything it classified was never allowed to persist -
+        # and a normal poll only calls set_nodes() again when a discovery or
+        # manual-node pass is actually due, which may not happen again for a
+        # long time. Flush it explicitly now instead of waiting for that.
+        coordinator.flush_pending_discovery_state()
     except BaseException as err:
         hass.data[DOMAIN].pop(hub_id, None)
         await coordinator.async_shutdown()
@@ -679,6 +685,13 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         # looks "newly assigned" again on a later poll; without this backlog
         # the pending write would be silently lost until a restart.
         self._pending_node_settings: dict[str, dict] = {}
+        # (seen_ids, full_discovery) from the most recent set_nodes() call,
+        # regardless of whether it was allowed to persist. Lets
+        # flush_pending_discovery_state() replay that exact classification
+        # once entities_ready flips True, instead of waiting for a further
+        # set_nodes() call that normal polling may not make again for a long
+        # time (see flush_pending_discovery_state's docstring).
+        self._last_discovery_snapshot: tuple[set[str], bool] | None = None
         self._discovery_pending = config_entry is not None
         self.nodes = {}
         self.discovered_nodes = {}
@@ -930,10 +943,28 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 elif saved:
                     self.node_settings[node_id] = settings
                     self._pending_node_settings[node_id] = settings
+        seen_ids = set(candidates)
+        self._last_discovery_snapshot = (seen_ids, full_discovery)
         if persist:
-            self._persist_discovery_state(
-                set(candidates), full_discovery=full_discovery
-            )
+            self._persist_discovery_state(seen_ids, full_discovery=full_discovery)
+
+    def flush_pending_discovery_state(self) -> None:
+        """Persist a classification made before entities_ready, right now.
+
+        Regular polls only call set_nodes() when a discovery or manual-node
+        pass is actually due (see _async_update_data): once the PLC is
+        simply online and nothing changes, that can be a long time, or
+        never, before the next call. Waiting for it to flush the backlog
+        from _persist_discovery_state's docstring would mean a node
+        classified during the initial discovery (which normally runs before
+        entities_ready is set) never gets its baseline or auto-assigned
+        settings saved at all. Call this once, right after entities_ready is
+        set, using the snapshot from whichever pass most recently ran.
+        """
+        if self._last_discovery_snapshot is None:
+            return
+        seen_ids, full_discovery = self._last_discovery_snapshot
+        self._persist_discovery_state(seen_ids, full_discovery=full_discovery)
 
     def _persist_discovery_state(self, seen_ids, *, full_discovery):
         """Record newly auto-configured nodes and update the known-node baseline.
