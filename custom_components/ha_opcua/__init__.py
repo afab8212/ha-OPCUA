@@ -944,8 +944,15 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                     self.node_settings[node_id] = settings
                     self._pending_node_settings[node_id] = settings
         seen_ids = set(candidates)
-        self._last_discovery_snapshot = (seen_ids, full_discovery)
+        # persist=False here means this pass is fundamentally not eligible to
+        # ever become the discovery baseline (see the cache-only seed call in
+        # __init__), not merely "delay persisting a real discovery" - that
+        # delay is handled entirely by _persist_discovery_state's own
+        # entities_ready check. Recording the snapshot regardless would let
+        # flush_pending_discovery_state() later persist cache-only data as if
+        # it were a real discovery result.
         if persist:
+            self._last_discovery_snapshot = (seen_ids, full_discovery)
             self._persist_discovery_state(seen_ids, full_discovery=full_discovery)
 
     def flush_pending_discovery_state(self) -> None:

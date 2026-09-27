@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from custom_components.ha_opcua import AsyncuaCoordinator
-from custom_components.ha_opcua.const import CONF_KNOWN_NODE_IDS, CONF_NODE_SETTINGS
+from custom_components.ha_opcua.const import (
+    CONF_KNOWN_NODE_IDS,
+    CONF_NODE_SETTINGS,
+    CONF_OFFLINE_NODES,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -122,5 +126,70 @@ async def test_new_node_settings_persist_with_existing_baseline_without_manual_s
     # called again at all. Nothing should change, and nothing should break.
     await c.async_refresh()
     assert entry.options[CONF_NODE_SETTINGS]["ns=2;i=9"]["platform"] == "number"
+
+    await c.async_shutdown()
+
+
+async def test_cache_only_startup_seed_never_becomes_the_discovery_baseline(
+    hass, entry
+):
+    """The pre-connection cache-only pass in __init__ must not seed the baseline.
+
+    On an upgrading installation with no known_node_ids baseline yet, an
+    "always available" node's cached metadata is loaded via
+    set_nodes([], persist=False) in __init__, before any real discovery ever
+    runs and while the PLC may still be offline. If that pass recorded a
+    snapshot, flushing it right after entities_ready would wrongly treat the
+    tiny cached-only set as the complete baseline - so once the PLC
+    reconnects, a pre-existing PLC node that was never manually configured
+    (and isn't in that cache) would look "new" on the very first real
+    discovery and get auto-reclassified, overwriting its existing behavior.
+    """
+    cached_id = "ns=2;i=5"
+    existing_id = "ns=2;i=9"
+    cached_node = {
+        "name": "Cached",
+        "node_id": cached_id,
+        "variant_type": "Boolean",
+        "writable": False,
+    }
+    existing_node = {
+        "name": "Existing",
+        "node_id": existing_id,
+        "variant_type": "Float",
+        "writable": True,
+    }
+    hass.config_entries.async_update_entry(
+        entry,
+        options={
+            CONF_NODE_SETTINGS: {cached_id: {"always_available": True}},
+            CONF_OFFLINE_NODES: {cached_id: cached_node},
+        },
+    )
+    hub = Mock(
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+        discovery_complete=True,
+    )
+    hub.discover_nodes = AsyncMock(return_value=[cached_node, existing_node])
+    hub.get_values = AsyncMock(return_value={cached_id: True, existing_id: 1.5})
+
+    # __init__ seeds offline_nodes from the cache before any real discovery.
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    assert CONF_KNOWN_NODE_IDS not in entry.options
+
+    # entities_ready flips right after the initial async_refresh() in
+    # async_setup_entry, regardless of whether the PLC was actually reachable.
+    c.entities_ready = True
+    c.flush_pending_discovery_state()
+    assert CONF_KNOWN_NODE_IDS not in entry.options
+
+    # The PLC reconnects: the first real discovery must not treat the
+    # pre-existing, never-configured node as new.
+    await c.async_refresh()
+    assert existing_id not in entry.options.get(CONF_NODE_SETTINGS, {})
+    assert entry.options[CONF_KNOWN_NODE_IDS] == sorted([cached_id, existing_id])
 
     await c.async_shutdown()
