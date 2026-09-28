@@ -94,6 +94,13 @@ async def async_setup(hass: HomeAssistant, config) -> bool:
     """Register the administrator configuration panel once per HA process."""
     from .panel import async_setup_panel
 
+    # asyncua logs every read and subscription notification at INFO. Keep
+    # normal operation quiet, without overriding an explicit library level.
+    # The manifest loggers entry lets HA enable library debug logs on demand.
+    library_logger = logging.getLogger("asyncua")
+    if library_logger.level == logging.NOTSET:
+        library_logger.setLevel(logging.WARNING)
+
     await async_setup_panel(hass)
     return True
 

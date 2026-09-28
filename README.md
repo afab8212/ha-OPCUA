@@ -178,6 +178,22 @@ If values update only at the scan interval, check that the connection is enabled
 
 The connectivity sensor’s **`subscription_active`** attribute reports whether the integration currently holds a subscription. The Auto-Subscription switch reports the saved request, so it can be on while `subscription_active` is false—for example, when no entity is selected or the PLC is offline. A connected session alone does not prove that subscriptions are active.
 
+## Logging and troubleshooting
+
+The `asyncua` library logs routine reads, browsing and subscription notifications at INFO level. ha-OPCUA defaults that library to **WARNING** to keep normal operation quiet. Warnings and errors remain visible. An explicitly configured library logger level is preserved; no root/Home Assistant logging level is changed.
+
+For troubleshooting, use **Enable debug logging** on the ha-OPCUA integration in Home Assistant. The integration declares `asyncua` as a library logger, so Home Assistant can include its detailed messages as well. Disable debug logging after reproducing the issue.
+
+If you have an existing logging override and still see routine INFO messages, set the library level explicitly in your existing `configuration.yaml` logger section:
+
+```yaml
+logger:
+  logs:
+    asyncua: warning
+```
+
+Merge this into any existing `logger:` section and check for more specific `asyncua.*` overrides. The `asyncua` logger is shared by any integrations using that library; its level applies to all of them.
+
 ## Home Assistant device page (1.3.0)
 
 Each configured OPC UA server now appears as **one device** under its integration entry, named after the connection. Open the device to see the standard Home Assistant page with node entities, connection controls, diagnostics, activity and related automations. You can assign an area and rename the device using Home Assistant's normal controls. Entities in the entity list are grouped under that device instead of “Ungrouped”. The integration uses the standard entry labels, matching the presentation of Siemens S7.
