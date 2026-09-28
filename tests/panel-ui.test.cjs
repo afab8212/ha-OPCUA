@@ -1053,9 +1053,11 @@ for (const width of [390, 1280]) {
 
 test("manual nodes offer subscription mode in English", async () => {
   const page = await pageFor(390);
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     window.testHass.language = "en";
-    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+    const panel = document.querySelector("opcua-node-panel");
+    panel.hass = { ...window.testHass };
+    await panel._load();
   });
   await page.getByRole("button", { name: "Add entity", exact: true }).click();
   const dialog = page.locator("dialog[open]");
