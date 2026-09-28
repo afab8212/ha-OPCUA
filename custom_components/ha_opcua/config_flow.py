@@ -24,9 +24,16 @@ from .const import (
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
     CONF_NODE_SETTINGS,
+    CONF_SUBSCRIPTION_ENABLED,
     DOMAIN,
 )
-from .node_settings import allowed_platforms, number_defaults, validate_settings
+from .node_settings import (
+    allowed_platforms,
+    deadband_default,
+    number_defaults,
+    supports_deadband,
+    validate_settings,
+)
 
 DEFAULT_SCAN_INTERVAL = 10
 
@@ -56,6 +63,9 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                     ),
                     CONF_HUB_ROOT_NODE: user_input.get(CONF_HUB_ROOT_NODE, "").strip(),
+                    CONF_SUBSCRIPTION_ENABLED: user_input.get(
+                        CONF_SUBSCRIPTION_ENABLED, True
+                    ),
                 },
             )
 
@@ -67,6 +77,7 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_PASSWORD): str,
                 vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
                 vol.Required(CONF_HUB_ROOT_NODE, default="ns=2;i=1"): str,
+                vol.Optional(CONF_SUBSCRIPTION_ENABLED, default=True): bool,
             }
         )
 
@@ -134,6 +145,10 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                         CONF_HUB_ROOT_NODE,
                         default=current.get(CONF_HUB_ROOT_NODE, "ns=2;i=1"),
                     ): str,
+                    vol.Optional(
+                        CONF_SUBSCRIPTION_ENABLED,
+                        default=current.get(CONF_SUBSCRIPTION_ENABLED, True),
+                    ): bool,
                 }
             ),
         )
@@ -189,11 +204,14 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 "invert_state",
                 "device_class",
                 "precision",
+                "deadband",
                 "always_available",
             )
         }
         if self._node["variant_type"] not in {"Float", "Double"}:
             common.pop("precision", None)
+        if not supports_deadband(self._node, settings["platform"]):
+            common.pop("deadband", None)
         if settings["platform"] != "binary_sensor":
             common.pop("device_class", None)
         merged = {**common, **settings}
@@ -220,6 +238,8 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_number()
             elif platform == "text":
                 return await self.async_step_text()
+            elif supports_deadband(self._node, platform):
+                return await self.async_step_sensor()
             else:
                 return self._save_node({"platform": platform})
         current = self._current_settings().get("platform", "auto")
@@ -261,7 +281,7 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Required(key, default=current[key]): (
-                        vol.Coerce(float) if platform == "number" else int
+                        int if platform == "text" else vol.Coerce(float)
                     )
                     for key in defaults
                 }
@@ -270,7 +290,15 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_number(self, user_input=None):
         return await self._async_step_limits(
-            "number", number_defaults(self._node), user_input
+            "number",
+            {**number_defaults(self._node), "deadband": deadband_default(self._node)},
+            user_input,
+        )
+
+    async def async_step_sensor(self, user_input=None):
+        """Numeric read-only node: only the subscription deadband is editable."""
+        return await self._async_step_limits(
+            "sensor", {"deadband": deadband_default(self._node)}, user_input
         )
 
     async def async_step_text(self, user_input=None):

@@ -20,6 +20,7 @@ from custom_components.ha_opcua import (
 from custom_components.ha_opcua.const import (
     CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
+    CONF_SUBSCRIPTION_ENABLED,
     DOMAIN,
 )
 from custom_components.ha_opcua.orphans import (
@@ -217,6 +218,28 @@ async def test_discovery_requires_complete_current_results_and_protects_configur
         c._discovery_pending = flag == "pending"
         c.reload_options = {"changed": True} if flag == "reloading" else {}
         assert not is_orphan(hass, entry, old)
+    await c.async_shutdown()
+
+
+async def test_subscription_toggle_does_not_disable_orphan_detection(hass, entry):
+    """orphans.py must exclude subscription_enabled the same way the coordinator does.
+
+    Otherwise saving that option makes the two "reload_options" comparisons
+    disagree forever, and every discovery-dependent repair silently stops
+    appearing regardless of connection state.
+    """
+    c, registry, old = await prepare(hass, entry)
+    c.set_nodes(
+        [{**NODE, "writable": False}]
+    )  # becomes a sensor; "old" (switch) is stale
+    c.hub._connected = True
+    c.hub.discovery_complete = True
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_SUBSCRIPTION_ENABLED: False}
+    )
+    # What the coordinator itself computes for this exact options dict.
+    c.reload_options = {}
+    assert is_orphan(hass, entry, old)
     await c.async_shutdown()
 
 
