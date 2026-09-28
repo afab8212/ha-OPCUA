@@ -33,6 +33,7 @@ from .const import (
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
     CONF_SUBSCRIPTION_ENABLED,
+    DEFAULT_SUBSCRIPTION_ENABLED,
     DOMAIN,
     FIELD_NODE_HUB,
     FIELD_NODE_ID,
@@ -115,7 +116,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hub,
         timedelta(seconds=settings.get(CONF_HUB_SCAN_INTERVAL, 10)),
         config_entry=entry,
-        subscription_enabled=settings.get(CONF_SUBSCRIPTION_ENABLED, True),
+        subscription_enabled=settings.get(
+            CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
+        ),
     )
     try:
         async_register_device(hass, entry)
@@ -193,12 +196,12 @@ async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None
         await coordinator.async_set_connection_enabled(
             entry.options.get(CONF_CONNECTION_ENABLED, True), persist=False
         )
-        # subscription_enabled can still live in entry.data alone (set by the
-        # initial config flow and never touched since); entry.options.get()
-        # would silently fall back to True and re-enable it on any unrelated
-        # options update (e.g. toggling the connection switch).
+        # Preserve the initial choice in entry.data unless options override it.
+        # Older entries without this setting retain polling-only behavior.
         await coordinator.async_set_subscription_enabled(
-            {**entry.data, **entry.options}.get(CONF_SUBSCRIPTION_ENABLED, True),
+            {**entry.data, **entry.options}.get(
+                CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
+            ),
             persist=False,
         )
 
@@ -658,7 +661,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         update_interval_in_second=timedelta(seconds=10),
         *,
         config_entry=None,
-        subscription_enabled=True,
+        subscription_enabled=DEFAULT_SUBSCRIPTION_ENABLED,
     ):
         self._hub = hub
         self.subscription_enabled = subscription_enabled

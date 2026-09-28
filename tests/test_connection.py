@@ -64,6 +64,7 @@ async def test_offline_startup_recovery_pause_and_native_controls(
     switch = next(e for e in entities if isinstance(e, OpcuaConnectionSwitch))
     sensor = next(e for e in entities if isinstance(e, OpcuaConnectionSensor))
     sub_switch = next(e for e in entities if isinstance(e, OpcuaSubscriptionSwitch))
+    assert not sub_switch.is_on
     assert len(entities) == 3
     assert switch.available and switch.is_on
     assert sensor.available and not sensor.is_on
@@ -72,6 +73,7 @@ async def test_offline_startup_recovery_pause_and_native_controls(
     try:
         await c.async_refresh()
         assert sensor.is_on and c.last_update_success
+        assert not hub.subscription_active
         assert len(entities) == 4
         text = next(e for e in entities if e not in (switch, sensor, sub_switch))
         assert text.native_value == "initial" and text.available
@@ -219,14 +221,13 @@ async def test_connection_attributes_redact_url_credentials(hass):
     await c.async_shutdown()
 
 
-async def test_subscription_setting_survives_unrelated_options_update(hass, entry):
-    """subscription_enabled chosen at initial setup lives in entry.data alone
-    until the options flow ever touches it. An unrelated live options update
-    (e.g. toggling the connection switch) must not silently re-enable it by
-    reading only entry.options and defaulting to True.
-    """
+@pytest.mark.parametrize("enabled", [False, True])
+async def test_subscription_setting_survives_unrelated_options_update(
+    hass, entry, enabled
+):
+    """Unrelated live options updates preserve either initial subscription choice."""
     hass.config_entries.async_update_entry(
-        entry, data={**entry.data, CONF_SUBSCRIPTION_ENABLED: False}
+        entry, data={**entry.data, CONF_SUBSCRIPTION_ENABLED: enabled}
     )
     hub = Mock(
         get_values=AsyncMock(),
@@ -238,10 +239,10 @@ async def test_subscription_setting_survives_unrelated_options_update(hass, entr
         pause=AsyncMock(),
     )
     c = AsyncuaCoordinator(
-        hass, "PLC", hub, config_entry=entry, subscription_enabled=False
+        hass, "PLC", hub, config_entry=entry, subscription_enabled=enabled
     )
     hass.data.setdefault(DOMAIN, {})[entry.data["hub_id"]] = c
     await c.async_set_connection_enabled(False, persist=True)
     await async_options_updated(hass, entry)
-    assert c.subscription_enabled is False
+    assert c.subscription_enabled is enabled
     await c.async_shutdown()

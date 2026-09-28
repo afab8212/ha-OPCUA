@@ -84,6 +84,9 @@ See [Home Assistant's brand image documentation](https://developers.home-assista
 - **Password** (optional)
 - **Root Node ID** (e.g., `ns=2;i=85`)
 - **Scan Interval** in seconds
+- **Auto-Subscription** (optional, disabled by default)
+
+By default, updates use polling only, including for existing endpoints without a saved Auto-Subscription setting. Enable Auto-Subscription explicitly in the connection options or with the endpoint’s Auto-Subscription switch to also receive OPC UA data-change notifications. Polling remains active when subscriptions are enabled. Previously saved choices are preserved.
 
 ---
 
