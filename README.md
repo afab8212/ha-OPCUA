@@ -12,7 +12,7 @@
 
 **ha-OPCUA** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number`, `text` or `datetime` entities in Home Assistant.
 
-This integration supports **local polling** using the `asyncua` library and is ideal for industrial or automation environments where OPC UA is the communication protocol standard.
+This integration uses the `asyncua` library for **local polling**, with optional **OPC UA data-change subscriptions selected per entity**. Polling remains enabled in both update modes; subscriptions provide additional updates when the server reports a value change.
 
 ---
 
@@ -23,6 +23,7 @@ This integration supports **local polling** using the `asyncua` library and is i
 - 🧠 Automatic mapping with per-node entity selection and exclusion
 - ✏️ Native numeric and text controls with configurable limits
 - 🔄 Periodic polling with configurable scan interval
+- ⚡ Optional subscriptions per entity, numeric deadband and a master Auto-Subscription switch; polling only by default
 - ⏯️ Persistent connection switch and live connectivity diagnostics per hub
 - 🧪 Graceful reconnection logic on connection loss
 - 📥 Set opc-ua nodes values via Home Assistant services (`ha_opcua.opcua_set_value`)
@@ -84,6 +85,9 @@ See [Home Assistant's brand image documentation](https://developers.home-assista
 - **Password** (optional)
 - **Root Node ID** (e.g., `ns=2;i=85`)
 - **Scan Interval** in seconds
+- **Auto-Subscription** (optional, disabled by default)
+
+By default, updates use polling only. Subscriptions require both an explicit per-entity selection and the endpoint’s **Auto-Subscription** switch to be on. See [Polling and subscriptions](#polling-and-subscriptions) for setup, filtering and upgrade behavior.
 
 ---
 
@@ -91,10 +95,11 @@ See [Home Assistant's brand image documentation](https://developers.home-assista
 
 After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
-Each entity card shows its live Home Assistant state, including localized binary device-class labels, numeric units, text and date/time formatting. Values update as Home Assistant receives state changes without refreshing the panel or interrupting open dialogs. Unknown, unavailable, unregistered and excluded entities are clearly distinguished. This uses Home Assistant's existing state stream and adds no PLC polling: freshness follows the endpoint's configured polling interval. Boolean inversion is already reflected in the displayed entity state.
+Each entity card shows its live Home Assistant state, including localized binary device-class labels, numeric units, text and date/time formatting. Values update as Home Assistant receives state changes without refreshing the panel or interrupting open dialogs. Unknown, unavailable, unregistered and excluded entities are clearly distinguished. This uses Home Assistant's existing state stream and adds no PLC polling. Values update after reads at the endpoint's configured polling interval and, for opted-in entities while Auto-Subscription is enabled, after server data-change notifications. Boolean inversion is already reflected in the displayed entity state.
 
 Click **Edit** on an entity to configure:
 
+- **Update mode** (**Modalità aggiornamento**): **Polling only** (**Solo polling**, default) or **Polling + subscription**, for both discovered and manually added entities. See [Polling and subscriptions](#polling-and-subscriptions).
 - **Category**: automatic, sensor, binary sensor, switch, number, text, datetime or excluded, according to node type and write permissions. Excluded discovered nodes can be enabled here even if they have no registry entity yet.
 - **Always available**: keep the last known state if the connection is lost or disabled. Applies independently to any node entity; disabled/excluded entities stay excluded. `value_stale: true` indicates a retained or unknown value, and becomes false after a fresh read. Verified node metadata lets opted-in entities start offline; Home Assistant restores their last saved raw value on reload/restart when available. With no saved value the state is unknown, never a fabricated zero/off value. Writes require a connection and a fresh node reading; commands are not queued offline. Inversion and rounding are applied to the retained raw value. Default is off.
 - **Decimal places** for REAL/LREAL (OPC UA Float/Double) nodes: choose 0–10, or leave empty to disable rounding. Available for sensors and numbers, including manually added nodes. This rounds the Home Assistant state used by history and automations; the raw coordinator value and PLC writes are unchanged. For example, `12.345678` becomes `12.35` with 2 decimals. This does not force trailing zeros or change the number step. Existing nodes keep their original precision until configured.
@@ -106,17 +111,17 @@ Click **Edit** on an entity to configure:
 - **Device class** for binary sensors, including None.
 - **Invert boolean state** for Boolean nodes. For switches this also inverts commands: with inversion enabled, turning the HA switch on writes `false` to the PLC. Nonboolean values are not inverted.
 
-Saving updates the native entity registry and integration options. NodeId, category, limits, inversion and device-class changes reload the endpoint; wait for it to finish and use Refresh if needed. Cancel leaves the saved configuration unchanged. Stale forms are rejected if another editor has changed the endpoint; cancel, refresh and reopen the entity. Panel APIs require administrator access and do not perform PLC writes.
+Saving updates the native entity registry and integration options. NodeId, category, update-mode, deadband, limits, inversion and device-class changes reload the endpoint; wait for it to finish and use Refresh if needed. Cancel leaves the saved configuration unchanged. Stale forms are rejected if another editor has changed the endpoint; cancel, refresh and reopen the entity. Panel APIs require administrator access and do not perform PLC writes.
 
 To add a node that discovery did not find, select the endpoint and click **Add entity** (**Aggiungi entità**):
 
 1. Enter its complete NodeId, such as `ns=4;i=2` or `ns=4;s="DB"."Variable"`, and click **Verify node**. The connection must be enabled and the node reachable.
-2. Choose the entity category and configure name, area, binary device class and Boolean inversion as applicable. Only compatible categories are offered: sensor for supported scalar values, binary sensor for Booleans, and switch/number/text/datetime when the server grants write access.
+2. Choose the entity category and configure name, area, update mode, binary device class and Boolean inversion as applicable. Keep **Polling only** for the default behavior, or select **Polling + subscription**; numeric nodes then show the deadband setting. Only compatible categories are offered: sensor for supported scalar values, binary sensor for Booleans, and switch/number/text/datetime when the server grants write access.
 3. Save. The endpoint reloads and the new entity appears on the same Home Assistant device. Creating or verifying an entity never writes a value to the PLC.
 
 Manual nodes are persisted independently of discovery and verified again on reload. They can be outside the configured discovery root, including when that root is inaccessible. Temporarily unreadable manual nodes are retried during normal polling; disabling the connection stops these attempts too. A node later found by discovery does not create a duplicate. Invalid IDs, objects, arrays, unreadable nodes and duplicate entities are rejected. A manual node remains subject to the PLC's authentication and access permissions.
 
-Category and number/text limits are editable directly in the panel for existing and new manual entities. New number entities default to min 0, max 100 and step 1 for integers or 0.1 for floats; text defaults to 0–255 characters. Connection settings remain in integration options. The older node options flow remains available for compatibility. Discovery still runs at setup/reload. The connection switch and connectivity sensor remain standard HA entities outside the node editor.
+Category and number/text limits are editable directly in the panel for existing and new manual entities. New number entities default to min 0, max 100 and step 1 for integers or 0.1 for floats; text defaults to 0–255 characters. Connection settings remain in integration options. The older node options flow remains available for compatibility. Discovery still runs at setup/reload. The connection switch, Auto-Subscription switch and connectivity sensor remain standard HA entities outside the node editor.
 
 Changing an entity domain (for example sensor → number) creates or restores an entity in that domain, retaining its logical NodeId identity, name and area. Its entity ID may change, so update automation and dashboard references. The previous domain’s registry entry is retained but disabled by the integration; returning to that category restores its previous entity ID. Explicit user-disabled entries remain disabled. Editing limits without changing domains preserves the entity ID. Choosing Excluded disables the entity and periodic reads while retaining number/text limits; select a compatible category to enable it again.
 
@@ -132,6 +137,47 @@ The panel header displays the installed integration version, read from the backe
 
 Panel JavaScript is bundled with the integration and uses a versioned URL; no separate Lovelace resource or frontend build is required.
 
+## Polling and subscriptions
+
+### Enable subscriptions for selected entities
+
+1. Open **OPC UA** in the Home Assistant sidebar and select the endpoint.
+2. Click **Edit** (**Modifica**) on an entity. Under **Update mode** (**Modalità aggiornamento**), select **Polling + subscription**. This is also available when adding a manual node.
+3. For numeric sensors or numbers, optionally adjust **Deadband**. Save and allow the endpoint to reload. Repeat for the other entities that should receive notifications.
+4. On the endpoint’s Home Assistant device page, turn on **Auto-Subscription**. You can also enable it in the integration’s connection options. **Connection enabled** must be on and the PLC reachable.
+
+The two update modes apply independently to each entity:
+
+| Entity update mode | Auto-Subscription switch | Updates while connected |
+| --- | --- | --- |
+| Polling only / Solo polling (default) | Off or on | Reads at the configured scan interval |
+| Polling + subscription | Off | Reads at the configured scan interval; the entity’s selection is retained |
+| Polling + subscription | On | Periodic reads plus OPC UA data-change notifications |
+
+The **Auto-Subscription** switch is a master enable for that endpoint, not a command to subscribe to every node. It takes effect without reloading the endpoint. With no active entity selected for subscriptions, no subscription is opened, even if the switch is on. Excluded entities are neither polled nor subscribed.
+
+Turning Auto-Subscription off stops notifications while polling continues, preserving all entity choices. Turning it back on subscribes the selected nodes again. To stop polling and connection attempts as well, turn off **Connection enabled**. Subscriptions do not bypass this connection control or the entity’s availability policy.
+
+**Polling continues in both modes.** Subscriptions improve update responsiveness; they do not reduce periodic reads. They are notifications supplied by the OPC UA server, so delivery timing depends on the server and connection. If the server rejects subscriptions, the integration logs the failure and continues polling. After reconnection, subscriptions for selected nodes are recreated during the next successful refresh.
+
+### Numeric deadband
+
+The panel shows **Deadband** for numeric sensors and numbers when **Polling + subscription** is selected. It is an absolute change in the raw OPC UA value, not a percentage. The defaults are **0.01** for Float/Double (REAL/LREAL) and **1** for integer types. Use **0** to disable filtering. Values must be finite and nonnegative; integer node types use an integer deadband.
+
+For example, with a deadband of `0.5`, small fluctuations of `0.1` can be suppressed in server notifications. The next poll still reads the current value: **deadband never filters polling reads**. It is separate from **Decimal places**, which rounds the value presented in Home Assistant, and from a number entity’s editable step. Neither deadband nor rounding changes the value stored in the PLC.
+
+Switching an entity back to **Polling only** hides the deadband field and retains its setting for later use. If the server rejects a deadband filter, that node is retried without the filter while polling continues.
+
+When several entities share a NodeId, the integration subscribes to that physical node once. Only entities set to **Polling + subscription** receive its push updates; polling-only entities still update on reads. The shared subscription uses the **smallest deadband among the subscribed entities**. If any of them requests `0`, the shared target is unfiltered. Therefore, an entity sharing a target can receive more notifications than its own larger deadband would otherwise allow.
+
+### Existing configurations and troubleshooting
+
+Saved endpoint Auto-Subscription choices are preserved. An endpoint with no saved choice defaults to **off**. Any entity without an update-mode setting defaults to **Polling only**, including existing configurations and newly discovered or manually added nodes. After upgrading from the earlier global-subscription behavior, select the desired entities explicitly; an already-enabled endpoint switch alone does not opt them in.
+
+If values update only at the scan interval, check that the connection is enabled and connected, the entity is not excluded, its mode is **Polling + subscription**, and the endpoint’s **Auto-Subscription** switch is on. For numeric nodes, check whether deadband is filtering small changes. Check the Home Assistant log for server subscription/filter errors.
+
+The connectivity sensor’s **`subscription_active`** attribute reports whether the integration currently holds a subscription. The Auto-Subscription switch reports the saved request, so it can be on while `subscription_active` is false—for example, when no entity is selected or the PLC is offline. A connected session alone does not prove that subscriptions are active.
+
 ## Home Assistant device page (1.3.0)
 
 Each configured OPC UA server now appears as **one device** under its integration entry, named after the connection. Open the device to see the standard Home Assistant page with node entities, connection controls, diagnostics, activity and related automations. You can assign an area and rename the device using Home Assistant's normal controls. Entities in the entity list are grouped under that device instead of “Ungrouped”. The integration uses the standard entry labels, matching the presentation of Siemens S7.
@@ -142,12 +188,13 @@ The **Download diagnostics** action is available from both the integration entry
 
 ## Connection control and diagnostics (1.2.0)
 
-Each hub now provides two additional entities:
+Each hub provides three connection-related entities:
 
 - **Connection enabled** (`switch`, Configuration): turn it off before shutting down the machine to close the OPC UA session and stop polling, connection attempts and asyncua background session maintenance. The setting survives integration reloads and Home Assistant restarts. Turning it back on immediately attempts a connection; if the PLC is still offline, retries continue at the configured polling interval.
+- **Auto-Subscription** (`switch`, Configuration): enables notifications only for entities configured as **Polling + subscription**. Defaults to off when no choice is saved. Turning it off keeps polling active and preserves the per-entity selections. See [Polling and subscriptions](#polling-and-subscriptions).
 - **Connection** (`binary_sensor`, Diagnostics, connectivity device class): reports the actual observed session state. It stays available and shows disconnected when communication is disabled or lost. An enabled switch does not imply a successful connection. Transport loss is reported when detected by asyncua or by a failed request; it is not an instantaneous indication of PLC power or CPU RUN/STOP mode.
 
-The binary sensor includes endpoint, host, port, root NodeId, configured polling interval, security/authentication mode, negotiated session timeout in milliseconds, discovered/polled node counts, last connection/disconnection and successful read timestamps, and the last connection error **type**. Credentials and URL query/fragment are omitted. Timestamps describe the current integration session and reset on reload/restart.
+The binary sensor includes endpoint, host, port, root NodeId, configured polling interval, `subscription_active`, security/authentication mode, negotiated session timeout in milliseconds, discovered/polled node counts, last connection/disconnection and successful read timestamps, and the last connection error **type**. Credentials and URL query/fragment are omitted. Timestamps describe the current integration session and reset on reload/restart.
 
 While the connection is disabled, node entities are unavailable unless **Always available** is enabled for that node. Both entity writes and `opcua_set_value` are rejected without reconnecting. A request already in flight may finish before the session closes; queued requests cannot reopen it. Each switch affects only its own hub. The switch can be controlled by normal Home Assistant automations.
 
@@ -155,7 +202,7 @@ Connection controls are also available when the PLC is offline at startup. Node 
 
 ## Per-node entity configuration (1.1.0)
 
-Open the **OPC UA** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and, for `number` or `text`, set its limits in the same form. Save to reload the endpoint. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → ha-OPCUA → Configure**. English and Italian translations are included.
+Open the **OPC UA** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and update mode and, for `number` or `text`, set its limits in the same form. Numeric entities in subscription mode also offer a deadband setting. Save to reload the endpoint. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → ha-OPCUA → Configure**. English and Italian translations are included.
 
 | Choice | Compatible nodes | Behavior |
 | --- | --- | --- |

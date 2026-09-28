@@ -33,6 +33,7 @@ from .const import (
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
     CONF_SUBSCRIPTION_ENABLED,
+    DEFAULT_SUBSCRIPTION_ENABLED,
     DOMAIN,
     FIELD_NODE_HUB,
     FIELD_NODE_ID,
@@ -115,7 +116,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hub,
         timedelta(seconds=settings.get(CONF_HUB_SCAN_INTERVAL, 10)),
         config_entry=entry,
-        subscription_enabled=settings.get(CONF_SUBSCRIPTION_ENABLED, True),
+        subscription_enabled=settings.get(
+            CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
+        ),
     )
     try:
         async_register_device(hass, entry)
@@ -193,12 +196,12 @@ async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None
         await coordinator.async_set_connection_enabled(
             entry.options.get(CONF_CONNECTION_ENABLED, True), persist=False
         )
-        # subscription_enabled can still live in entry.data alone (set by the
-        # initial config flow and never touched since); entry.options.get()
-        # would silently fall back to True and re-enable it on any unrelated
-        # options update (e.g. toggling the connection switch).
+        # Preserve the initial choice in entry.data unless options override it.
+        # Older entries without this setting retain polling-only behavior.
         await coordinator.async_set_subscription_enabled(
-            {**entry.data, **entry.options}.get(CONF_SUBSCRIPTION_ENABLED, True),
+            {**entry.data, **entry.options}.get(
+                CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
+            ),
             persist=False,
         )
 
@@ -518,6 +521,9 @@ class OpcuaHub:
         deadband filter for one node, that node alone is retried without it
         rather than losing push updates for every node.
         """
+        if not node_ids:
+            await self.disable_subscription()
+            return
         if self.on_data_change is None:
             return
         deadbands = deadbands or {}
@@ -658,7 +664,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         update_interval_in_second=timedelta(seconds=10),
         *,
         config_entry=None,
-        subscription_enabled=True,
+        subscription_enabled=DEFAULT_SUBSCRIPTION_ENABLED,
     ):
         self._hub = hub
         self.subscription_enabled = subscription_enabled
@@ -761,14 +767,15 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         never changes (and so never triggers a push) still gets refreshed on
         schedule.
         """
-        if not self.enabled:
+        if not self.enabled or not self.subscription_enabled:
             return
         updated = dict(self.data or {})
         changed = False
         for node_id, node in self.nodes.items():
-            if node["target_node_id"] == target_node_id and self._platforms.get(
-                node_id
-            ) not in (None, "disabled"):
+            if (
+                self._node_uses_subscription(node_id)
+                and node["target_node_id"] == target_node_id
+            ):
                 updated[node_id] = value
                 changed = True
         if changed:
@@ -800,16 +807,33 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             dict.fromkeys(self.nodes[key]["target_node_id"] for key in active_nodes)
         )
 
+    def _node_uses_subscription(self, node_id) -> bool:
+        """Only explicitly selected, active entities receive push updates."""
+        return (
+            self._platforms.get(node_id) not in (None, "disabled")
+            and self.node_settings.get(node_id, {}).get("update_mode", "polling")
+            == "subscription"
+        )
+
+    def _subscription_target_ids(self) -> list[str]:
+        """Monitor shared targets once, independently of the polling node set."""
+        return list(
+            dict.fromkeys(
+                node["target_node_id"]
+                for node_id, node in self.nodes.items()
+                if self._node_uses_subscription(node_id)
+            )
+        )
+
     def _target_deadbands(self) -> dict[str, float]:
-        """Map each subscribed NodeId to its configured absolute deadband, if any."""
+        """Use the least restrictive filter requested for each subscribed target."""
         result: dict[str, float] = {}
-        for node_id, settings in self.node_settings.items():
-            deadband = settings.get("deadband")
-            if not deadband or self._platforms.get(node_id) == "disabled":
+        for node_id, node in self.nodes.items():
+            if not self._node_uses_subscription(node_id):
                 continue
-            node = self.nodes.get(node_id)
-            if node is not None:
-                result[node["target_node_id"]] = deadband
+            deadband = self.node_settings.get(node_id, {}).get("deadband", 0)
+            target_id = node["target_node_id"]
+            result[target_id] = min(result.get(target_id, deadband), deadband)
         return result
 
     async def async_set_subscription_enabled(self, enabled, *, persist=True):
@@ -826,9 +850,9 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                         CONF_SUBSCRIPTION_ENABLED: enabled,
                     },
                 )
-            if enabled:
+            if enabled and self.enabled:
                 await self._hub.ensure_subscription(
-                    self._active_target_ids(), self._target_deadbands()
+                    self._subscription_target_ids(), self._target_deadbands()
                 )
             else:
                 await self._hub.disable_subscription()
@@ -1105,13 +1129,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 for key in active_nodes
                 if self.nodes[key]["target_node_id"] in raw_values
             }
-            # Keep the push subscription's node set aligned with what we just polled;
-            # future changes to these nodes then arrive immediately instead of waiting
-            # for the next timer tick. Polling itself is untouched either way, so a
-            # value that never changes is still re-read on every configured interval.
+            # Subscribe only opted-in entities; all active targets still poll
+            # at the configured interval, regardless of their update mode.
             if self.subscription_enabled:
                 await self._hub.ensure_subscription(
-                    target_ids, self._target_deadbands()
+                    self._subscription_target_ids(), self._target_deadbands()
                 )
             else:
                 await self._hub.disable_subscription()

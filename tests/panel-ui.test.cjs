@@ -184,6 +184,10 @@ async function pageFor(width = 1280, admin = true) {
           settings: {
             ...row.settings,
             platform: msg.platform,
+            update_mode: msg.update_mode,
+            ...(Object.hasOwn(msg, "deadband")
+              ? { deadband: msg.deadband }
+              : {}),
             ...msg.limits,
             ...(Object.hasOwn(msg, "always_available")
               ? { always_available: msg.always_available }
@@ -305,6 +309,7 @@ test("editing saves correct fields and live hass updates preserve draft", async 
     revision: "rev1",
     key: "ns=4;i=2",
     platform: "binary_sensor",
+    update_mode: "polling",
     name: "Porta ingresso",
     area_id: "workshop",
     node_id: "ns=4;i=1",
@@ -422,6 +427,7 @@ test("manual NodeId creation on an empty endpoint, category, area and inversion"
     revision: "rev2",
     node_id: 'ns=4;s="DB"."Door"',
     platform: "binary_sensor",
+    update_mode: "polling",
     name: "Porta manuale",
     area_id: "workshop",
     device_class: "door",
@@ -991,6 +997,92 @@ test("always available is per entity, persists, clears and supports manual nodes
         window.calls.find((m) => m.type.endsWith("/create")).always_available,
     ),
     true,
+  );
+  await page.close();
+});
+
+for (const width of [390, 1280]) {
+  test(`subscription selection persists and keeps deadband while polling at ${width}px`, async () => {
+    const page = await pageFor(width);
+    const card = page.locator("article").filter({ hasText: "Velocità linea" });
+    const edit = () =>
+      card.getByRole("button", { name: "Modifica", exact: true }).click();
+    const dialog = page.locator("dialog[open]");
+    const mode = dialog.getByLabel("Modalità aggiornamento", { exact: true });
+    const deadband = dialog.getByLabel("Deadband", { exact: true });
+    const save = async () => {
+      await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+      await page
+        .getByText("Configurazione salvata.", { exact: true })
+        .waitFor();
+    };
+    await edit();
+    assert.equal(await mode.inputValue(), "polling");
+    assert.equal(await deadband.isVisible(), false);
+    await mode.selectOption("subscription");
+    await deadband.fill("0.25");
+    await page.evaluate(() => {
+      document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+    });
+    assert.equal(await mode.inputValue(), "subscription");
+    await shot(page, `subscription-${width}.png`);
+    await save();
+    await edit();
+    assert.equal(await mode.inputValue(), "subscription");
+    assert.equal(await deadband.inputValue(), "0.25");
+    await mode.selectOption("polling");
+    assert.equal(await deadband.isVisible(), false);
+    await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    await edit();
+    assert.equal(await mode.inputValue(), "subscription");
+    await mode.selectOption("polling");
+    await save();
+    const saved = await page.evaluate(() =>
+      window.calls.filter((m) => m.type.endsWith("/update")).at(-1),
+    );
+    assert.equal(saved.update_mode, "polling");
+    assert.equal(Object.hasOwn(saved, "deadband"), false);
+    await edit();
+    assert.equal(await mode.inputValue(), "polling");
+    await mode.selectOption("subscription");
+    assert.equal(await deadband.inputValue(), "0.25");
+    await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    await page.close();
+  });
+}
+
+test("manual nodes offer subscription mode in English", async () => {
+  const page = await pageFor(390);
+  await page.evaluate(async () => {
+    window.testHass.language = "en";
+    const panel = document.querySelector("opcua-node-panel");
+    panel.hass = { ...window.testHass };
+    await panel._load();
+  });
+  await page.getByRole("button", { name: "Add entity", exact: true }).click();
+  const dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("Associated NodeId", { exact: true })
+    .fill("ns=4;i=77");
+  await dialog
+    .getByRole("button", { name: "Verify node", exact: true })
+    .click();
+  const mode = dialog.getByLabel("Update mode", { exact: true });
+  assert.equal(await mode.inputValue(), "polling");
+  await mode.selectOption("subscription");
+  assert.equal(
+    await dialog.getByLabel("Deadband", { exact: true }).isVisible(),
+    false,
+  );
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await page.waitForFunction(() =>
+    window.calls.some((m) => m.type.endsWith("/create")),
+  );
+  assert.equal(
+    await page.evaluate(
+      () => window.calls.find((m) => m.type.endsWith("/create")).update_mode,
+    ),
+    "subscription",
   );
   await page.close();
 });

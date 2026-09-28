@@ -43,6 +43,7 @@ SNAPSHOT_SETTINGS = (
     "max_length",
     "precision",
     "always_available",
+    "update_mode",
 )
 
 PANEL_PATH = "opcua-nodes"
@@ -313,7 +314,7 @@ def _entity_settings(node, msg, saved=None):
     }
     if "platform" in msg:
         proposed["platform"] = msg["platform"]
-    for field in ("precision", "deadband", "always_available"):
+    for field in ("precision", "deadband", "always_available", "update_mode"):
         if field in msg:
             proposed[field] = msg[field]
     limits = msg.get("limits", {})
@@ -643,6 +644,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Optional("precision"): vol.Any(int, None),
         vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
+        vol.Optional("update_mode"): vol.In(("polling", "subscription")),
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("device_class"): vol.Any(str, None),
@@ -678,6 +680,7 @@ async def ws_snapshot(hass, connection, msg):
         vol.Optional("precision"): vol.Any(int, None),
         vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
+        vol.Optional("update_mode"): vol.In(("polling", "subscription")),
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("node_id"): str,

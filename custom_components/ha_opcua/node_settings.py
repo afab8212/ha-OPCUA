@@ -70,6 +70,10 @@ def validate_settings(node, settings):
     if platform not in allowed_platforms(node):
         raise ValueError("incompatible_platform")
     result = {"platform": platform}
+    if "update_mode" in settings:
+        if settings["update_mode"] not in ("polling", "subscription"):
+            raise ValueError("invalid_update_mode")
+        result["update_mode"] = settings["update_mode"]
     if "always_available" in settings:
         if type(settings["always_available"]) is not bool:
             raise ValueError("invalid_availability")
