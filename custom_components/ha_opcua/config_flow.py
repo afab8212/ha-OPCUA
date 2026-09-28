@@ -211,6 +211,7 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 "precision",
                 "deadband",
                 "always_available",
+                "update_mode",
             )
         }
         if self._node["variant_type"] not in {"Float", "Double"}:

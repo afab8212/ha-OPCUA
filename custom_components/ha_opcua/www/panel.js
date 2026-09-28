@@ -6,6 +6,12 @@ const TEXT = {
     alwaysAvailableHelp:
       "Mantiene l’ultimo valore noto quando il PLC è scollegato o la connessione è disabilitata. Senza un valore salvato lo stato è sconosciuto. Le scritture richiedono la connessione e una lettura aggiornata.",
     invalid_availability: "Impostazione di disponibilità non valida.",
+    updateMode: "Modalità aggiornamento",
+    polling: "Solo polling",
+    subscription: "Polling + subscription",
+    updateModeHelp:
+      "Le notifiche richiedono anche lo switch Auto-Subscription dell’endpoint acceso. Il polling continua in entrambe le modalità. Spegnere lo switch non cancella questa scelta.",
+    invalid_update_mode: "Modalità aggiornamento non valida.",
     precision: "Decimali",
     precisionHelp:
       "REAL/LREAL: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
@@ -157,6 +163,12 @@ const TEXT = {
     alwaysAvailableHelp:
       "Keeps the last known value when the PLC is disconnected or the connection is disabled. Without a saved value the state is unknown. Writes require a connection and a fresh reading.",
     invalid_availability: "Invalid availability setting.",
+    updateMode: "Update mode",
+    polling: "Polling only",
+    subscription: "Polling + subscription",
+    updateModeHelp:
+      "Notifications also require the endpoint’s Auto-Subscription switch to be on. Polling continues in both modes. Turning the switch off preserves this choice.",
+    invalid_update_mode: "Invalid update mode.",
     precision: "Decimal places",
     precisionHelp:
       "REAL/LREAL: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
@@ -1124,6 +1136,14 @@ class OpcuaNodePanel extends HTMLElement {
     const limitInputs = {};
     const limitGroups = {};
     const initial = row.settings || {};
+    const updateMode = element("select", undefined, { name: "update_mode" });
+    for (const mode of ["polling", "subscription"])
+      updateMode.append(element("option", this._t(mode), { value: mode }));
+    updateMode.value = initial.update_mode || "polling";
+    form.append(
+      this._field("updateMode", updateMode),
+      element("p", this._t("updateModeHelp"), { class: "hint" }),
+    );
     const alwaysAvailable = element("input", undefined, {
       type: "checkbox",
       name: "always_available",
@@ -1233,6 +1253,7 @@ class OpcuaNodePanel extends HTMLElement {
       // Any numeric node shown as number or sensor: a read-only float has
       // exactly the same push-noise problem as a writable one.
       deadbandField.hidden = deadbandHelp.hidden = !(
+        updateMode.value === "subscription" &&
         ["number", "sensor"].includes(platform) &&
         NUMERIC.has(selectedNode()?.variant_type)
       );
@@ -1252,6 +1273,7 @@ class OpcuaNodePanel extends HTMLElement {
         platform === "disabled" ? "excludeHelp" : "categoryHelp",
       );
     };
+    updateMode.addEventListener("change", updateFields);
     category.addEventListener("change", () => {
       populate();
       updateFields();
@@ -1293,6 +1315,7 @@ class OpcuaNodePanel extends HTMLElement {
           revision,
           ...(manual ? {} : { key: row.key }),
           platform: category.value,
+          update_mode: updateMode.value,
           ...(alwaysAvailable.checked || initial.always_available !== undefined
             ? { always_available: alwaysAvailable.checked }
             : {}),

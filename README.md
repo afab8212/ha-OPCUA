@@ -86,7 +86,7 @@ See [Home Assistant's brand image documentation](https://developers.home-assista
 - **Scan Interval** in seconds
 - **Auto-Subscription** (optional, disabled by default)
 
-By default, updates use polling only, including for existing endpoints without a saved Auto-Subscription setting. Enable Auto-Subscription explicitly in the connection options or with the endpoint’s Auto-Subscription switch to also receive OPC UA data-change notifications. Polling remains active when subscriptions are enabled. Previously saved choices are preserved.
+By default, updates use polling only, including for existing endpoints without a saved Auto-Subscription setting. To receive OPC UA data-change notifications, select **Polling + subscription** for the desired entities in the side panel and enable the endpoint’s **Auto-Subscription** switch (also available in connection options). The switch is a master enable: turning it off preserves each entity’s selection. Polling remains active for all entities in both modes. No subscription is created until at least one active entity opts in. Saved endpoint switch choices are preserved; entities without an update-mode setting use polling only, even if the switch was already on.
 
 ---
 
@@ -98,6 +98,7 @@ Each entity card shows its live Home Assistant state, including localized binary
 
 Click **Edit** on an entity to configure:
 
+- **Update mode**: **Polling only** (default) or **Polling + subscription**, for both discovered and manually added entities. Numeric entities in subscription mode also offer an absolute **deadband** (0 disables filtering). If multiple subscribed entities share a NodeId, the node is monitored once using their smallest deadband; polling-only entities still update only on reads.
 - **Category**: automatic, sensor, binary sensor, switch, number, text, datetime or excluded, according to node type and write permissions. Excluded discovered nodes can be enabled here even if they have no registry entity yet.
 - **Always available**: keep the last known state if the connection is lost or disabled. Applies independently to any node entity; disabled/excluded entities stay excluded. `value_stale: true` indicates a retained or unknown value, and becomes false after a fresh read. Verified node metadata lets opted-in entities start offline; Home Assistant restores their last saved raw value on reload/restart when available. With no saved value the state is unknown, never a fabricated zero/off value. Writes require a connection and a fresh node reading; commands are not queued offline. Inversion and rounding are applied to the retained raw value. Default is off.
 - **Decimal places** for REAL/LREAL (OPC UA Float/Double) nodes: choose 0–10, or leave empty to disable rounding. Available for sensors and numbers, including manually added nodes. This rounds the Home Assistant state used by history and automations; the raw coordinator value and PLC writes are unchanged. For example, `12.345678` becomes `12.35` with 2 decimals. This does not force trailing zeros or change the number step. Existing nodes keep their original precision until configured.

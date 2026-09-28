@@ -143,6 +143,7 @@ async def test_binary_device_class_inversion_and_options_flow_preserve_panel_fie
         "node_id": "ns=2;i=2",
         "device_class": "door",
         "invert_state": True,
+        "update_mode": "subscription",
     }
     hass.config_entries.async_update_entry(
         entry, options={CONF_NODE_SETTINGS: {"ns=2;i=1": settings}}
