@@ -1,14 +1,16 @@
 """A node classified before entities_ready must still reach the config entry."""
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from custom_components.ha_opcua import AsyncuaCoordinator
+from custom_components.ha_opcua import AsyncuaCoordinator, async_options_updated
 from custom_components.ha_opcua.const import (
     CONF_KNOWN_NODE_IDS,
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
+    CONF_SUBSCRIPTION_ENABLED,
+    DOMAIN,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -191,5 +193,41 @@ async def test_cache_only_startup_seed_never_becomes_the_discovery_baseline(
     await c.async_refresh()
     assert existing_id not in entry.options.get(CONF_NODE_SETTINGS, {})
     assert entry.options[CONF_KNOWN_NODE_IDS] == sorted([cached_id, existing_id])
+
+    await c.async_shutdown()
+
+
+async def test_persisting_discovery_state_does_not_trigger_a_reload_once_subscription_is_saved(
+    hass, entry
+):
+    """_persist_discovery_state's reload_options must exclude subscription_enabled too.
+
+    Once subscription_enabled has ever been saved into entry.options (e.g.
+    via the options flow or the subscription switch), it stays there.
+    async_options_updated() compares entry.options against
+    coordinator.reload_options with both connection_enabled and
+    subscription_enabled filtered out (see its own docstring/comment). If
+    _persist_discovery_state() only filtered out connection_enabled, saving
+    a newly discovered node's settings while subscription_enabled sits in
+    options would make that comparison mismatch forever, triggering a full
+    config entry reload on every single discovery-driven write - not just
+    once, but repeatedly on live SPS changes.
+    """
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_SUBSCRIPTION_ENABLED: True}
+    )
+    c = AsyncuaCoordinator(hass, "PLC", _hub_returning(NEW_NODE), config_entry=entry)
+    c.known_node_ids = {"ns=2;i=1"}
+    c._known_node_ids_initialized = True
+    hass.data.setdefault(DOMAIN, {})["PLC"] = c
+
+    await c.async_refresh()
+    c.entities_ready = True
+    c.flush_pending_discovery_state()
+    assert "ns=2;i=9" in entry.options.get(CONF_NODE_SETTINGS, {})
+
+    with patch.object(hass.config_entries, "async_reload", new=AsyncMock()) as reload:
+        await async_options_updated(hass, entry)
+        reload.assert_not_awaited()
 
     await c.async_shutdown()
