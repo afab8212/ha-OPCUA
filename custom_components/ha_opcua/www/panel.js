@@ -37,12 +37,12 @@ const TEXT = {
     deleting: "Eliminazione…",
     deleteTitle: "Elimina entità orfana",
     deleteHelp:
-      "Il PLC non fornisce più questo nodo dopo una rilevazione completa, oppure l’entità è rimasta da un cambio di categoria. L’entità Home Assistant e le sue impostazioni salvate verranno eliminate. Le automazioni e le dashboard che la usano dovranno essere aggiornate. Il PLC non viene modificato.",
+      "Il PLC non fornisce più questo nodo dopo una rilevazione completa, oppure l’entità è rimasta da un cambio di categoria. L’entità Home Assistant verrà eliminata. Le automazioni e le dashboard che la usano dovranno essere aggiornate. Il PLC non viene modificato. Le impostazioni necessarie a un'entità sostitutiva vengono mantenute; le impostazioni di un nodo confermato come assente possono invece essere rimosse se nessun'altra entità lo referenzia.",
     deleted: "Entità orfana eliminata.",
     deleteAll: "Elimina tutte le mancanti",
     deleteAllTitle: "Elimina tutte le entità orfane",
     deleteAllHelp:
-      "Tutte le entità il cui nodo non è più fornito dal PLC dopo una rilevazione completa, e quelle rimaste da un cambio di categoria, verranno eliminate con le relative impostazioni salvate. Le automazioni e le dashboard che le usano dovranno essere aggiornate. Il PLC non viene modificato.",
+      "Tutte le entità il cui nodo non è più fornito dal PLC dopo una rilevazione completa, e quelle rimaste da un cambio di categoria, verranno eliminate. Le automazioni e le dashboard che le usano dovranno essere aggiornate. Il PLC non viene modificato. Le impostazioni necessarie a entità sostitutive vengono mantenute; le impostazioni di nodi confermati come assenti possono invece essere rimosse se nessun'altra entità le referenzia.",
     deletedAll: "Entità orfane eliminate.",
     not_orphan:
       "L’entità non è più orfana o non può essere verificata ora (connessione assente o rilevazione incompleta). Nulla è stato eliminato.",
@@ -209,12 +209,12 @@ const TEXT = {
     deleting: "Deleting…",
     deleteTitle: "Delete orphaned entity",
     deleteHelp:
-      "The PLC no longer provides this node after a complete discovery, or the entity was left behind by a category change. The Home Assistant entity and its saved node settings will be deleted. Automations and dashboards using it will need updating. The PLC is unchanged.",
+      "The PLC no longer provides this node after a complete discovery, or the entity was left behind by a category change. The Home Assistant entity will be deleted. Automations and dashboards using it will need updating. The PLC is unchanged. Settings needed by a replacement entity are preserved; settings for a node confirmed missing may also be removed if no other entity references it.",
     deleted: "Orphaned entity deleted.",
     deleteAll: "Delete all missing",
     deleteAllTitle: "Delete all orphaned entities",
     deleteAllHelp:
-      "Every entity whose node the PLC no longer provides after a complete discovery, and every entity left behind by a category change, will be deleted together with its saved node settings. Automations and dashboards using them will need updating. The PLC is unchanged.",
+      "Every entity whose node the PLC no longer provides after a complete discovery, and every entity left behind by a category change, will be deleted. Automations and dashboards using them will need updating. The PLC is unchanged. Settings needed by replacement entities are preserved; settings for nodes confirmed missing may also be removed when no other entity references them.",
     deletedAll: "Orphaned entities deleted.",
     not_orphan:
       "This entity is no longer orphaned or cannot be verified right now (connection down or discovery incomplete). Nothing was deleted.",
