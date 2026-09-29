@@ -261,7 +261,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.0.1",
+    "Pannello 1.1.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1423,6 +1423,152 @@ for (const width of [1280, 390, 320]) {
     await shot(page, `editor-fixed-actions-error-${width}.png`);
     await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
     await dialog.waitFor({ state: "detached" });
+    await page.close();
+  });
+}
+
+for (const [width, dark] of [
+  [1440, false],
+  [390, true],
+  [320, false],
+]) {
+  test(`typed state cards and live indicators at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page.evaluate(async (dark) => {
+      if (dark)
+        document.body.style.cssText +=
+          ";--primary-background-color:#111827;--card-background-color:#1f2937;--primary-text-color:#eef2f7;--secondary-text-color:#acb8c9;--divider-color:#374151;--primary-color:#38bdf8;--text-primary-color:#111827";
+      const endpoint = window.fixture.endpoints[0];
+      const samples = [
+        ["Int2", "Int16", "10", {}],
+        ["Real1", "Float", "0.0", {}],
+        ["Real2", "Float", "11.1000003814697", { value_stale: true }],
+        ["String1", "String", "", {}],
+        ["String2", "String", "Ricetta A / articolo in lavorazione", {}],
+        ["Orologio", "DateTime", "2026-09-29T10:00:00+00:00", {}],
+        ["Marcia", "Boolean", "on", {}],
+        ["Consenso", "Boolean", "off", {}],
+        ["Allarme", "Boolean", "on", { device_class: "problem" }],
+        ["Scollegato", "Boolean", "unavailable", {}],
+      ];
+      endpoint.rows = samples.map(
+        ([name, variant_type, state, attributes], i) => {
+          const platform =
+            variant_type === "Boolean" ? "binary_sensor" : "sensor";
+          const entity_id = `${platform}.sample${i}`;
+          window.testHass.states[entity_id] = { state, attributes };
+          return {
+            key: `sample${i}`,
+            node_id: `ns=4;i=${i + 5}`,
+            name,
+            variant_type,
+            platform,
+            entity_id,
+            editable: true,
+          };
+        },
+      );
+      const panel = document.querySelector("opcua-node-panel");
+      panel.hass = { ...window.testHass };
+      await panel._load();
+    }, dark);
+    const card = (name) =>
+      page
+        .locator("article")
+        .filter({ has: page.getByRole("heading", { name, exact: true }) });
+    assert.equal(await card("Int2").getAttribute("data-value-type"), "numeric");
+    assert.equal(await card("String2").getAttribute("data-value-type"), "text");
+    assert.equal(
+      await card("Orologio").getAttribute("data-value-type"),
+      "datetime",
+    );
+    assert.equal(
+      await card("String1").getAttribute("data-state-kind"),
+      "empty",
+    );
+    assert.equal(
+      await card("String1").locator(".stateValue").textContent(),
+      "Testo vuoto",
+    );
+    assert.equal(await card("Marcia").getAttribute("data-tone"), "active");
+    assert.equal(
+      await card("Consenso").locator(".valueIcon").getAttribute("data-icon"),
+      "off",
+    );
+    assert.equal(await card("Allarme").getAttribute("data-tone"), "alert");
+    assert.equal(
+      await card("Scollegato").locator(".valueIcon").getAttribute("data-icon"),
+      "unavailable",
+    );
+    assert.equal(
+      await card("Real2").locator(".retainedValue").isVisible(),
+      true,
+    );
+    assert.equal(
+      await card("Real2").locator(".stateValue").textContent(),
+      "11.1000003814697",
+    );
+    for (const [mode, label] of [
+      ["grid", "Vista a riquadri"],
+      ["list", "Vista a elenco"],
+    ]) {
+      await page.getByRole("button", { name: label, exact: true }).click();
+      await page.locator(".content").evaluate((el) => {
+        el.scrollTop +=
+          el.querySelector("section").getBoundingClientRect().top -
+          el.getBoundingClientRect().top;
+      });
+      assert.equal(
+        await page
+          .locator(".content")
+          .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+        false,
+      );
+      for (const c of await page.locator("article").all())
+        assert.equal(
+          await c.evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+          false,
+        );
+      if (width === 1440 && mode === "grid")
+        assert.ok(
+          (await card("Int2").boundingBox()).height < 180,
+          "simple cards stay compact",
+        );
+      await shot(
+        page,
+        `typed-states-${width}-${dark ? "dark" : "light"}-${mode}.png`,
+      );
+    }
+    // A live update clears both stale and active/alarm visuals without rebuilding the card.
+    await page.evaluate(() => {
+      window.testHass.states["sensor.sample2"] = {
+        state: "12",
+        attributes: { value_stale: false },
+      };
+      window.testHass.states["binary_sensor.sample6"] = {
+        state: "off",
+        attributes: {},
+      };
+      window.testHass.states["binary_sensor.sample8"] = {
+        state: "unknown",
+        attributes: { device_class: "problem" },
+      };
+      document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+    });
+    assert.equal(
+      await card("Real2").locator(".retainedValue").isVisible(),
+      false,
+    );
+    assert.equal(await card("Marcia").getAttribute("data-tone"), "neutral");
+    assert.equal(
+      await card("Marcia").locator(".valueIcon").getAttribute("data-icon"),
+      "off",
+    );
+    assert.equal(await card("Allarme").getAttribute("data-tone"), "neutral");
+    assert.equal(
+      await card("Allarme").locator(".valueIcon").getAttribute("data-icon"),
+      "unknown",
+    );
     await page.close();
   });
 }
