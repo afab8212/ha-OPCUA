@@ -327,3 +327,69 @@ async def test_existing_read_only_boolean_never_retroactively_becomes_binary_sen
     assert "ns=2;i=1" not in c.node_settings
 
     await c.async_shutdown()
+
+
+async def test_new_array_struct_field_gets_a_disambiguated_display_name(hass, entry):
+    """A field inside a PLC array-of-struct element must not collide by name.
+
+    Every element of e.g. "astMeldungen[N]" shares the same field names
+    (xAktiv, sText, ...), so a raw browse name alone would make Home
+    Assistant number the colliding entities _2, _3, ... with no way to
+    tell which element they came from. The array index is disambiguated
+    into the name once, at discovery time, using the same "never
+    retroactive" guard as the other smart defaults.
+    """
+    new_field = {
+        "name": "xAktiv",
+        "node_id": "ns=2;s=|var|PLC.PlantRelay.astMeldungen[10].xAktiv",
+        "variant_type": "Boolean",
+        "writable": False,
+    }
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+    )
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    c.known_node_ids = {"ns=2;i=1"}
+    c._known_node_ids_initialized = True
+
+    c.set_nodes([new_field], full_discovery=True)
+
+    assert (
+        c.node_settings[new_field["node_id"]]["display_name"]
+        == "astMeldungen 10 · xAktiv"
+    )
+    assert c.nodes[new_field["node_id"]]["name"] == "astMeldungen 10 · xAktiv"
+
+    await c.async_shutdown()
+
+
+async def test_existing_array_struct_field_never_retroactively_renamed(hass, entry):
+    """An installation's pre-existing array-field entity must never silently rename."""
+    existing_field = {
+        "name": "xAktiv",
+        "node_id": "ns=2;s=|var|PLC.PlantRelay.astMeldungen[10].xAktiv",
+        "variant_type": "Boolean",
+        "writable": False,
+    }
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+    )
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    # This node was already known before this feature existed.
+    c.known_node_ids = {existing_field["node_id"]}
+    c._known_node_ids_initialized = True
+
+    c.set_nodes([existing_field], full_discovery=True)
+
+    assert existing_field["node_id"] not in c.node_settings
+    assert c.nodes[existing_field["node_id"]]["name"] == "xAktiv"
+
+    await c.async_shutdown()

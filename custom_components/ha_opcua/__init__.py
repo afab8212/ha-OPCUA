@@ -20,6 +20,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .arrays import array_element_name, parse_array_element
 from .const import (
     CONF_CONNECTION_ENABLED,
     CONF_HUB_ID,
@@ -957,6 +958,26 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 # field silently falling back to the raw float.
                 if node["variant_type"] in {"Float", "Double"}:
                     saved = {**saved, "precision": 2}
+                # A brand-new field inside one element of a PLC array-of-struct
+                # (e.g. "astMeldungen[10].xAktiv") shares its raw field name
+                # with every other element, so HA would otherwise number the
+                # colliding entity_ids _2, _3, ... with no way to tell which
+                # element they came from. Disambiguating by array index here
+                # - once, at discovery time - means the name is right from
+                # the entity's first creation instead of needing a rename
+                # after the fact. Persisted like the defaults above so it
+                # stays stable once the node is no longer "new".
+                if parse_array_element(node_id) is not None:
+                    saved = {
+                        **saved,
+                        "display_name": array_element_name(node_id, node["name"]),
+                    }
+            # A persisted display name (from this node's own "new" pass,
+            # possibly in an earlier run) always wins over the raw field
+            # name - but only ever a name this feature computed and saved
+            # itself, never invented fresh for an existing installation.
+            if saved.get("display_name"):
+                node["name"] = saved["display_name"]
             try:
                 if target is None:
                     raise ValueError("node_not_found")

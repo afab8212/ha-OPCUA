@@ -217,6 +217,23 @@ async function pageFor(width = 1280, admin = true) {
           endpoint.revision = "reclassified";
           return { reclassified };
         }
+        if (msg.type.endsWith("/rename_array_fields")) {
+          if (window.failRename) throw { code: window.failRename };
+          const endpoint = window.fixture.endpoints.find(
+            (e) => e.entry_id === msg.entry_id,
+          );
+          const renamed = [];
+          for (const key of msg.keys) {
+            const row = endpoint.rows.find((r) => r.key === key && r.renamable);
+            if (!row) continue;
+            row.name = row.proposed_name;
+            row.custom_name = row.proposed_name;
+            row.renamable = false;
+            renamed.push(key);
+          }
+          endpoint.revision = "renamed";
+          return { renamed };
+        }
         if (window.failSave) throw { code: "stale_configuration" };
         const endpoint = window.fixture.endpoints.find(
           (e) => e.entry_id === msg.entry_id,
@@ -279,7 +296,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.3.0",
+    "Pannello 1.4.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -881,6 +898,119 @@ test("reclassify dialog starts empty and sends only the confirmed keys", async (
     window.calls.find((m) => m.type.endsWith("/reclassify_boolean_sensors")),
   );
   assert.deepEqual(call.keys, ["bool1"]);
+  await page.close();
+});
+
+test("array-of-struct fields are grouped and can be renamed selectively", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    const group1 = "ns=4;s=PLC.astMeldungen[1]";
+    const group2 = "ns=4;s=PLC.astMeldungen[2]";
+    endpoint.rows.push(
+      {
+        key: "arr1x",
+        node_id: `${group1}.xAktiv`,
+        name: "xAktiv",
+        entity_id: "binary_sensor.arr1x",
+        platform: "binary_sensor",
+        variant_type: "Boolean",
+        reclassifiable: false,
+        array_group: group1,
+        array_label: "astMeldungen 1",
+        array_field: "xAktiv",
+        proposed_name: "astMeldungen 1 · xAktiv",
+        renamable: true,
+      },
+      {
+        key: "arr1s",
+        node_id: `${group1}.sText`,
+        name: "sText",
+        entity_id: "sensor.arr1s",
+        platform: "sensor",
+        variant_type: "String",
+        reclassifiable: false,
+        array_group: group1,
+        array_label: "astMeldungen 1",
+        array_field: "sText",
+        proposed_name: "astMeldungen 1 · sText",
+        renamable: true,
+      },
+      {
+        key: "arr2x",
+        node_id: `${group2}.xAktiv`,
+        name: "xAktiv",
+        entity_id: "binary_sensor.arr2x",
+        platform: "binary_sensor",
+        variant_type: "Boolean",
+        reclassifiable: false,
+        array_group: group2,
+        array_label: "astMeldungen 2",
+        array_field: "xAktiv",
+        proposed_name: "astMeldungen 2 · xAktiv",
+        renamable: true,
+      },
+    );
+    endpoint.renamable_array_fields = 3;
+    window.testHass.states = {
+      ...window.testHass.states,
+      "binary_sensor.arr1x": { state: "on", attributes: {} },
+      "sensor.arr1s": { state: "Pump running", attributes: {} },
+      "binary_sensor.arr2x": { state: "off", attributes: {} },
+    };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+
+  // "All" groups the two astMeldungen[1] fields under one heading and
+  // astMeldungen[2] under another, independent of how many fields each
+  // struct element has.
+  const groups = page.locator(".arrayGroup");
+  assert.equal(await groups.count(), 2);
+  const group1Card = groups.filter({ hasText: "astMeldungen 1" });
+  assert.equal(
+    await group1Card.locator("article").count(),
+    2,
+    "both fields of astMeldungen[1] appear under its own heading",
+  );
+
+  // A platform filter wants its own flat, precise list instead.
+  await page
+    .getByRole("button", { name: "Sensori binari · 3", exact: true })
+    .click();
+  assert.equal(await page.locator(".arrayGroup").count(), 0);
+  assert.equal(
+    await page.locator("article").filter({ hasText: "astMeldungen" }).count(),
+    2,
+  );
+  await page.getByRole("button", { name: "Tutte · 7", exact: true }).click();
+
+  await page
+    .getByRole("button", { name: "Rinomina campi array (3)", exact: true })
+    .click();
+  const dialog = page.locator("dialog[open]");
+  await dialog.waitFor();
+  const confirm = dialog.getByRole("button", { name: /Rinomina selezionati/ });
+  assert.equal(await confirm.textContent(), "Rinomina selezionati (0)");
+  assert.equal(await confirm.isDisabled(), true);
+
+  const item = dialog
+    .locator(".pickItem")
+    .filter({ hasText: "xAktiv" })
+    .first();
+  assert.equal(
+    await item.locator(".pickArrow").textContent(),
+    "→ astMeldungen 1 · xAktiv",
+  );
+  await item.locator("input").check();
+  assert.equal(await confirm.textContent(), "Rinomina selezionati (1)");
+  await confirm.click();
+  await dialog.waitFor({ state: "detached" });
+
+  const call = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/rename_array_fields")),
+  );
+  assert.deepEqual(call.keys, ["arr1x"]);
   await page.close();
 });
 
