@@ -23,6 +23,7 @@ from .const import (
     CONF_HUB_SCAN_INTERVAL,
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
+    CONF_KNOWN_NODE_IDS,
     CONF_NODE_SETTINGS,
     CONF_SUBSCRIPTION_ENABLED,
     DEFAULT_SUBSCRIPTION_ENABLED,
@@ -68,6 +69,14 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
                     ),
                 },
+                # An empty (not absent) baseline marks this endpoint as having
+                # already completed its "zero known nodes" starting point, so
+                # its very first real discovery sees every node as new and
+                # applies the smart platform defaults - unlike an existing
+                # installation upgrading to this code, whose options predate
+                # this key entirely and so must stay unrecognized as "new"
+                # (see known_node_ids docstring in coordinator.__init__).
+                options={CONF_KNOWN_NODE_IDS: []},
             )
 
         data_schema = vol.Schema(

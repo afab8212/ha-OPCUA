@@ -32,7 +32,12 @@ from .node_settings import (
     update_offline_node,
     validate_settings,
 )
-from .orphans import async_remove_orphan, async_sync_orphan_repairs, is_orphan
+from .orphans import (
+    _reload_options,
+    async_remove_orphan,
+    async_sync_orphan_repairs,
+    is_orphan,
+)
 
 SNAPSHOT_SETTINGS = (
     "platform",
@@ -80,11 +85,25 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_rediscover)
     websocket_api.async_register_command(hass, ws_remove_orphan)
     websocket_api.async_register_command(hass, ws_remove_orphans)
+    websocket_api.async_register_command(hass, ws_reclassify_boolean_sensors)
     hass.data[PANEL_DATA] = {"locks": {}, "version": version}
 
 
 def _coordinator(hass, entry):
     return hass.data.get(DOMAIN, {}).get(entry.data[CONF_HUB_ID])
+
+
+def _is_auto_readonly_boolean(node, settings):
+    """A read-only Boolean left on Auto - the smart default a new one gets.
+
+    Never matches a node with any explicit platform choice, including an
+    explicit "sensor" - reclassifying is opt-in per node, not just per type.
+    """
+    return (
+        node["variant_type"] == "Boolean"
+        and not node["writable"]
+        and settings.get("platform", "auto") == "auto"
+    )
 
 
 def _panel_nodes(coordinator):
@@ -100,11 +119,15 @@ def endpoint_snapshot(hass, entry):
     c = _coordinator(hass, entry)
     available_nodes = _panel_nodes(c) if c else {}
     rows = []
+    reclassifiable_booleans = 0
     manual = entry.options.get(CONF_MANUAL_NODES, {})
     nodes = {**manual, **(c.nodes if c else {})}
     for key, node in nodes.items():
         settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
         platform = effective_platform(node, settings)
+        reclassifiable = _is_auto_readonly_boolean(node, settings)
+        if reclassifiable:
+            reclassifiable_booleans += 1
         entity_id = registry.async_get_entity_id(
             platform, DOMAIN, f"{entry.entry_id}:{key}"
         )
@@ -150,6 +173,7 @@ def endpoint_snapshot(hass, entry):
                 },
                 "manual": key in manual,
                 "orphan": False,
+                "reclassifiable": reclassifiable,
             }
         )
     # Entities whose node vanished from the PLC (or that a category change
@@ -182,6 +206,7 @@ def endpoint_snapshot(hass, entry):
                 },
                 "manual": False,
                 "orphan": True,
+                "reclassifiable": False,
             }
         )
     revision = hashlib.sha256(
@@ -208,6 +233,7 @@ def endpoint_snapshot(hass, entry):
         "connected": bool(c and c.enabled and c.hub.is_connected),
         "revision": revision,
         "rows": rows,
+        "reclassifiable_booleans": reclassifiable_booleans,
         "nodes": list(available_nodes.values()),
         "subscription_entity": registry.async_get_entity_id(
             "switch", DOMAIN, f"{entry.entry_id}:subscription_enabled"
@@ -231,6 +257,46 @@ def panel_snapshot(hass):
         ],
         "device_classes": sorted(item.value for item in BinarySensorDeviceClass),
     }
+
+
+def _migrate_entity_registry(
+    hass, entry, node, key, platform, related, *, name, area_id, suggested_object_id
+):
+    """Move a node's registered entity to `platform`, preserving name/area.
+
+    Any other related entry (same unique_id, different platform) is left
+    disabled instead of dangling, matching a manual category change. Shared
+    by a panel-driven edit and the bulk Boolean reclassification so both go
+    through identical registry handling.
+    """
+    registry = er.async_get(hass)
+    unique_id = f"{entry.entry_id}:{key}"
+    selected = None
+    if platform != "disabled":
+        device = async_register_device(hass, entry)
+        selected = registry.async_get_or_create(
+            platform,
+            DOMAIN,
+            unique_id,
+            config_entry=entry,
+            device_id=device.id,
+            original_name=node["name"],
+            suggested_object_id=suggested_object_id,
+        )
+        changes = {"name": name, "area_id": area_id}
+        if platform == "binary_sensor":
+            changes["device_class"] = None
+        if selected.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
+            changes["disabled_by"] = None
+        registry.async_update_entity(selected.entity_id, **changes)
+    for old in related:
+        if selected is not None and old.entity_id == selected.entity_id:
+            continue
+        changes = {"name": name, "area_id": area_id}
+        if old.disabled_by is None:
+            changes["disabled_by"] = er.RegistryEntryDisabler.INTEGRATION
+        registry.async_update_entity(old.entity_id, **changes)
+    return selected.entity_id if selected else None
 
 
 async def async_save_entity(hass, msg):
@@ -277,35 +343,21 @@ async def async_save_entity(hass, msg):
             for e in er.async_entries_for_config_entry(registry, entry.entry_id)
             if e.platform == DOMAIN and e.unique_id == unique_id
         ]
-        selected = None
-        if platform != "disabled":
-            device = async_register_device(hass, entry)
-            selected = registry.async_get_or_create(
-                platform,
-                DOMAIN,
-                unique_id,
-                config_entry=entry,
-                device_id=device.id,
-                original_name=c.nodes[msg["key"]]["name"],
-                suggested_object_id=(
-                    row["entity_id"].split(".", 1)[1]
-                    if row["entity_id"]
-                    else name or row["name"]
-                ),
-            )
-            changes = {"name": name, "area_id": area_id}
-            if platform == "binary_sensor":
-                changes["device_class"] = None
-            if selected.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
-                changes["disabled_by"] = None
-            registry.async_update_entity(selected.entity_id, **changes)
-        for old in related:
-            if selected is not None and old.entity_id == selected.entity_id:
-                continue
-            changes = {"name": name, "area_id": area_id}
-            if old.disabled_by is None:
-                changes["disabled_by"] = er.RegistryEntryDisabler.INTEGRATION
-            registry.async_update_entity(old.entity_id, **changes)
+        selected_entity_id = _migrate_entity_registry(
+            hass,
+            entry,
+            c.nodes[msg["key"]],
+            msg["key"],
+            platform,
+            related,
+            name=name,
+            area_id=area_id,
+            suggested_object_id=(
+                row["entity_id"].split(".", 1)[1]
+                if row["entity_id"]
+                else name or row["name"]
+            ),
+        )
         if platform != row["platform"]:
             # Prevent old controls from writing while the new domain loads.
             c._platforms[msg["key"]] = "disabled"
@@ -319,7 +371,7 @@ async def async_save_entity(hass, msg):
         return {
             "saved": True,
             "reload": reload_needed,
-            "entity_id": selected.entity_id if selected else None,
+            "entity_id": selected_entity_id,
         }
 
 
@@ -561,6 +613,97 @@ async def async_remove_all_orphans(hass, msg):
         return {"removed": removed}
 
 
+async def async_reclassify_boolean_sensors(hass, msg):
+    """Explicitly opt selected read-only Boolean sensors into binary_sensor.
+
+    A newly discovered read-only Boolean node already gets binary_sensor by
+    default; this never applies retroactively on its own (see set_nodes()),
+    so an installation with Boolean nodes discovered before that default
+    existed is stuck with plain sensors showing a raw "True"/"False" state
+    unless it opts in here, one endpoint at a time. Only nodes still left on
+    Auto are eligible - an explicit past choice (including an explicit
+    "sensor") is never overridden.
+
+    `msg["keys"]` is the caller's selection (the panel lets the user pick
+    which eligible entities to convert instead of an all-or-nothing action).
+    Each key is re-validated against the current live state rather than
+    trusted as-is, since it may be stale by the time the user confirms; a
+    key that is missing or no longer eligible is silently skipped, matching
+    how the rest of this action already tolerates a state that moved on.
+
+    Applies the change to the live coordinator directly (mirroring a normal
+    discovery-driven classification) instead of forcing a full reload: the
+    new binary_sensor entities appear via the platform's own discovery
+    listener, and the old sensor entities are picked up by the orphan
+    detection right away, ready for the existing "Delete all missing" flow.
+
+    The old sensor's custom name and area, if any, are carried over to the
+    new binary_sensor (same registry handling a manual category change
+    uses), and the old entity is left disabled instead of dangling enabled
+    - a normal category change leaves it exactly that way too.
+    """
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        if endpoint_snapshot(hass, entry)["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        c = _coordinator(hass, entry)
+        if c is None:
+            raise ValueError("endpoint_not_loaded")
+        registry = er.async_get(hass)
+        options = deepcopy(dict(entry.options))
+        node_settings_opt = options.setdefault(CONF_NODE_SETTINGS, {})
+        reclassified = []
+        for key in dict.fromkeys(msg["keys"]):
+            node = c.nodes.get(key)
+            if node is None:
+                continue
+            saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
+            if not _is_auto_readonly_boolean(node, saved):
+                continue
+            settings = validate_settings(node, {**saved, "platform": "binary_sensor"})
+            node_settings_opt[key] = settings
+            c.node_settings[key] = settings
+            c._platforms[key] = "binary_sensor"
+            reclassified.append(key)
+            unique_id = f"{entry.entry_id}:{key}"
+            related = [
+                e
+                for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+                if e.platform == DOMAIN and e.unique_id == unique_id
+            ]
+            _migrate_entity_registry(
+                hass,
+                entry,
+                node,
+                key,
+                "binary_sensor",
+                related,
+                name=next((e.name for e in related if e.name is not None), None),
+                area_id=next(
+                    (e.area_id for e in related if e.area_id is not None), None
+                ),
+                suggested_object_id=(
+                    related[0].entity_id.split(".", 1)[1] if related else None
+                ),
+            )
+        if not reclassified:
+            return {"reclassified": []}
+        # Already applied above; sync so async_options_updated takes its
+        # "apply live, don't reload" branch instead of racing a reload
+        # against the live change just made (same reasoning as
+        # _persist_discovery_state in __init__.py).
+        c.reload_options = _reload_options(options)
+        hass.config_entries.async_update_entry(entry, options=options)
+        c.async_update_listeners()
+        async_sync_orphan_repairs(hass, entry)
+        return {"reclassified": reclassified}
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/node/remove",
@@ -628,6 +771,25 @@ async def ws_remove_orphan(hass, connection, msg):
 async def ws_remove_orphans(hass, connection, msg):
     try:
         result = await async_remove_all_orphans(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/entity/reclassify_boolean_sensors",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+        vol.Required("keys"): [str],
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_reclassify_boolean_sensors(hass, connection, msg):
+    try:
+        result = await async_reclassify_boolean_sensors(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
     else:

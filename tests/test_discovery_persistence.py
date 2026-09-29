@@ -231,3 +231,99 @@ async def test_persisting_discovery_state_does_not_trigger_a_reload_once_subscri
         reload.assert_not_awaited()
 
     await c.async_shutdown()
+
+
+async def test_new_read_only_boolean_defaults_to_binary_sensor(hass, entry):
+    """A sensor can only show raw True/False; binary_sensor is the proper fit.
+
+    Mirrors the writable-numeric/string smart defaults above, with the same
+    "never retroactive" guard: only a genuinely new node (per known_node_ids)
+    with no saved settings gets this, so an existing installation's Boolean
+    sensors never silently change domain.
+    """
+    new_boolean = {
+        "name": "Alarm",
+        "node_id": "ns=2;i=9",
+        "variant_type": "Boolean",
+        "writable": False,
+    }
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+    )
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    c.known_node_ids = {"ns=2;i=1"}
+    c._known_node_ids_initialized = True
+
+    c.set_nodes([new_boolean], full_discovery=True)
+
+    assert c.node_settings["ns=2;i=9"]["platform"] == "binary_sensor"
+
+    await c.async_shutdown()
+
+
+async def test_fresh_endpoint_first_discovery_defaults_to_binary_sensor(hass, entry):
+    """A brand-new endpoint's very first discovery must not be treated as an upgrade.
+
+    known_node_ids being initialized (config_flow seeds it to []; see
+    config_flow.async_step_user) but still empty is what a genuinely fresh
+    endpoint looks like before its first real discovery - every discovered
+    node is new relative to that empty baseline, unlike the protected
+    "never initialized" case an existing installation predating this
+    feature is in.
+    """
+    new_boolean = {
+        "name": "Alarm",
+        "node_id": "ns=2;i=9",
+        "variant_type": "Boolean",
+        "writable": False,
+    }
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+    )
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    # A fresh endpoint per config_flow: initialized, but nothing known yet.
+    c.known_node_ids = set()
+    c._known_node_ids_initialized = True
+
+    c.set_nodes([new_boolean], full_discovery=True)
+
+    assert c.node_settings["ns=2;i=9"]["platform"] == "binary_sensor"
+
+    await c.async_shutdown()
+
+
+async def test_existing_read_only_boolean_never_retroactively_becomes_binary_sensor(
+    hass, entry
+):
+    """An installation's pre-existing Boolean sensor must never silently change."""
+    existing_boolean = {
+        "name": "Alarm",
+        "node_id": "ns=2;i=1",
+        "variant_type": "Boolean",
+        "writable": False,
+    }
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+    )
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    # This node was already known before this feature existed.
+    c.known_node_ids = {"ns=2;i=1"}
+    c._known_node_ids_initialized = True
+
+    c.set_nodes([existing_boolean], full_discovery=True)
+
+    assert "ns=2;i=1" not in c.node_settings
+
+    await c.async_shutdown()

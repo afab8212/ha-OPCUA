@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.2.0";
+const PANEL_VERSION = "1.3.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -56,6 +56,14 @@ const TEXT = {
     deleteAllHelp:
       "Tutte le entità il cui nodo non è più fornito dal PLC dopo una rilevazione completa, e quelle rimaste da un cambio di categoria, verranno eliminate. Le automazioni e le dashboard che le usano dovranno essere aggiornate. Il PLC non viene modificato. Le impostazioni necessarie a entità sostitutive vengono mantenute; le impostazioni di nodi confermati come assenti possono invece essere rimosse se nessun'altra entità le referenzia.",
     deletedAll: "Entità orfane eliminate.",
+    reclassifyBooleans: "Riclassifica come binary_sensor",
+    reclassifyBooleansTitle: "Riclassifica i sensori Boolean esistenti",
+    reclassifyBooleansHelp:
+      "I nodi Boolean di sola lettura lasciati su Automatico possono essere convertiti in binary_sensor invece di sensor, così da mostrare Acceso/Spento invece di un valore grezzo True/False: vengono modificati solo quelli selezionati qui sotto. Sono idonei solo i nodi ancora su Automatico: una scelta esplicita, incluso sensor, non viene mai sovrascritta. Ogni vecchia entità sensor risultante dalla conversione compare come entità orfana, pronta per “Elimina tutte le mancanti”.",
+    reclassifySelectAll: "Seleziona tutti",
+    reclassifyConvert: "Converti selezionati",
+    reclassifying: "Riclassificazione…",
+    reclassified: "Sensori Boolean riclassificati.",
     not_orphan:
       "L’entità non è più orfana o non può essere verificata ora (connessione assente o rilevazione incompleta). Nulla è stato eliminato.",
     remove: "Rimuovi",
@@ -240,6 +248,14 @@ const TEXT = {
     deleteAllHelp:
       "Every entity whose node the PLC no longer provides after a complete discovery, and every entity left behind by a category change, will be deleted. Automations and dashboards using them will need updating. The PLC is unchanged. Settings needed by replacement entities are preserved; settings for nodes confirmed missing may also be removed when no other entity references them.",
     deletedAll: "Orphaned entities deleted.",
+    reclassifyBooleans: "Reclassify as binary_sensor",
+    reclassifyBooleansTitle: "Reclassify existing Boolean sensors",
+    reclassifyBooleansHelp:
+      'Read-only Boolean nodes left on Auto can be converted to binary_sensor instead of sensor, so they show On/Off instead of a raw True/False value - only the ones selected below are changed. Only nodes still left on Auto are eligible - an explicit choice, including sensor, is never overridden. Each old sensor entity is left as an orphaned entity after conversion, ready for "Delete all missing".',
+    reclassifySelectAll: "Select all",
+    reclassifyConvert: "Convert selected",
+    reclassifying: "Reclassifying…",
+    reclassified: "Boolean sensors reclassified.",
     not_orphan:
       "This entity is no longer orphaned or cannot be verified right now (connection down or discovery incomplete). Nothing was deleted.",
     node_in_use:
@@ -463,6 +479,7 @@ header{display:flex;flex-shrink:0;gap:16px;align-items:center;padding:18px 28px;
 [data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
 .endpointSubscription{display:flex;flex:1 1 100%;gap:8px 20px;flex-wrap:wrap;align-items:center;min-width:0;padding-top:14px;border-top:1px solid var(--divider-color,#e2e7ef)}.endpointSubscription .hint{flex:1 1 270px;font-size:12px;margin:0}.endpointSubscription #subscription-status,.endpointSubscription .error{flex-basis:100%}.endpointSubscription .toggle{font-weight:600;color:var(--primary-text-color,#243346);padding:4px 0;min-height:36px}.endpointSubscription input[role="switch"]{appearance:none;position:relative;width:42px;min-width:42px;height:24px;padding:0;border:0;border-radius:12px;background:var(--disabled-color,#8695a5);cursor:pointer}.endpointSubscription input[role="switch"]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.endpointSubscription input[role="switch"]:checked{background:var(--primary-color,#008fac)}.endpointSubscription input[role="switch"]:checked::after{left:21px}.endpointSubscription input[role="switch"]:disabled{opacity:.5;cursor:default}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease;overflow:hidden}dialog[open]{opacity:1;transform:none;display:flex;flex-direction:column}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px;overflow-y:auto;flex:1;min-height:0}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:-24px;margin:6px -24px -24px;padding:14px 24px 24px;background:var(--card-background-color,#fff)}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}.orphanTag{color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 15%,transparent)}.card.orphan{border-left-color:var(--error-color,#be3131);border-style:dashed}.card.orphan .cardTitle h3{color:var(--secondary-text-color,#637487)}
+.pickList{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:6px}.pickItem{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:7px;cursor:pointer}.pickItem:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 6%,transparent)}.pickItem input{width:18px;height:18px;min-width:18px;flex-shrink:0;accent-color:var(--primary-color,#008fac)}.pickInfo{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.pickName{font-weight:600;overflow-wrap:anywhere}.pickNodeId{font:11px ui-monospace,monospace;color:var(--secondary-text-color,#637487);overflow-wrap:anywhere}.pickState{font-size:12px;font-weight:600;color:var(--secondary-text-color,#637487);white-space:nowrap;flex-shrink:0}
 .entityForm{padding:0;gap:0;overflow:hidden;max-height:inherit;flex:0 1 auto}.editorBody{display:flex;flex-direction:column;gap:17px;padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1}.editorBody>*{flex-shrink:0}.entityForm footer{position:static;flex-shrink:0;flex-wrap:wrap;margin:0;padding:16px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color,#dce2ea)}.entityForm footer .error{flex-basis:100%;overflow-wrap:anywhere}.entityForm footer .error:empty{display:none}
 @media(max-width:870px){.menu{display:inline-flex;align-items:center;justify-content:center}.grid.list .card{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(140px,.8fr);gap:12px}}
 @media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:16px 12px 32px}.endpointPanel{padding:15px;margin-bottom:18px}.toolbar{grid-template-columns:1fr;gap:12px}.endpointMeta{gap:12px}.endpointIdentity{flex-basis:100%}.endpointActions{width:100%}.endpointActions button{flex:1;min-height:44px}.endpointSubscription{gap:5px;padding-top:12px}.endpointSubscription .toggle{width:100%;min-height:44px}.grid{grid-template-columns:1fr}.navRow{gap:10px}nav{gap:3px}nav button{padding:8px 10px;min-height:42px}.card{padding:15px}.grid.list .card{grid-template-columns:minmax(0,1fr);gap:12px;padding:14px}.grid.list .cardBottom{flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--divider-color,#e2e7ef);padding-top:10px}.grid.list .cardBottom .meta{text-align:left}.grid.list .entityState{display:flex;align-items:baseline;gap:10px}.actions button{min-height:42px}form{padding:20px}.entityForm{padding:0}.editorBody{padding:20px}.entityForm footer{padding-left:20px;padding-right:20px}.entityForm footer button{min-height:44px}.headerText p{font-size:12px}}
@@ -730,6 +747,16 @@ class OpcuaNodePanel extends HTMLElement {
       );
       deleteAll.textContent = `${this._t("deleteAll")} (${orphans.length})`;
       endpointActions.append(deleteAll);
+    }
+    // Read-only Boolean nodes discovered before binary_sensor became their
+    // default stay on Auto -> sensor forever unless opted in explicitly here.
+    if (endpoint.reclassifiable_booleans) {
+      const candidates = endpoint.rows.filter((row) => row.reclassifiable);
+      const reclassify = this._button("reclassifyBooleans", () =>
+        this._reclassifyBooleans(candidates),
+      );
+      reclassify.textContent = `${this._t("reclassifyBooleans")} (${candidates.length})`;
+      endpointActions.append(reclassify);
     }
     endpointPanel.append(meta);
     main.append(endpointPanel);
@@ -1175,6 +1202,121 @@ class OpcuaNodePanel extends HTMLElement {
         busy = false;
         remove.disabled = cancel.disabled = false;
         remove.textContent = `${this._t("deleteAll")} (${count})`;
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+  }
+  _reclassifyBooleanState(entityId) {
+    const entity = this._hass.states?.[entityId];
+    if (!entity || ["unavailable", "unknown", ""].includes(entity.state))
+      return this._t("stateUnavailable");
+    const raw = entity.state.toLowerCase();
+    if (["on", "true"].includes(raw)) return this._t("stateOn");
+    if (["off", "false"].includes(raw)) return this._t("stateOff");
+    return entity.state;
+  }
+  _reclassifyBooleans(candidates) {
+    const endpoint = this._endpoint();
+    const dialog = element("dialog");
+    this._dialog = dialog;
+    const form = element("form");
+    dialog.append(form);
+    const error = element("div", "", { class: "error", role: "alert" });
+    const cancel = this._button("cancel", () => dialog.close());
+    const confirm = element("button", `${this._t("reclassifyConvert")} (0)`, {
+      type: "submit",
+      class: "primary",
+    });
+    confirm.disabled = true;
+    const footer = element("footer");
+    footer.append(cancel, confirm);
+    const selectAllLabel = element("label", undefined, { class: "toggle" });
+    const selectAll = element("input", undefined, { type: "checkbox" });
+    selectAllLabel.append(
+      selectAll,
+      element("span", this._t("reclassifySelectAll")),
+    );
+    const list = element("div", undefined, {
+      class: "pickList",
+      role: "group",
+    });
+    const checkboxes = [];
+    const updateConfirm = () => {
+      const selected = checkboxes.filter((box) => box.checked).length;
+      confirm.disabled = selected === 0;
+      confirm.textContent = `${this._t("reclassifyConvert")} (${selected})`;
+      selectAll.checked = selected > 0 && selected === checkboxes.length;
+      selectAll.indeterminate = selected > 0 && selected < checkboxes.length;
+    };
+    for (const candidate of candidates) {
+      const item = element("label", undefined, { class: "pickItem" });
+      const checkbox = element("input", undefined, { type: "checkbox" });
+      checkbox.value = candidate.key;
+      checkbox.addEventListener("change", updateConfirm);
+      checkboxes.push(checkbox);
+      const info = element("div", undefined, { class: "pickInfo" });
+      info.append(
+        element("span", candidate.name, { class: "pickName" }),
+        element("span", candidate.node_id, { class: "pickNodeId" }),
+      );
+      item.append(
+        checkbox,
+        info,
+        element("span", this._reclassifyBooleanState(candidate.entity_id), {
+          class: "pickState",
+        }),
+      );
+      list.append(item);
+    }
+    selectAll.addEventListener("change", () => {
+      for (const checkbox of checkboxes) checkbox.checked = selectAll.checked;
+      updateConfirm();
+    });
+    form.append(
+      element("h2", this._t("reclassifyBooleansTitle")),
+      element("p", this._t("reclassifyBooleansHelp")),
+      selectAllLabel,
+      list,
+      error,
+      footer,
+    );
+    let busy = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      const keys = checkboxes
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => checkbox.value);
+      if (!keys.length) return;
+      busy = true;
+      confirm.disabled = cancel.disabled = selectAll.disabled = true;
+      for (const checkbox of checkboxes) checkbox.disabled = true;
+      confirm.textContent = this._t("reclassifying");
+      error.textContent = "";
+      try {
+        await this._hass.callWS({
+          type: "ha_opcua/entity/reclassify_boolean_sensors",
+          entry_id: endpoint.entry_id,
+          revision: endpoint.revision,
+          keys,
+        });
+        this._notice = this._t("reclassified");
+        dialog.close();
+        await this._load();
+      } catch (err) {
+        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        busy = false;
+        cancel.disabled = selectAll.disabled = false;
+        for (const checkbox of checkboxes) checkbox.disabled = false;
+        updateConfirm();
       }
     });
     this.shadowRoot.append(dialog);

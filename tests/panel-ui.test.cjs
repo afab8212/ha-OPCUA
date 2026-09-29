@@ -199,6 +199,24 @@ async function pageFor(width = 1280, admin = true) {
           if (window.failCreate) throw { code: "node_already_configured" };
           return { saved: true, reload: false };
         }
+        if (msg.type.endsWith("/reclassify_boolean_sensors")) {
+          if (window.failReclassify) throw { code: window.failReclassify };
+          const endpoint = window.fixture.endpoints.find(
+            (e) => e.entry_id === msg.entry_id,
+          );
+          const reclassified = [];
+          for (const key of msg.keys) {
+            const row = endpoint.rows.find(
+              (r) => r.key === key && r.reclassifiable,
+            );
+            if (!row) continue;
+            row.platform = "binary_sensor";
+            row.reclassifiable = false;
+            reclassified.push(key);
+          }
+          endpoint.revision = "reclassified";
+          return { reclassified };
+        }
         if (window.failSave) throw { code: "stale_configuration" };
         const endpoint = window.fixture.endpoints.find(
           (e) => e.entry_id === msg.entry_id,
@@ -261,7 +279,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.2.0",
+    "Pannello 1.3.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -789,6 +807,80 @@ test("HA formatting and unavailable, unknown, empty, excluded and pending states
     await value("text.ricetta").textContent(),
     "<img src=x onerror=alert(1)>",
   );
+  await page.close();
+});
+
+test("reclassify dialog starts empty and sends only the confirmed keys", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    endpoint.rows.push(
+      {
+        key: "bool1",
+        node_id: "ns=4;i=20",
+        name: "Allarme 1",
+        entity_id: "sensor.allarme1",
+        platform: "sensor",
+        variant_type: "Boolean",
+        reclassifiable: true,
+      },
+      {
+        key: "bool2",
+        node_id: "ns=4;i=21",
+        name: "Allarme 2",
+        entity_id: "sensor.allarme2",
+        platform: "sensor",
+        variant_type: "Boolean",
+        reclassifiable: true,
+      },
+    );
+    endpoint.reclassifiable_booleans = 2;
+    window.testHass.states = {
+      ...window.testHass.states,
+      "sensor.allarme1": { state: "True", attributes: {} },
+      "sensor.allarme2": { state: "False", attributes: {} },
+    };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Riclassifica come binary_sensor (2)",
+      exact: true,
+    })
+    .click();
+
+  const dialog = page.locator("dialog[open]");
+  await dialog.waitFor();
+  const confirm = dialog.getByRole("button", { name: /Converti selezionati/ });
+  assert.equal(await confirm.textContent(), "Converti selezionati (0)");
+  assert.equal(await confirm.isDisabled(), true);
+
+  const item1 = dialog.locator(".pickItem").filter({ hasText: "Allarme 1" });
+  const item2 = dialog.locator(".pickItem").filter({ hasText: "Allarme 2" });
+  assert.equal(await item1.locator(".pickState").textContent(), "Acceso");
+  assert.equal(await item2.locator(".pickState").textContent(), "Spento");
+
+  await item1.locator("input").check();
+  assert.equal(await confirm.textContent(), "Converti selezionati (1)");
+  assert.equal(await confirm.isDisabled(), false);
+
+  await dialog.getByLabel("Seleziona tutti", { exact: true }).check();
+  assert.equal(await confirm.textContent(), "Converti selezionati (2)");
+  assert.equal(await item2.locator("input").isChecked(), true);
+
+  // Deselecting one candidate again must drop it from what gets sent -
+  // "select all" is a shortcut, not a separate all-or-nothing action.
+  await item2.locator("input").uncheck();
+  assert.equal(await confirm.textContent(), "Converti selezionati (1)");
+
+  await confirm.click();
+  await dialog.waitFor({ state: "detached" });
+
+  const call = await page.evaluate(() =>
+    window.calls.find((m) => m.type.endsWith("/reclassify_boolean_sensors")),
+  );
+  assert.deepEqual(call.keys, ["bool1"]);
   await page.close();
 });
 
