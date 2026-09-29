@@ -199,7 +199,7 @@ async def test_panel_registration_is_once_and_versioned(hass):
     assert register.call_args.kwargs["module_url"] == (
         f"/ha-opcua-panel/panel.js?v=1.4.0&panel={digest}"
     )
-    assert commands.call_count == 9
+    assert commands.call_count == 10
     assert panel_snapshot(hass)["version"] == "1.4.0"
 
 

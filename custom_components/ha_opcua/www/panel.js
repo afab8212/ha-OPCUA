@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.4.0";
+const PANEL_VERSION = "1.5.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -69,6 +69,14 @@ const TEXT = {
     reclassifyConvert: "Converti selezionati",
     reclassifying: "Riclassificazione…",
     reclassified: "Sensori Boolean riclassificati.",
+    groupedArrays: "Array raggruppati",
+    renameArrayFields: "Rinomina campi array",
+    renameArrayFieldsTitle: "Disambigua i campi degli array esistenti",
+    renameArrayFieldsHelp:
+      "Ogni campo di un array di struct del PLC (es. “astMeldungen[10].xAktiv”) condivide lo stesso nome con ogni altro elemento: rinominare i campi selezionati qui sotto aggiunge l'indice dell'array al nome, così da poterli distinguere. Vengono modificati solo i nomi delle entità selezionate; un nome già personalizzato manualmente non viene mai sovrascritto.",
+    renameConfirm: "Rinomina selezionati",
+    renaming: "Ridenominazione…",
+    renamed: "Campi rinominati.",
     not_orphan:
       "L’entità non è più orfana o non può essere verificata ora (connessione assente o rilevazione incompleta). Nulla è stato eliminato.",
     remove: "Rimuovi",
@@ -266,6 +274,14 @@ const TEXT = {
     reclassifyConvert: "Convert selected",
     reclassifying: "Reclassifying…",
     reclassified: "Boolean sensors reclassified.",
+    groupedArrays: "Grouped arrays",
+    renameArrayFields: "Rename array fields",
+    renameArrayFieldsTitle: "Disambiguate existing array fields",
+    renameArrayFieldsHelp:
+      'Every field of one PLC array-of-struct element (e.g. "astMeldungen[10].xAktiv") shares the same name with every other element - renaming the ones selected below adds the array index to the name so they can be told apart. Only the selected entities\' names are changed; a name already customized manually is never overridden.',
+    renameConfirm: "Rename selected",
+    renaming: "Renaming…",
+    renamed: "Fields renamed.",
     not_orphan:
       "This entity is no longer orphaned or cannot be verified right now (connection down or discovery incomplete). Nothing was deleted.",
     node_in_use:
@@ -490,6 +506,8 @@ header{display:flex;flex-shrink:0;gap:16px;align-items:center;padding:18px 28px;
 .endpointSubscription{display:flex;flex:1 1 100%;gap:8px 20px;flex-wrap:wrap;align-items:center;min-width:0;padding-top:14px;border-top:1px solid var(--divider-color,#e2e7ef)}.endpointSubscription .hint{flex:1 1 270px;font-size:12px;margin:0}.endpointSubscription #subscription-status,.endpointSubscription .error{flex-basis:100%}.endpointSubscription .toggle{font-weight:600;color:var(--primary-text-color,#243346);padding:4px 0;min-height:36px}.endpointSubscription input[role="switch"]{appearance:none;position:relative;width:42px;min-width:42px;height:24px;padding:0;border:0;border-radius:12px;background:var(--disabled-color,#8695a5);cursor:pointer}.endpointSubscription input[role="switch"]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.endpointSubscription input[role="switch"]:checked{background:var(--primary-color,#008fac)}.endpointSubscription input[role="switch"]:checked::after{left:21px}.endpointSubscription input[role="switch"]:disabled{opacity:.5;cursor:default}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease;overflow:hidden}dialog[open]{opacity:1;transform:none;display:flex;flex-direction:column}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px;overflow-y:auto;flex:1;min-height:0}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:-24px;margin:6px -24px -24px;padding:14px 24px 24px;background:var(--card-background-color,#fff)}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}.orphanTag{color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 15%,transparent)}.card.orphan{border-left-color:var(--error-color,#be3131);border-style:dashed}.card.orphan .cardTitle h3{color:var(--secondary-text-color,#637487)}
 .pickList{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:6px}.pickItem{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:7px;cursor:pointer}.pickItem:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 6%,transparent)}.pickItem input{width:18px;height:18px;min-width:18px;flex-shrink:0;accent-color:var(--primary-color,#008fac)}.pickInfo{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.pickName{font-weight:600;overflow-wrap:anywhere}.pickNodeId{font:11px ui-monospace,monospace;color:var(--secondary-text-color,#637487);overflow-wrap:anywhere}.pickState{font-size:12px;font-weight:600;color:var(--secondary-text-color,#637487);white-space:nowrap;flex-shrink:0}
+.pickArrow{font-size:12px;color:var(--secondary-text-color,#637487);text-align:right;max-width:180px;overflow-wrap:anywhere;flex-shrink:0}
+.arrayGroups{display:flex;flex-direction:column;gap:16px}.arrayGroup{border:1px solid var(--divider-color,#e2e7ef);border-radius:12px;padding:14px}.arrayGroupTitle{margin:0 0 10px;font-size:14px;font-weight:600;color:var(--secondary-text-color,#637487)}
 .entityForm{padding:0;gap:0;overflow:hidden;max-height:inherit;flex:0 1 auto}.editorBody{display:flex;flex-direction:column;gap:17px;padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1}.editorBody>*{flex-shrink:0}.entityForm footer{position:static;flex-shrink:0;flex-wrap:wrap;margin:0;padding:16px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color,#dce2ea)}.entityForm footer .error{flex-basis:100%;overflow-wrap:anywhere}.entityForm footer .error:empty{display:none}
 @media(max-width:870px){.menu{display:inline-flex;align-items:center;justify-content:center}.grid.list .card{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(140px,.8fr);gap:12px}}
 @media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:16px 12px 32px}.endpointPanel{padding:15px;margin-bottom:18px}.toolbar{grid-template-columns:1fr;gap:12px}.endpointMeta{gap:12px}.endpointIdentity{flex-basis:100%}.endpointActions{width:100%}.endpointActions button{flex:1;min-height:44px}.endpointSubscription{gap:5px;padding-top:12px}.endpointSubscription .toggle{width:100%;min-height:44px}.grid{grid-template-columns:1fr}.navRow{gap:10px}nav{gap:3px}nav button{padding:8px 10px;min-height:42px}.card{padding:15px}.grid.list .card{grid-template-columns:minmax(0,1fr);gap:12px;padding:14px}.grid.list .cardBottom{flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--divider-color,#e2e7ef);padding-top:10px}.grid.list .cardBottom .meta{text-align:left}.grid.list .entityState{display:flex;align-items:baseline;gap:10px}.actions button{min-height:42px}form{padding:20px}.entityForm{padding:0}.editorBody{padding:20px}.entityForm footer{padding-left:20px;padding-right:20px}.entityForm footer button{min-height:44px}.headerText p{font-size:12px}}
@@ -768,6 +786,17 @@ class OpcuaNodePanel extends HTMLElement {
       reclassify.textContent = `${this._t("reclassifyBooleans")} (${candidates.length})`;
       endpointActions.append(reclassify);
     }
+    // A field inside a PLC array-of-struct element discovered before this
+    // disambiguation existed keeps its raw, colliding name forever unless
+    // opted in explicitly here.
+    if (endpoint.renamable_array_fields) {
+      const renameCandidates = endpoint.rows.filter((row) => row.renamable);
+      const rename = this._button("renameArrayFields", () =>
+        this._renameArrayFields(renameCandidates),
+      );
+      rename.textContent = `${this._t("renameArrayFields")} (${renameCandidates.length})`;
+      endpointActions.append(rename);
+    }
     endpointPanel.append(meta);
     main.append(endpointPanel);
     const nav = element("nav", undefined, { "aria-label": this._t("all") });
@@ -918,6 +947,122 @@ class OpcuaNodePanel extends HTMLElement {
       add("node_id", this._t("remappedBadge"), `${row.key} → ${row.node_id}`);
     return badges.childElementCount ? badges : null;
   }
+  _buildCard(row) {
+    const type = valueType(row);
+    const card = element("article", undefined, {
+      class: row.orphan ? "card orphan" : "card",
+      "data-platform": row.platform,
+      "data-value-type": type,
+    });
+    const top = element("div", undefined, { class: "cardTop" });
+    const text = element("div", undefined, { class: "cardTitle" });
+    text.append(
+      element("h3", row.name || row.node_id),
+      element("div", row.node_id, { class: "address" }),
+    );
+    top.append(text);
+    // An orphan row may have no cached type (node gone, never "always available").
+    if (row.variant_type)
+      top.append(element("span", row.variant_type, { class: "badge" }));
+    if (row.orphan)
+      top.append(element("span", this._t("orphan"), { class: "orphanTag" }));
+    if (row.manual)
+      top.append(element("span", this._t("manual"), { class: "manualTag" }));
+    const bottom = element("div", undefined, { class: "cardBottom" });
+    const area =
+      this._data.areas.find((a) => a.id === row.area_id)?.name ||
+      this._t("inherit");
+    bottom.append(element("span", area, { class: "meta" }));
+    const actions = element("div", undefined, { class: "actions" });
+    if (row.orphan) {
+      // Nothing left to edit: the only sensible action is cleanup.
+      actions.append(
+        this._button("deleteEntity", () => this._removeOrphan(row), "danger"),
+      );
+    } else {
+      const edit = this._button("edit", () => this._edit(row));
+      edit.disabled = !row.editable;
+      if (!row.editable) edit.title = this._t("notReady");
+      actions.append(edit);
+      if (row.manual)
+        actions.append(
+          this._button("remove", () => this._remove(row), "danger"),
+        );
+    }
+    bottom.append(actions);
+    const state = element("div", undefined, { class: "entityState" });
+    const icon = element("span", undefined, {
+      class: "valueIcon",
+      "aria-hidden": "true",
+    });
+    const content = element("div", undefined, { class: "stateContent" });
+    const labelKey = {
+      numeric: "valueLabel",
+      text: "textLabel",
+      datetime: "dateLabel",
+      boolean: "state",
+    }[type];
+    content.append(
+      element("span", this._t(labelKey), { class: "stateLabel" }),
+      element("span", "", {
+        class: "stateValue",
+        "data-entity-state": row.entity_id || "",
+        "data-platform": row.platform,
+      }),
+    );
+    const retained = element("span", this._t("retainedValue"), {
+      class: "retainedValue",
+      title: this._t("retainedHelp"),
+      hidden: "",
+    });
+    content.append(retained);
+    state.append(icon, content);
+    card.append(top, state, bottom);
+    const customizations = this._customizations(row);
+    if (customizations) card.append(customizations);
+    return card;
+  }
+  _renderArrayGroups(rows) {
+    // Every field of one PLC array-of-struct element (e.g.
+    // "astMeldungen[10]") shares a group key - shown together under one
+    // heading instead of scattered across the sensor/binary_sensor/...
+    // sections above, regardless of how many fields the struct has or
+    // how large the array is.
+    const byGroup = new Map();
+    for (const row of rows) {
+      if (!byGroup.has(row.array_group)) byGroup.set(row.array_group, []);
+      byGroup.get(row.array_group).push(row);
+    }
+    const groups = [...byGroup.values()].sort((a, b) =>
+      a[0].array_label.localeCompare(b[0].array_label, undefined, {
+        numeric: true,
+      }),
+    );
+    const details = element("details", undefined, {
+      class: "group",
+      open: "",
+      "data-platform": "grouped",
+    });
+    details.append(
+      element("summary", `${this._t("groupedArrays")} · ${groups.length}`),
+    );
+    const container = element("div", undefined, { class: "arrayGroups" });
+    for (const fields of groups) {
+      fields.sort((a, b) => (a.array_field > b.array_field ? 1 : -1));
+      const section = element("div", undefined, { class: "arrayGroup" });
+      section.append(
+        element("h3", fields[0].array_label, { class: "arrayGroupTitle" }),
+      );
+      const grid = element("div", undefined, {
+        class: this._viewMode === "list" ? "grid list" : "grid",
+      });
+      for (const row of fields) grid.append(this._buildCard(row));
+      section.append(grid);
+      container.append(section);
+    }
+    details.append(container);
+    this._rows.append(details);
+  }
   _renderRows() {
     if (!this._rows) return;
     this._rows.replaceChildren();
@@ -936,8 +1081,13 @@ class OpcuaNodePanel extends HTMLElement {
         `${r.name} ${r.node_id} ${r.entity_id}`.toLowerCase().includes(query),
     );
     if (!rows.length) this._rows.append(emptyMessage(this._t("empty")));
+    // Grouping by array only makes sense browsing everything at once - a
+    // platform filter or an active search wants its own flat, precise list.
+    const grouping = this._filter === "all" && !query;
+    const groupedRows = grouping ? rows.filter((r) => r.array_group) : [];
+    const ungroupedRows = grouping ? rows.filter((r) => !r.array_group) : rows;
     for (const group of GROUPS) {
-      const items = rows.filter((r) => r.platform === group);
+      const items = ungroupedRows.filter((r) => r.platform === group);
       if (!items.length) continue;
       const details = element("details", undefined, {
         class: "group",
@@ -948,92 +1098,11 @@ class OpcuaNodePanel extends HTMLElement {
       const grid = element("div", undefined, {
         class: this._viewMode === "list" ? "grid list" : "grid",
       });
-      for (const row of items) {
-        const type = valueType(row);
-        const card = element("article", undefined, {
-          class: row.orphan ? "card orphan" : "card",
-          "data-platform": row.platform,
-          "data-value-type": type,
-        });
-        const top = element("div", undefined, { class: "cardTop" });
-        const text = element("div", undefined, { class: "cardTitle" });
-        text.append(
-          element("h3", row.name || row.node_id),
-          element("div", row.node_id, { class: "address" }),
-        );
-        top.append(text);
-        // An orphan row may have no cached type (node gone, never "always available").
-        if (row.variant_type)
-          top.append(element("span", row.variant_type, { class: "badge" }));
-        if (row.orphan)
-          top.append(
-            element("span", this._t("orphan"), { class: "orphanTag" }),
-          );
-        if (row.manual)
-          top.append(
-            element("span", this._t("manual"), { class: "manualTag" }),
-          );
-        const bottom = element("div", undefined, { class: "cardBottom" });
-        const area =
-          this._data.areas.find((a) => a.id === row.area_id)?.name ||
-          this._t("inherit");
-        bottom.append(element("span", area, { class: "meta" }));
-        const actions = element("div", undefined, { class: "actions" });
-        if (row.orphan) {
-          // Nothing left to edit: the only sensible action is cleanup.
-          actions.append(
-            this._button(
-              "deleteEntity",
-              () => this._removeOrphan(row),
-              "danger",
-            ),
-          );
-        } else {
-          const edit = this._button("edit", () => this._edit(row));
-          edit.disabled = !row.editable;
-          if (!row.editable) edit.title = this._t("notReady");
-          actions.append(edit);
-          if (row.manual)
-            actions.append(
-              this._button("remove", () => this._remove(row), "danger"),
-            );
-        }
-        bottom.append(actions);
-        const state = element("div", undefined, { class: "entityState" });
-        const icon = element("span", undefined, {
-          class: "valueIcon",
-          "aria-hidden": "true",
-        });
-        const content = element("div", undefined, { class: "stateContent" });
-        const labelKey = {
-          numeric: "valueLabel",
-          text: "textLabel",
-          datetime: "dateLabel",
-          boolean: "state",
-        }[type];
-        content.append(
-          element("span", this._t(labelKey), { class: "stateLabel" }),
-          element("span", "", {
-            class: "stateValue",
-            "data-entity-state": row.entity_id || "",
-            "data-platform": row.platform,
-          }),
-        );
-        const retained = element("span", this._t("retainedValue"), {
-          class: "retainedValue",
-          title: this._t("retainedHelp"),
-          hidden: "",
-        });
-        content.append(retained);
-        state.append(icon, content);
-        card.append(top, state, bottom);
-        const customizations = this._customizations(row);
-        if (customizations) card.append(customizations);
-        grid.append(card);
-      }
+      for (const row of items) grid.append(this._buildCard(row));
       details.append(grid);
       this._rows.append(details);
     }
+    if (groupedRows.length) this._renderArrayGroups(groupedRows);
     this._paintStates();
   }
   async _setEndpointSubscription(endpoint, enabled) {
@@ -1220,6 +1289,112 @@ class OpcuaNodePanel extends HTMLElement {
         busy = false;
         remove.disabled = cancel.disabled = false;
         remove.textContent = `${this._t("deleteAll")} (${count})`;
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+  }
+  _renameArrayFields(candidates) {
+    const endpoint = this._endpoint();
+    const dialog = element("dialog");
+    this._dialog = dialog;
+    const form = element("form");
+    dialog.append(form);
+    const error = element("div", "", { class: "error", role: "alert" });
+    const cancel = this._button("cancel", () => dialog.close());
+    const confirm = element("button", `${this._t("renameConfirm")} (0)`, {
+      type: "submit",
+      class: "primary",
+    });
+    confirm.disabled = true;
+    const footer = element("footer");
+    footer.append(cancel, confirm);
+    const selectAllLabel = element("label", undefined, { class: "toggle" });
+    const selectAll = element("input", undefined, { type: "checkbox" });
+    selectAllLabel.append(
+      selectAll,
+      element("span", this._t("reclassifySelectAll")),
+    );
+    const list = element("div", undefined, {
+      class: "pickList",
+      role: "group",
+    });
+    const checkboxes = [];
+    const updateConfirm = () => {
+      const selected = checkboxes.filter((box) => box.checked).length;
+      confirm.disabled = selected === 0;
+      confirm.textContent = `${this._t("renameConfirm")} (${selected})`;
+      selectAll.checked = selected > 0 && selected === checkboxes.length;
+      selectAll.indeterminate = selected > 0 && selected < checkboxes.length;
+    };
+    for (const candidate of candidates) {
+      const item = element("label", undefined, { class: "pickItem" });
+      const checkbox = element("input", undefined, { type: "checkbox" });
+      checkbox.value = candidate.key;
+      checkbox.addEventListener("change", updateConfirm);
+      checkboxes.push(checkbox);
+      const info = element("div", undefined, { class: "pickInfo" });
+      info.append(
+        element("span", candidate.name, { class: "pickName" }),
+        element("span", candidate.node_id, { class: "pickNodeId" }),
+      );
+      item.append(
+        checkbox,
+        info,
+        element("span", `→ ${candidate.proposed_name}`, {
+          class: "pickArrow",
+        }),
+      );
+      list.append(item);
+    }
+    selectAll.addEventListener("change", () => {
+      for (const checkbox of checkboxes) checkbox.checked = selectAll.checked;
+      updateConfirm();
+    });
+    form.append(
+      element("h2", this._t("renameArrayFieldsTitle")),
+      element("p", this._t("renameArrayFieldsHelp")),
+      selectAllLabel,
+      list,
+      error,
+      footer,
+    );
+    let busy = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      const keys = checkboxes
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => checkbox.value);
+      if (!keys.length) return;
+      busy = true;
+      confirm.disabled = cancel.disabled = selectAll.disabled = true;
+      for (const checkbox of checkboxes) checkbox.disabled = true;
+      confirm.textContent = this._t("renaming");
+      error.textContent = "";
+      try {
+        await this._hass.callWS({
+          type: "ha_opcua/entity/rename_array_fields",
+          entry_id: endpoint.entry_id,
+          revision: endpoint.revision,
+          keys,
+        });
+        this._notice = this._t("renamed");
+        dialog.close();
+        await this._load();
+      } catch (err) {
+        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        busy = false;
+        cancel.disabled = selectAll.disabled = false;
+        for (const checkbox of checkboxes) checkbox.disabled = false;
+        updateConfirm();
       }
     });
     this.shadowRoot.append(dialog);
