@@ -1,10 +1,17 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.1.1";
+const PANEL_VERSION = "1.2.0";
 const TEXT = {
   it: {
     version: "Integrazione",
     panelVersion: "Pannello",
+    customizations: "Personalizzazioni salvate",
+    invertedBadge: "Stato invertito",
+    classBadge: "Classe",
+    rangeBadge: "Limiti",
+    lengthBadge: "Caratteri",
+    remappedBadge: "NodeId riassegnato",
+    subscriptionBadge: "Subscription configurata",
     valueLabel: "Valore",
     textLabel: "Testo",
     dateLabel: "Data e ora",
@@ -175,6 +182,13 @@ const TEXT = {
   en: {
     version: "Integration",
     panelVersion: "Panel",
+    customizations: "Saved customizations",
+    invertedBadge: "Inverted state",
+    classBadge: "Class",
+    rangeBadge: "Limits",
+    lengthBadge: "Characters",
+    remappedBadge: "Reassigned NodeId",
+    subscriptionBadge: "Subscription configured",
     valueLabel: "Value",
     textLabel: "Text",
     dateLabel: "Date and time",
@@ -455,6 +469,8 @@ dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:mi
 .grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:10px;align-items:start}.card{padding:12px 14px;border-radius:11px}.card h3{font-size:14px;margin-bottom:3px}.address{font-size:10px}.cardTop .badge{font-size:10px;padding:2px 6px}.entityState{display:flex;align-items:center;gap:12px;flex:0 0 auto;margin-top:12px;min-height:48px}.valueIcon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;flex:0 0 38px;border-radius:10px;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}.valueIcon svg{width:23px;height:23px}.stateContent{min-width:0;flex:1}.stateLabel{font-size:10px;margin-bottom:2px}.stateValue{font-size:26px;font-weight:650;line-height:1.25;max-height:5em}.card[data-value-type="text"] .stateValue{font-size:15px;font-weight:400;line-height:1.45}.card[data-value-type="text"] .valueIcon{color:var(--accent-text);background:color-mix(in srgb,var(--accent-text) 10%,transparent)}.card[data-value-type="datetime"] .stateValue{font-size:15px;font-weight:500;line-height:1.45}.card[data-value-type="boolean"] .stateValue{font-size:16px;font-weight:600}.card[data-value-type="boolean"] .valueIcon{border-radius:50%;color:var(--secondary-text-color,#637487);background:color-mix(in srgb,var(--secondary-text-color,#637487) 10%,transparent)}.card[data-tone="active"] .valueIcon{color:var(--primary-color,#008fac);background:color-mix(in srgb,var(--primary-color,#008fac) 15%,transparent)}.card[data-tone="active"] .stateValue{color:var(--primary-color,#008fac)}.card[data-tone="alert"] .valueIcon{color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 12%,transparent)}.card[data-tone="alert"] .stateValue{color:var(--error-color,#be3131)}.card:not([data-state-kind="value"]) .stateValue{font-size:14px;font-weight:400;color:var(--secondary-text-color,#637487)}.card:not([data-state-kind="value"]) .valueIcon{color:var(--secondary-text-color,#637487);background:color-mix(in srgb,var(--secondary-text-color,#637487) 8%,transparent)}.card[data-state-kind="empty"] .stateValue{font-style:italic}.retainedValue{display:inline-block;font-size:10px;line-height:1.4;margin-top:5px;padding:2px 6px;border-radius:4px;color:var(--primary-text-color,#243346);background:color-mix(in srgb,var(--warning-color,#e0a000) 18%,var(--card-background-color,#fff))}.cardBottom{margin-top:8px;padding-top:0;border-top:0;gap:8px}.cardBottom .meta{font-size:11px}.cardBottom .actions button{padding:5px 10px;min-height:32px;font-size:12px}.grid.list .card{padding:10px 14px;gap:16px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(150px,.55fr)}.grid.list .entityState{margin:0;min-height:40px;gap:10px}.grid.list .stateValue{font-size:21px}.grid.list .card[data-value-type="text"] .stateValue,.grid.list .card[data-value-type="datetime"] .stateValue{font-size:14px}.grid.list .card[data-value-type="boolean"] .stateValue{font-size:15px}.grid.list .card:not([data-state-kind="value"]) .stateValue{font-size:14px}.grid.list .valueIcon{width:32px;height:32px;flex-basis:32px}.grid.list .valueIcon svg{width:20px;height:20px}
 @media(max-width:650px){.grid{grid-template-columns:1fr}.card{padding:12px}.grid.list .card{grid-template-columns:minmax(0,1fr);gap:10px;padding:12px}.grid.list .entityState{align-items:center}.cardBottom .actions button{min-height:44px;padding:8px 12px}.cardBottom .meta{font-size:11px}}
 .card{--value-accent:var(--accent)}.card[data-value-type="text"]{--value-accent:var(--accent-text)}.card[data-value-type="datetime"]{--value-accent:var(--accent-datetime)}.card[data-value-type="boolean"]{--value-accent:var(--secondary-text-color,#637487)}.card[data-tone="active"]{--value-accent:var(--primary-color,#008fac)}.card[data-tone="alert"]{--value-accent:var(--error-color,#be3131)}.card:not([data-state-kind="value"]){--value-accent:var(--secondary-text-color,#637487)}.entityState{margin-top:8px;padding:6px 10px;gap:10px;border:1px solid color-mix(in srgb,var(--value-accent) 24%,transparent);border-radius:10px;background:color-mix(in srgb,var(--value-accent) 9%,var(--card-background-color,#fff));max-width:100%}.card .entityState .valueIcon{width:30px;height:30px;flex-basis:30px;background:transparent;color:var(--value-accent)}.grid.list .entityState{width:fit-content;max-width:100%;padding:6px 10px}.card[data-tone="alert"] .stateValue{color:color-mix(in srgb,var(--error-color,#be3131) 70%,var(--primary-text-color,#243346))}
+.customizations{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;min-width:0;order:2}.customizationBadge{padding:3px 7px;border-radius:5px;background:color-mix(in srgb,var(--secondary-text-color,#637487) 8%,transparent);border:1px solid var(--divider-color,#dce2ea);color:var(--secondary-text-color,#637487);font-size:11px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}.cardBottom{order:3}.grid.list .cardBottom{order:0}.grid.list .customizations{grid-column:1/-1;order:1;margin-top:-4px}.grid.list .card:has(.customizations){row-gap:10px}
+@media(max-width:650px){.grid.list .customizations{margin-top:0}.grid.list .cardBottom{order:2}}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
@@ -771,6 +787,92 @@ class OpcuaNodePanel extends HTMLElement {
     main.append(element("p", this._t("info"), { class: "hint" }));
     this._paintStates();
   }
+  _customizations(row) {
+    // Orphans may share settings with a replacement entity; do not attribute
+    // that replacement's configuration to the obsolete entity.
+    if (row.orphan) return null;
+    const settings = row.settings || {};
+    const badges = element("div", undefined, {
+      class: "customizations",
+      role: "list",
+      "aria-label": this._t("customizations"),
+    });
+    const add = (key, text, help = text) =>
+      badges.append(
+        element("span", text, {
+          class: "customizationBadge",
+          role: "listitem",
+          "data-setting": key,
+          title: help,
+        }),
+      );
+    const number = (n) =>
+      new Intl.NumberFormat(this._hass?.language || "en", {
+        maximumSignificantDigits: 17,
+      }).format(n);
+    const floating = ["Float", "Double"].includes(row.variant_type);
+    if (row.invert_state) add("invert_state", this._t("invertedBadge"));
+    if (row.platform === "binary_sensor" && row.device_class) {
+      const name =
+        this._hass.localize?.(
+          `component.binary_sensor.entity_component.${row.device_class}.name`,
+        ) || row.device_class;
+      add("device_class", `${this._t("classBadge")}: ${name}`);
+    }
+    if (floating && settings.precision != null)
+      add(
+        "precision",
+        `${this._t("precision")}: ${settings.precision}`,
+        this._t("precisionHelp"),
+      );
+    if (settings.always_available === true)
+      add(
+        "always_available",
+        this._t("alwaysAvailable"),
+        this._t("alwaysAvailableHelp"),
+      );
+    if (settings.update_mode === "subscription") {
+      add(
+        "update_mode",
+        this._t("subscriptionBadge"),
+        this._t("updateModeHelp"),
+      );
+      const deadband = settings.deadband;
+      if (
+        ["sensor", "number"].includes(row.platform) &&
+        NUMERIC.has(row.variant_type) &&
+        Number.isFinite(deadband) &&
+        deadband !== (floating ? 0.01 : 1)
+      ) {
+        add(
+          "deadband",
+          `${this._t("deadband")}: ${number(deadband)}`,
+          this._t("deadbandHelp"),
+        );
+      }
+    }
+    if (row.platform === "number") {
+      const min = settings.min ?? 0;
+      const max = settings.max ?? 100;
+      if (min !== 0 || max !== 100)
+        add(
+          "range",
+          `${this._t("rangeBadge")}: ${number(min)} – ${number(max)}`,
+        );
+      const step = settings.step;
+      if (Number.isFinite(step) && step !== (floating ? 0.1 : 1))
+        add("step", `${this._t("step")}: ${number(step)}`);
+    }
+    if (row.platform === "text") {
+      const min = settings.min_length ?? 0;
+      const max = settings.max_length ?? 255;
+      if (min !== 0 || max !== 255)
+        add("length", `${this._t("lengthBadge")}: ${min} – ${max}`);
+    }
+    if (row.key && row.node_id && row.node_id !== row.key)
+      add("node_id", this._t("remappedBadge"), `${row.key} → ${row.node_id}`);
+    return badges.childElementCount ? badges : null;
+  }
   _renderRows() {
     if (!this._rows) return;
     this._rows.replaceChildren();
@@ -880,6 +982,8 @@ class OpcuaNodePanel extends HTMLElement {
         content.append(retained);
         state.append(icon, content);
         card.append(top, state, bottom);
+        const customizations = this._customizations(row);
+        if (customizations) card.append(customizations);
         grid.append(card);
       }
       details.append(grid);

@@ -261,7 +261,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.1.1",
+    "Pannello 1.2.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1294,7 +1294,7 @@ for (const [width, dark] of [
         const nodeId = `ns=4;s="ProductionLine"."Counter_${i}"`;
         endpoint.rows.push({
           ...endpoint.rows[2],
-          key: `extra${i}`,
+          key: nodeId,
           node_id: nodeId,
           name:
             i === 0
@@ -1458,7 +1458,7 @@ for (const [width, dark] of [
           const entity_id = `${platform}.sample${i}`;
           window.testHass.states[entity_id] = { state, attributes };
           return {
-            key: `sample${i}`,
+            key: `ns=4;i=${i + 5}`,
             node_id: `ns=4;i=${i + 5}`,
             name,
             variant_type,
@@ -1579,6 +1579,147 @@ for (const [width, dark] of [
       await card("Allarme").locator(".valueIcon").getAttribute("data-icon"),
       "unknown",
     );
+    await page.close();
+  });
+}
+
+for (const width of [1280, 390]) {
+  test(`saved customizations are compact, conditional and update after saving at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page.evaluate(async () => {
+      const endpoint = window.fixture.endpoints[0];
+      Object.assign(endpoint.rows[0], {
+        settings: { always_available: false, update_mode: "polling" },
+      });
+      Object.assign(endpoint.rows[1], { invert_state: true });
+      Object.assign(endpoint.rows[2], {
+        platform: "number",
+        node_id: "ns=4;i=30",
+        settings: {
+          precision: 0,
+          always_available: true,
+          update_mode: "subscription",
+          deadband: 0,
+          min: -10,
+          max: 50,
+          step: 0.5,
+        },
+      });
+      endpoint.rows[3].settings = { min_length: 0, max_length: 64 };
+      window.testHass.localize = (key) =>
+        key.endsWith(".door.name") ? "Porta" : "";
+      const panel = document.querySelector("opcua-node-panel");
+      panel.hass = { ...window.testHass };
+      await panel._load();
+    });
+    const card = (name) =>
+      page
+        .locator("article")
+        .filter({ has: page.getByRole("heading", { name, exact: true }) });
+    const number = card("Velocità linea");
+    assert.equal(
+      await card("Marcia macchina").locator(".customizations").count(),
+      0,
+    );
+    assert.equal(
+      await number.locator('[data-setting="precision"]').textContent(),
+      "Decimali: 0",
+    );
+    assert.equal(
+      await number.locator('[data-setting="deadband"]').textContent(),
+      "Deadband: 0",
+    );
+    assert.equal(
+      await number.locator('[data-setting="range"]').textContent(),
+      "Limiti: -10 – 50",
+    );
+    assert.equal(
+      await number.locator('[data-setting="step"]').textContent(),
+      "Passo: 0,5",
+    );
+    assert.equal(
+      await number.locator('[data-setting="node_id"]').getAttribute("title"),
+      "ns=4;i=3 → ns=4;i=30",
+    );
+    assert.equal(
+      await number.locator('[data-setting="update_mode"]').textContent(),
+      "Subscription configurata",
+    );
+    assert.equal(
+      await card("Porta protezione")
+        .locator('[data-setting="device_class"]')
+        .textContent(),
+      "Classe: Porta",
+    );
+    assert.equal(
+      await card("Nome ricetta")
+        .locator('[data-setting="length"]')
+        .textContent(),
+      "Caratteri: 0 – 64",
+    );
+    for (const mode of ["Vista a riquadri", "Vista a elenco"]) {
+      await page.getByRole("button", { name: mode, exact: true }).click();
+      assert.equal(
+        await page
+          .locator(".content")
+          .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+        false,
+      );
+      assert.equal(
+        await number.evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+        false,
+      );
+      const state = await number.locator(".entityState").boundingBox();
+      const badges = await number.locator(".customizations").boundingBox();
+      assert.ok(
+        badges.y >= state.y + state.height,
+        "saved settings are separate from live state",
+      );
+      await number.scrollIntoViewIfNeeded();
+      await shot(
+        page,
+        `customizations-${width}-${mode.endsWith("elenco") ? "list" : "grid"}.png`,
+      );
+    }
+    // Use the real save handler: clearing an override must remove its badge.
+    await card("Porta protezione")
+      .getByRole("button", { name: "Modifica", exact: true })
+      .click();
+    const dialog = page.locator("dialog");
+    await dialog
+      .getByLabel("Inverti stato booleano", { exact: true })
+      .uncheck();
+    await dialog
+      .getByLabel("Classe dispositivo", { exact: true })
+      .selectOption("");
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(
+      await card("Porta protezione").locator(".customizations").count(),
+      0,
+    );
+    // Default limits and inactive deadband must not add noise; orphan settings
+    // belong to the replacement entity and should not be repeated on the orphan.
+    await page.evaluate(async () => {
+      const rows = window.fixture.endpoints[0].rows;
+      rows[2].node_id = rows[2].key;
+      rows[2].settings = {
+        min: 0,
+        max: 100,
+        step: 0.1,
+        precision: null,
+        update_mode: "polling",
+        deadband: 0.5,
+      };
+      rows[3].settings = { min_length: 0, max_length: 255 };
+      rows[0].orphan = true;
+      rows[0].settings = {
+        always_available: true,
+        update_mode: "subscription",
+      };
+      await document.querySelector("opcua-node-panel")._load();
+    });
+    assert.equal(await page.locator(".customizations").count(), 0);
     await page.close();
   });
 }
