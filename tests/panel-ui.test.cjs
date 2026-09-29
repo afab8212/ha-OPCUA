@@ -255,7 +255,14 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
-  assert.equal(await page.locator(".version").textContent(), "Versione 2.1.0");
+  assert.equal(
+    await page.locator(".integrationVersion").textContent(),
+    "Integrazione 2.1.0",
+  );
+  assert.equal(
+    await page.locator(".panelVersion").textContent(),
+    "Pannello 1.0.0",
+  );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
     0,
@@ -1344,6 +1351,74 @@ for (const [width, dark] of [
         `polish-${width}-${dark ? "dark" : "light"}-${mode.endsWith("elenco") ? "list" : "grid"}.png`,
       );
     }
+    await page.close();
+  });
+}
+
+for (const width of [1280, 390, 320]) {
+  test(`entity editor actions stay visible while fields scroll at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width, height: 620 });
+    await page
+      .locator("article")
+      .filter({ hasText: "Velocità linea" })
+      .getByRole("button", { name: "Modifica" })
+      .click();
+    const dialog = page.locator("dialog");
+    await dialog
+      .getByLabel("Categoria", { exact: true })
+      .selectOption("number");
+    const body = dialog.locator(".editorBody");
+    const footer = dialog.locator("footer");
+    const assertActionsVisible = async () => {
+      const viewport = page.viewportSize();
+      for (const label of ["Annulla", "Salva"]) {
+        const button = dialog.getByRole("button", { name: label, exact: true });
+        const box = await button.boundingBox();
+        assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height);
+        assert.ok(box.x >= 0 && box.x + box.width <= viewport.width);
+        // Check actual hit testing, not just presence in the DOM.
+        assert.equal(
+          await button.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return (
+              el
+                .getRootNode()
+                .elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === el
+            );
+          }),
+          true,
+        );
+      }
+      const fields = await body.boundingBox();
+      const actions = await footer.boundingBox();
+      assert.ok(fields.y + fields.height <= actions.y + 1);
+    };
+    await body.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await assertActionsVisible();
+    const top = (await footer.boundingBox()).y;
+    await body.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    assert.ok(await body.evaluate((el) => el.scrollTop > 0));
+    await assertActionsVisible();
+    assert.ok(Math.abs((await footer.boundingBox()).y - top) < 1);
+    // A reduced viewport also covers landscape / constrained-height layouts.
+    await page.setViewportSize({ width, height: 400 });
+    await assertActionsVisible();
+    await shot(page, `editor-fixed-actions-${width}.png`);
+    await page.evaluate(() => {
+      window.failSave = true;
+    });
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await dialog.getByRole("alert").filter({ hasText: /.+/ }).waitFor();
+    await assertActionsVisible();
+    await shot(page, `editor-fixed-actions-error-${width}.png`);
+    await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    assert.equal(await page.locator("dialog").count(), 0);
     await page.close();
   });
 }

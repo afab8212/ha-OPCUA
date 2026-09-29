@@ -1,7 +1,10 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
+// Bump for every frontend change; displayed from the loaded JavaScript bundle.
+const PANEL_VERSION = "1.0.0";
 const TEXT = {
   it: {
-    version: "Versione",
+    version: "Integrazione",
+    panelVersion: "Pannello",
     alwaysAvailable: "Sempre disponibile",
     alwaysAvailableHelp:
       "Mantiene l’ultimo valore noto quando il PLC è scollegato o la connessione è disabilitata. Senza un valore salvato lo stato è sconosciuto. Le scritture richiedono la connessione e una lettura aggiornata.",
@@ -165,7 +168,8 @@ const TEXT = {
     info: "Configura categoria e limiti da Modifica. Le impostazioni di connessione restano nelle opzioni dell’integrazione.",
   },
   en: {
-    version: "Version",
+    version: "Integration",
+    panelVersion: "Panel",
     alwaysAvailable: "Always available",
     alwaysAvailableHelp:
       "Keeps the last known value when the PLC is disconnected or the connection is disabled. Without a saved value the state is unknown. Writes require a connection and a fresh reading.",
@@ -390,8 +394,9 @@ header{display:flex;flex-shrink:0;gap:16px;align-items:center;padding:18px 28px;
 [data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
 .endpointSubscription{display:flex;flex:1 1 100%;gap:8px 20px;flex-wrap:wrap;align-items:center;min-width:0;padding-top:14px;border-top:1px solid var(--divider-color,#e2e7ef)}.endpointSubscription .hint{flex:1 1 270px;font-size:12px;margin:0}.endpointSubscription #subscription-status,.endpointSubscription .error{flex-basis:100%}.endpointSubscription .toggle{font-weight:600;color:var(--primary-text-color,#243346);padding:4px 0;min-height:36px}.endpointSubscription input[role="switch"]{appearance:none;position:relative;width:42px;min-width:42px;height:24px;padding:0;border:0;border-radius:12px;background:var(--disabled-color,#8695a5);cursor:pointer}.endpointSubscription input[role="switch"]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.endpointSubscription input[role="switch"]:checked{background:var(--primary-color,#008fac)}.endpointSubscription input[role="switch"]:checked::after{left:21px}.endpointSubscription input[role="switch"]:disabled{opacity:.5;cursor:default}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease;overflow:hidden}dialog[open]{opacity:1;transform:none;display:flex;flex-direction:column}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px;overflow-y:auto;flex:1;min-height:0}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:-24px;margin:6px -24px -24px;padding:14px 24px 24px;background:var(--card-background-color,#fff)}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}.orphanTag{color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 15%,transparent)}.card.orphan{border-left-color:var(--error-color,#be3131);border-style:dashed}.card.orphan .cardTitle h3{color:var(--secondary-text-color,#637487)}
+.entityForm{padding:0;gap:0;overflow:hidden;max-height:inherit;flex:0 1 auto}.editorBody{display:flex;flex-direction:column;gap:17px;padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1}.editorBody>*{flex-shrink:0}.entityForm footer{position:static;flex-shrink:0;flex-wrap:wrap;margin:0;padding:16px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color,#dce2ea)}.entityForm footer .error{flex-basis:100%;overflow-wrap:anywhere}.entityForm footer .error:empty{display:none}
 @media(max-width:870px){.menu{display:inline-flex;align-items:center;justify-content:center}.grid.list .card{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(140px,.8fr);gap:12px}}
-@media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:16px 12px 32px}.endpointPanel{padding:15px;margin-bottom:18px}.toolbar{grid-template-columns:1fr;gap:12px}.endpointMeta{gap:12px}.endpointIdentity{flex-basis:100%}.endpointActions{width:100%}.endpointActions button{flex:1;min-height:44px}.endpointSubscription{gap:5px;padding-top:12px}.endpointSubscription .toggle{width:100%;min-height:44px}.grid{grid-template-columns:1fr}.navRow{gap:10px}nav{gap:3px}nav button{padding:8px 10px;min-height:42px}.card{padding:15px}.grid.list .card{grid-template-columns:minmax(0,1fr);gap:12px;padding:14px}.grid.list .cardBottom{flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--divider-color,#e2e7ef);padding-top:10px}.grid.list .cardBottom .meta{text-align:left}.grid.list .entityState{display:flex;align-items:baseline;gap:10px}.actions button{min-height:42px}form{padding:20px}.headerText p{font-size:12px}}
+@media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:16px 12px 32px}.endpointPanel{padding:15px;margin-bottom:18px}.toolbar{grid-template-columns:1fr;gap:12px}.endpointMeta{gap:12px}.endpointIdentity{flex-basis:100%}.endpointActions{width:100%}.endpointActions button{flex:1;min-height:44px}.endpointSubscription{gap:5px;padding-top:12px}.endpointSubscription .toggle{width:100%;min-height:44px}.grid{grid-template-columns:1fr}.navRow{gap:10px}nav{gap:3px}nav button{padding:8px 10px;min-height:42px}.card{padding:15px}.grid.list .card{grid-template-columns:minmax(0,1fr);gap:12px;padding:14px}.grid.list .cardBottom{flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--divider-color,#e2e7ef);padding-top:10px}.grid.list .cardBottom .meta{text-align:left}.grid.list .entityState{display:flex;align-items:baseline;gap:10px}.actions button{min-height:42px}form{padding:20px}.entityForm{padding:0}.editorBody{padding:20px}.entityForm footer{padding-left:20px;padding-right:20px}.entityForm footer button{min-height:44px}.headerText p{font-size:12px}}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
@@ -498,10 +503,15 @@ class OpcuaNodePanel extends HTMLElement {
     if (this._data?.version) {
       titleRow.append(
         element("span", `${this._t("version")} ${this._data.version}`, {
-          class: "badge version",
+          class: "badge version integrationVersion",
         }),
       );
     }
+    titleRow.append(
+      element("span", `${this._t("panelVersion")} ${PANEL_VERSION}`, {
+        class: "badge version panelVersion",
+      }),
+    );
     title.append(titleRow, element("p", this._t("subtitle")));
     header.append(
       menu,
@@ -1150,9 +1160,11 @@ class OpcuaNodePanel extends HTMLElement {
     const revision = endpoint.revision;
     const dialog = element("dialog");
     this._dialog = dialog;
-    const form = element("form");
+    const form = element("form", undefined, { class: "entityForm" });
+    const body = element("div", undefined, { class: "editorBody" });
+    form.append(body);
     dialog.append(form);
-    form.append(
+    body.append(
       element(
         "h2",
         `${this._t(manual ? "add" : "edit")} · ${row.name || row.node_id}`,
@@ -1165,7 +1177,7 @@ class OpcuaNodePanel extends HTMLElement {
     });
     name.value = row.custom_name ?? "";
     name.placeholder = row.name || "";
-    form.append(
+    body.append(
       this._field("name", name),
       element("p", this._t("nameHelp"), { class: "hint" }),
     );
@@ -1174,7 +1186,7 @@ class OpcuaNodePanel extends HTMLElement {
     for (const item of this._data.areas)
       area.append(element("option", item.name, { value: item.id }));
     area.value = row.area_id || "";
-    form.append(this._field("area", area));
+    body.append(this._field("area", area));
     const availableNodes = manual ? [manual.node] : endpoint.nodes;
     const originalPlatform = row.platform;
     const category = element("select");
@@ -1231,15 +1243,15 @@ class OpcuaNodePanel extends HTMLElement {
     };
     populateCategories();
     populate();
-    form.append(this._field("category", category));
+    body.append(this._field("category", category));
     const categoryHelp = element("p", "", { class: "hint" });
-    form.append(categoryHelp);
+    body.append(categoryHelp);
     nodeFilter.addEventListener("input", populate);
-    if (!manual) form.append(this._field("filterNodes", nodeFilter));
+    if (!manual) body.append(this._field("filterNodes", nodeFilter));
     nodes.disabled = !!manual;
-    form.append(this._field("node", nodes));
+    body.append(this._field("node", nodes));
     if (!manual)
-      form.append(element("p", this._t("nodeHelp"), { class: "hint" }));
+      body.append(element("p", this._t("nodeHelp"), { class: "hint" }));
     const effective = () =>
       category.value === "auto"
         ? selectedNode()?.writable
@@ -1255,7 +1267,7 @@ class OpcuaNodePanel extends HTMLElement {
     for (const mode of ["polling", "subscription"])
       updateMode.append(element("option", this._t(mode), { value: mode }));
     updateMode.value = initial.update_mode || "polling";
-    form.append(
+    body.append(
       this._field("updateMode", updateMode),
       element("p", this._t("updateModeHelp"), { class: "hint" }),
     );
@@ -1269,7 +1281,7 @@ class OpcuaNodePanel extends HTMLElement {
       alwaysAvailable,
       element("span", this._t("alwaysAvailable")),
     );
-    form.append(
+    body.append(
       availabilityToggle,
       element("p", this._t("alwaysAvailableHelp"), { class: "hint" }),
     );
@@ -1304,10 +1316,10 @@ class OpcuaNodePanel extends HTMLElement {
         group.append(this._field(key, input));
       }
       limitGroups[platform] = group;
-      form.append(group);
+      body.append(group);
     }
     const limitsHelp = element("p", this._t("limitsHelp"), { class: "hint" });
-    form.append(limitsHelp);
+    body.append(limitsHelp);
     const precision = element("input", undefined, {
       type: "number",
       name: "precision",
@@ -1320,7 +1332,7 @@ class OpcuaNodePanel extends HTMLElement {
     const precisionHelp = element("p", this._t("precisionHelp"), {
       class: "hint",
     });
-    form.append(precisionField, precisionHelp);
+    body.append(precisionField, precisionHelp);
     const deadband = element("input", undefined, {
       type: "number",
       name: "deadband",
@@ -1332,7 +1344,7 @@ class OpcuaNodePanel extends HTMLElement {
     const deadbandHelp = element("p", this._t("deadbandHelp"), {
       class: "hint",
     });
-    form.append(deadbandField, deadbandHelp);
+    body.append(deadbandField, deadbandHelp);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     for (const cls of this._data.device_classes)
@@ -1347,7 +1359,7 @@ class OpcuaNodePanel extends HTMLElement {
       );
     deviceClass.value = row.device_class || "";
     const classField = this._field("deviceClass", deviceClass);
-    form.append(classField);
+    body.append(classField);
     const invert = element("input", undefined, {
       type: "checkbox",
       name: "invert",
@@ -1356,7 +1368,7 @@ class OpcuaNodePanel extends HTMLElement {
     const toggle = element("label", undefined, { class: "toggle" });
     toggle.append(invert, element("span", this._t("invert")));
     const invertHelp = element("p", this._t("invertHelp"), { class: "hint" });
-    form.append(toggle, invertHelp);
+    body.append(toggle, invertHelp);
     const updateFields = () => {
       const platform = effective();
       classField.hidden = platform !== "binary_sensor";
@@ -1399,14 +1411,13 @@ class OpcuaNodePanel extends HTMLElement {
     });
     updateFields();
     const error = element("div", "", { class: "error", role: "alert" });
-    form.append(error);
     const footer = element("footer");
     const cancel = this._button("cancel", () => dialog.close());
     const save = element("button", this._t("save"), {
       type: "submit",
       class: "primary",
     });
-    footer.append(cancel, save);
+    footer.append(error, cancel, save);
     form.append(footer);
     let saving = false;
     dialog.addEventListener("cancel", (event) => {

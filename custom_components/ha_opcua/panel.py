@@ -55,6 +55,11 @@ async def async_setup_panel(hass):
     if PANEL_DATA in hass.data:
         return
     version = (await async_get_integration(hass, DOMAIN)).manifest["version"]
+    # Invalidate cached frontend assets even for panel-only updates.
+    panel_source = await hass.async_add_executor_job(
+        (Path(__file__).parent / "www" / "panel.js").read_bytes
+    )
+    panel_hash = hashlib.sha256(panel_source).hexdigest()[:16]
     await hass.http.async_register_static_paths(
         [StaticPathConfig("/ha-opcua-panel", str(Path(__file__).parent / "www"), True)]
     )
@@ -64,7 +69,7 @@ async def async_setup_panel(hass):
         webcomponent_name="opcua-node-panel",
         sidebar_title="OPC UA",
         sidebar_icon="mdi:lan-connect",
-        module_url=f"/ha-opcua-panel/panel.js?v={version}",
+        module_url=f"/ha-opcua-panel/panel.js?v={version}&panel={panel_hash}",
         require_admin=True,
     )
     websocket_api.async_register_command(hass, ws_snapshot)
