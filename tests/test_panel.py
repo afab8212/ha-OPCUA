@@ -305,3 +305,43 @@ async def test_panel_number_limits_and_enabling_unregistered_excluded_node(hass,
         settings = entry.options[CONF_NODE_SETTINGS][msg["key"]]
         assert (settings["min"], settings["max"], settings["step"]) == (0, 200, 2)
     await c.async_shutdown()
+
+
+async def test_snapshot_resolves_renamed_subscription_switch(hass, entry):
+    c, _, _ = await prepare(hass, entry)
+    registry = er.async_get(hass)
+    try:
+        assert endpoint_snapshot(hass, entry)["subscription_entity"] is None
+        switch = registry.async_get_or_create(
+            "switch",
+            DOMAIN,
+            f"{entry.entry_id}:subscription_enabled",
+            config_entry=entry,
+        )
+        switch = registry.async_update_entity(
+            switch.entity_id, new_entity_id="switch.custom_subscription_name"
+        )
+        assert endpoint_snapshot(hass, entry)["subscription_entity"] == switch.entity_id
+    finally:
+        await c.async_shutdown()
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_live_subscription_toggle_does_not_invalidate_node_editor(
+    hass, entry, enabled
+):
+    from custom_components.ha_opcua.const import CONF_SUBSCRIPTION_ENABLED
+
+    c, _, msg = await prepare(hass, entry)
+    try:
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_SUBSCRIPTION_ENABLED: enabled}
+        )
+        assert endpoint_snapshot(hass, entry)["revision"] == msg["revision"]
+        await async_save_entity(hass, msg)
+        assert entry.options[CONF_SUBSCRIPTION_ENABLED] is enabled
+        assert (
+            entry.options[CONF_NODE_SETTINGS][msg["key"]]["node_id"] == msg["node_id"]
+        )
+    finally:
+        await c.async_shutdown()

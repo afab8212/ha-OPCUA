@@ -121,7 +121,7 @@ To add a node that discovery did not find, select the endpoint and click **Add e
 
 Manual nodes are persisted independently of discovery and verified again on reload. They can be outside the configured discovery root, including when that root is inaccessible. Temporarily unreadable manual nodes are retried during normal polling; disabling the connection stops these attempts too. A node later found by discovery does not create a duplicate. Invalid IDs, objects, arrays, unreadable nodes and duplicate entities are rejected. A manual node remains subject to the PLC's authentication and access permissions.
 
-Category and number/text limits are editable directly in the panel for existing and new manual entities. New number entities default to min 0, max 100 and step 1 for integers or 0.1 for floats; text defaults to 0–255 characters. Connection settings remain in integration options. The older node options flow remains available for compatibility. Discovery still runs at setup/reload. The connection switch, Auto-Subscription switch and connectivity sensor remain standard HA entities outside the node editor.
+Category and number/text limits are editable directly in the panel for existing and new manual entities. New number entities default to min 0, max 100 and step 1 for integers or 0.1 for floats; text defaults to 0–255 characters. Connection settings remain in integration options. The older node options flow remains available for compatibility. Discovery still runs at setup/reload. The connection switch, Auto-Subscription switch and connectivity sensor remain standard HA entities. The panel also mirrors Auto-Subscription next to **Rediscover** for the selected endpoint.
 
 Changing an entity domain (for example sensor → number) creates or restores an entity in that domain, retaining its logical NodeId identity, name and area. Its entity ID may change, so update automation and dashboard references. The previous domain’s registry entry is retained but disabled by the integration; returning to that category restores its previous entity ID. Explicit user-disabled entries remain disabled. Editing limits without changing domains preserves the entity ID. Choosing Excluded disables the entity and periodic reads while retaining number/text limits; select a compatible category to enable it again.
 
@@ -144,7 +144,7 @@ Panel JavaScript is bundled with the integration and uses a versioned URL; no se
 1. Open **OPC UA** in the Home Assistant sidebar and select the endpoint.
 2. Click **Edit** (**Modifica**) on an entity. Under **Update mode** (**Modalità aggiornamento**), select **Polling + subscription**. This is also available when adding a manual node.
 3. For numeric sensors or numbers, optionally adjust **Deadband**. Save and allow the endpoint to reload. Repeat for the other entities that should receive notifications.
-4. On the endpoint’s Home Assistant device page, turn on **Auto-Subscription**. You can also enable it in the integration’s connection options. **Connection enabled** must be on and the PLC reachable.
+4. Turn on **Endpoint Auto-Subscription** (**Auto-Subscription endpoint**) next to **Rediscover** at the top of the panel. It controls the same switch entity available on the device page and in automations. Connection options remain another way to set it. You can save the choice with the PLC offline or the connection disabled; notifications start when the connection is enabled and the PLC is reachable.
 
 The two update modes apply independently to each entity:
 
@@ -153,6 +153,8 @@ The two update modes apply independently to each entity:
 | Polling only / Solo polling (default) | Off or on | Reads at the configured scan interval |
 | Polling + subscription | Off | Reads at the configured scan interval; the entity’s selection is retained |
 | Polling + subscription | On | Periodic reads plus OPC UA data-change notifications |
+
+The panel control follows the switch entity’s live state, including changes from automations or the device page. Switching endpoints shows the selected endpoint’s own setting. While a request is pending, the control is temporarily disabled; failures leave the actual switch state visible and show an error. If the integration or switch entity is disabled, missing or unavailable, the panel control is unavailable too. The toggle does not change any per-entity update-mode selection.
 
 The **Auto-Subscription** switch is a master enable for that endpoint, not a command to subscribe to every node. It takes effect without reloading the endpoint. With no active entity selected for subscriptions, no subscription is opened, even if the switch is on. Excluded entities are neither polled nor subscribed.
 
