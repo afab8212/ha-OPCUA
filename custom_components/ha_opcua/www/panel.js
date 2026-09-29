@@ -6,6 +6,13 @@ const TEXT = {
     alwaysAvailableHelp:
       "Mantiene l’ultimo valore noto quando il PLC è scollegato o la connessione è disabilitata. Senza un valore salvato lo stato è sconosciuto. Le scritture richiedono la connessione e una lettura aggiornata.",
     invalid_availability: "Impostazione di disponibilità non valida.",
+    endpointSubscription: "Auto-Subscription endpoint",
+    endpointSubscriptionHelp:
+      "Abilita le subscription per le entità selezionate di questo endpoint. Il polling rimane attivo.",
+    subscriptionUnavailable:
+      "Controllo non disponibile. Verifica che l’integrazione e l’entità Auto-Subscription siano abilitate.",
+    subscriptionFailed: "Impossibile modificare Auto-Subscription. Riprova.",
+    subscriptionSaving: "Salvataggio…",
     updateMode: "Modalità aggiornamento",
     polling: "Solo polling",
     subscription: "Polling + subscription",
@@ -163,6 +170,13 @@ const TEXT = {
     alwaysAvailableHelp:
       "Keeps the last known value when the PLC is disconnected or the connection is disabled. Without a saved value the state is unknown. Writes require a connection and a fresh reading.",
     invalid_availability: "Invalid availability setting.",
+    endpointSubscription: "Endpoint Auto-Subscription",
+    endpointSubscriptionHelp:
+      "Enable subscriptions for the selected entities on this endpoint. Polling remains active.",
+    subscriptionUnavailable:
+      "Control unavailable. Check that the integration and Auto-Subscription entity are enabled.",
+    subscriptionFailed: "Could not change Auto-Subscription. Please retry.",
+    subscriptionSaving: "Saving…",
     updateMode: "Update mode",
     polling: "Polling only",
     subscription: "Polling + subscription",
@@ -374,6 +388,7 @@ nav{display:flex;gap:6px;flex-wrap:wrap;padding:5px;background:var(--secondary-b
 .group{margin-bottom:24px}.group>summary{cursor:pointer;font-size:17px;font-weight:600;padding:8px 0 14px;display:flex;align-items:center;gap:10px;list-style:none}.group>summary::-webkit-details-marker{display:none}.group>summary::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--accent,var(--secondary-text-color,#637487));flex-shrink:0}.group>summary::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--secondary-text-color,#8a97a8);border-bottom:2px solid var(--secondary-text-color,#8a97a8);transform:rotate(-45deg);transition:transform var(--speed) ease}.group:not([open])>summary::after{transform:rotate(45deg)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.grid.list{grid-template-columns:1fr;gap:4px}.grid.list .card{padding:8px 16px}.grid.list .cardTop{align-items:baseline;flex-wrap:nowrap;gap:10px}.grid.list .cardTitle{display:flex;align-items:baseline;gap:10px;min-width:0;flex-wrap:wrap}.grid.list .card h3{margin:0;flex-shrink:0}.grid.list .address{line-height:1.4;font-size:11px}.grid.list .entityState{display:flex;align-items:baseline;gap:8px;margin-top:4px;padding:4px 10px}.grid.list .stateLabel{margin-bottom:0}.grid.list .stateValue{font-size:14px;max-height:1.6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.grid.list .cardBottom{margin-top:4px;gap:8px}.grid.list .actions button{padding:6px 12px;min-height:auto}.card{position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:10px;padding:18px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.cardTop{display:flex;align-items:start;gap:8px;flex-wrap:wrap}.cardTitle{flex:1;min-width:0}.card h3{font-size:16px;margin:0 0 7px;overflow-wrap:anywhere}.manualTag{font-size:11px;font-weight:600;color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}.address{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.entityState{margin-top:16px;padding:12px;border-radius:9px;background:var(--secondary-background-color,#f3f6fa);min-width:0}.stateLabel{display:block;font-size:12px;color:var(--secondary-text-color,#637487);margin-bottom:5px}.stateValue{display:block;font-size:20px;font-weight:500;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:16px;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:8px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:15px}.meta{color:var(--secondary-text-color,#637487);font-size:12px}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
 [data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
+.endpointSubscription{flex:1 1 280px;max-width:440px;min-width:0}.endpointSubscription .hint{font-size:12px;margin-top:5px}.endpointSubscription .toggle{font-weight:600;color:var(--primary-text-color,#243346)}.endpointSubscription input[role="switch"]{appearance:none;position:relative;width:42px;min-width:42px;height:24px;padding:0;border:0;border-radius:12px;background:var(--disabled-color,#8695a5);cursor:pointer}.endpointSubscription input[role="switch"]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.endpointSubscription input[role="switch"]:checked{background:var(--primary-color,#008fac)}.endpointSubscription input[role="switch"]:checked::after{left:21px}.endpointSubscription input[role="switch"]:disabled{opacity:.5;cursor:default}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease;overflow:hidden}dialog[open]{opacity:1;transform:none;display:flex;flex-direction:column}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px;overflow-y:auto;flex:1;min-height:0}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:-24px;margin:6px -24px -24px;padding:14px 24px 24px;background:var(--card-background-color,#fff)}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}
 .orphanTag{font-size:11px;font-weight:600;color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 15%,transparent);padding:3px 8px;border-radius:20px;white-space:nowrap}
 .card.orphan{border-left-color:var(--error-color,#be3131);border-style:dashed}
@@ -390,6 +405,8 @@ class OpcuaNodePanel extends HTMLElement {
     this._selected = "";
     this._generation = 0;
     this._viewMode = "grid";
+    this._subscriptionPending = new Set();
+    this._subscriptionErrors = new Set();
     try {
       const stored = localStorage.getItem("ha-opcua-view-mode");
       if (stored === "grid" || stored === "list") this._viewMode = stored;
@@ -572,6 +589,42 @@ class OpcuaNodePanel extends HTMLElement {
     });
     rediscover.disabled = !endpoint.loaded;
     meta.append(add, rediscover);
+    const subscriptionControl = element("div", undefined, {
+      class: "endpointSubscription",
+    });
+    const subscriptionLabel = element("label", undefined, { class: "toggle" });
+    const subscriptionToggle = element("input", undefined, {
+      type: "checkbox",
+      role: "switch",
+      "aria-label": this._t("endpointSubscription"),
+      "aria-describedby": "subscription-help subscription-status",
+      "data-subscription-toggle": "",
+    });
+    subscriptionToggle.addEventListener("change", () =>
+      this._setEndpointSubscription(endpoint, subscriptionToggle.checked),
+    );
+    subscriptionLabel.append(
+      subscriptionToggle,
+      element("span", this._t("endpointSubscription")),
+    );
+    subscriptionControl.append(
+      subscriptionLabel,
+      element("p", this._t("endpointSubscriptionHelp"), {
+        class: "hint",
+        id: "subscription-help",
+      }),
+      element("p", "", {
+        class: "hint",
+        id: "subscription-status",
+        role: "status",
+      }),
+      element("p", "", {
+        class: "error",
+        "data-subscription-error": "",
+        role: "alert",
+      }),
+    );
+    meta.append(subscriptionControl);
     // A root change or a PLC provider switch can orphan dozens of entities
     // at once; offer one cleanup for all of them next to the rediscover.
     const orphans = endpoint.rows.filter((r) => r.orphan);
@@ -735,7 +788,58 @@ class OpcuaNodePanel extends HTMLElement {
     }
     this._paintStates();
   }
+  async _setEndpointSubscription(endpoint, enabled) {
+    const key = endpoint.entry_id;
+    const state = this._hass.states?.[endpoint.subscription_entity]?.state;
+    if (
+      !endpoint.loaded ||
+      !["on", "off"].includes(state) ||
+      this._subscriptionPending.has(key)
+    ) {
+      this._paintStates();
+      return;
+    }
+    this._subscriptionPending.add(key);
+    this._subscriptionErrors.delete(key);
+    this._paintStates();
+    try {
+      await this._hass.callService("switch", enabled ? "turn_on" : "turn_off", {
+        entity_id: endpoint.subscription_entity,
+      });
+    } catch {
+      this._subscriptionErrors.add(key);
+    } finally {
+      this._subscriptionPending.delete(key);
+      if (this.isConnected) this._paintStates();
+    }
+  }
+  _paintSubscription() {
+    const control = this.shadowRoot.querySelector("[data-subscription-toggle]");
+    const endpoint = this._endpoint();
+    if (!control || !endpoint) return;
+    const state = this._hass.states?.[endpoint.subscription_entity]?.state;
+    const pending = this._subscriptionPending.has(endpoint.entry_id);
+    const available = endpoint.loaded && ["on", "off"].includes(state);
+    // Reflect the switch entity, including changes from automations. An offline
+    // PLC does not make this local configuration switch unavailable.
+    control.checked = state === "on";
+    control.disabled = pending || !available;
+    control.setAttribute("aria-busy", String(pending));
+    const status = this.shadowRoot.querySelector("#subscription-status");
+    status.textContent = pending
+      ? this._t("subscriptionSaving")
+      : available
+        ? ""
+        : this._t("subscriptionUnavailable");
+    status.hidden = !status.textContent;
+    const error = this.shadowRoot.querySelector("[data-subscription-error]");
+    error.textContent = this._subscriptionErrors.has(endpoint.entry_id)
+      ? this._t("subscriptionFailed")
+      : "";
+    error.hidden = !error.textContent;
+  }
   _paintStates() {
+    this._paintSubscription();
     const states = this._hass?.states || {};
     for (const value of this.shadowRoot.querySelectorAll(
       "[data-entity-state]",

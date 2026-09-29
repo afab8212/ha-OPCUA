@@ -107,6 +107,7 @@ async function pageFor(width = 1280, admin = true) {
       },
     ];
     window.calls = [];
+    window.serviceCalls = [];
     window.fixture = {
       version: "2.1.0",
       endpoints: [
@@ -120,6 +121,7 @@ async function pageFor(width = 1280, admin = true) {
           nodes,
           rows,
           status_entity: "binary_sensor.connection",
+          subscription_entity: "switch.subscription1",
         },
         {
           entry_id: "plc2",
@@ -131,6 +133,7 @@ async function pageFor(width = 1280, admin = true) {
           nodes: [],
           rows: [],
           status_entity: "binary_sensor.connection2",
+          subscription_entity: "switch.subscription2",
         },
       ],
       areas: [{ id: "workshop", name: "Officina" }],
@@ -139,7 +142,32 @@ async function pageFor(width = 1280, admin = true) {
     window.testHass = {
       language: "it",
       user: { is_admin: admin },
-      states: {},
+      states: {
+        "switch.subscription1": { state: "off", attributes: {} },
+        "switch.subscription2": { state: "on", attributes: {} },
+      },
+      callService: async (domain, service, data) => {
+        window.serviceCalls.push({
+          domain,
+          service,
+          data: structuredClone(data),
+        });
+        if (window.holdService)
+          await new Promise((resolve) => {
+            window.releaseService = resolve;
+          });
+        if (window.failService) throw new Error("service failed");
+        window.testHass.states = {
+          ...window.testHass.states,
+          [data.entity_id]: {
+            state: service === "turn_on" ? "on" : "off",
+            attributes: {},
+          },
+        };
+        document.querySelector("opcua-node-panel").hass = {
+          ...window.testHass,
+        };
+      },
       localize: () => "",
       callWS: async (msg) => {
         window.calls.push(structuredClone(msg));
@@ -1084,5 +1112,157 @@ test("manual nodes offer subscription mode in English", async () => {
     ),
     "subscription",
   );
+  await page.close();
+});
+
+for (const width of [390, 1280]) {
+  test(`endpoint toggle uses native switch, works offline and tracks external changes at ${width}px`, async () => {
+    const page = await pageFor(width);
+    const toggle = page.getByRole("switch", {
+      name: "Auto-Subscription endpoint",
+      exact: true,
+    });
+    assert.equal(await toggle.isChecked(), false);
+    await toggle.check();
+    await page.waitForFunction(
+      () => window.testHass.states["switch.subscription1"].state === "on",
+    );
+    assert.deepEqual(await page.evaluate(() => window.serviceCalls), [
+      {
+        domain: "switch",
+        service: "turn_on",
+        data: { entity_id: "switch.subscription1" },
+      },
+    ]);
+    const box = await toggle.boundingBox();
+    assert.ok(box.x >= 0 && box.x + box.width <= width);
+    await shot(page, `endpoint-subscription-${width}.png`);
+    await page
+      .locator("article")
+      .filter({ hasText: "Marcia macchina" })
+      .getByRole("button", { name: "Modifica", exact: true })
+      .click();
+    const dialog = page.locator("dialog[open]");
+    await dialog.getByLabel("Nome", { exact: true }).fill("Draft preserved");
+    await page.evaluate(() => {
+      window.testHass.states["switch.subscription1"] = {
+        state: "off",
+        attributes: {},
+      };
+      document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+    });
+    assert.equal(await toggle.isChecked(), false);
+    assert.equal(
+      await dialog.getByLabel("Nome", { exact: true }).inputValue(),
+      "Draft preserved",
+    );
+    await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    await page.getByLabel("Endpoint", { exact: true }).selectOption("plc2");
+    assert.equal(await toggle.isChecked(), true);
+    assert.equal(await toggle.isEnabled(), true); // PLC 2 is offline.
+    await toggle.uncheck();
+    await page.waitForFunction(
+      () => window.testHass.states["switch.subscription2"].state === "off",
+    );
+    assert.deepEqual(await page.evaluate(() => window.serviceCalls.at(-1)), {
+      domain: "switch",
+      service: "turn_off",
+      data: { entity_id: "switch.subscription2" },
+    });
+    assert.equal(
+      await page.evaluate(() =>
+        window.calls.some((c) => c.type.endsWith("/update")),
+      ),
+      false,
+    );
+    await page.close();
+  });
+}
+
+test("pending commands and errors stay scoped to their endpoint", async () => {
+  const page = await pageFor();
+  const toggle = page.getByRole("switch", {
+    name: "Auto-Subscription endpoint",
+    exact: true,
+  });
+  await page.evaluate(() => {
+    window.holdService = true;
+  });
+  await toggle.click();
+  assert.equal(await toggle.isDisabled(), true);
+  await page.getByLabel("Endpoint", { exact: true }).selectOption("plc2");
+  assert.equal(await toggle.isEnabled(), true);
+  assert.equal(await toggle.isChecked(), true);
+  await page.evaluate(() => {
+    window.failService = true;
+    window.releaseService();
+  });
+  await page.waitForFunction(
+    () =>
+      document.querySelector("opcua-node-panel")._subscriptionPending.size ===
+      0,
+  );
+  assert.equal(
+    await page
+      .getByText("Impossibile modificare Auto-Subscription. Riprova.", {
+        exact: true,
+      })
+      .isVisible(),
+    false,
+  );
+  await page.getByLabel("Endpoint", { exact: true }).selectOption("plc1");
+  assert.equal(await toggle.isChecked(), false);
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Impossibile modificare Auto-Subscription" })
+    .waitFor();
+  assert.equal(await page.evaluate(() => window.serviceCalls.length), 1);
+  await page.evaluate(() => {
+    window.failService = false;
+    window.holdService = false;
+  });
+  await toggle.check();
+  await page.waitForFunction(
+    () => window.testHass.states["switch.subscription1"].state === "on",
+  );
+  assert.equal(
+    await page
+      .getByText("Impossibile modificare Auto-Subscription. Riprova.", {
+        exact: true,
+      })
+      .isVisible(),
+    false,
+  );
+  await page.close();
+});
+
+test("unavailable, missing and unloaded subscription switches cannot be controlled", async () => {
+  const page = await pageFor();
+  const toggle = page.getByRole("switch", {
+    name: "Auto-Subscription endpoint",
+    exact: true,
+  });
+  for (const state of ["unavailable", "unknown", null]) {
+    await page.evaluate((state) => {
+      if (state === null) delete window.testHass.states["switch.subscription1"];
+      else
+        window.testHass.states["switch.subscription1"] = {
+          state,
+          attributes: {},
+        };
+      document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+    }, state);
+    assert.equal(await toggle.isDisabled(), true);
+  }
+  await page.evaluate(async () => {
+    window.testHass.states["switch.subscription1"] = {
+      state: "off",
+      attributes: {},
+    };
+    window.fixture.endpoints[0].loaded = false;
+    await document.querySelector("opcua-node-panel")._load();
+  });
+  assert.equal(await toggle.isDisabled(), true);
+  assert.equal(await page.evaluate(() => window.serviceCalls.length), 0);
   await page.close();
 });

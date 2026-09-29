@@ -22,6 +22,7 @@ from .const import (
     CONF_MANUAL_NODES,
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
+    CONF_SUBSCRIPTION_ENABLED,
     DOMAIN,
 )
 from .device import async_register_device
@@ -180,7 +181,17 @@ def endpoint_snapshot(hass, entry):
         )
     revision = hashlib.sha256(
         json.dumps(
-            {"options": dict(entry.options), "rows": rows}, sort_keys=True
+            {
+                # A live master toggle does not change the entity editor's data.
+                # Saves merge into current options, preserving its latest value.
+                "options": {
+                    key: value
+                    for key, value in entry.options.items()
+                    if key != CONF_SUBSCRIPTION_ENABLED
+                },
+                "rows": rows,
+            },
+            sort_keys=True,
         ).encode()
     ).hexdigest()
     endpoint = connection_attributes(c)["endpoint"] if c else None
@@ -193,6 +204,9 @@ def endpoint_snapshot(hass, entry):
         "revision": revision,
         "rows": rows,
         "nodes": list(available_nodes.values()),
+        "subscription_entity": registry.async_get_entity_id(
+            "switch", DOMAIN, f"{entry.entry_id}:subscription_enabled"
+        ),
         "status_entity": registry.async_get_entity_id(
             "binary_sensor", DOMAIN, f"{entry.entry_id}:connection_status"
         ),
