@@ -32,7 +32,12 @@ from .node_settings import (
     update_offline_node,
     validate_settings,
 )
-from .orphans import async_remove_orphan, async_sync_orphan_repairs, is_orphan
+from .orphans import (
+    _reload_options,
+    async_remove_orphan,
+    async_sync_orphan_repairs,
+    is_orphan,
+)
 
 SNAPSHOT_SETTINGS = (
     "platform",
@@ -80,11 +85,25 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_rediscover)
     websocket_api.async_register_command(hass, ws_remove_orphan)
     websocket_api.async_register_command(hass, ws_remove_orphans)
+    websocket_api.async_register_command(hass, ws_reclassify_boolean_sensors)
     hass.data[PANEL_DATA] = {"locks": {}, "version": version}
 
 
 def _coordinator(hass, entry):
     return hass.data.get(DOMAIN, {}).get(entry.data[CONF_HUB_ID])
+
+
+def _is_auto_readonly_boolean(node, settings):
+    """A read-only Boolean left on Auto - the smart default a new one gets.
+
+    Never matches a node with any explicit platform choice, including an
+    explicit "sensor" - reclassifying is opt-in per node, not just per type.
+    """
+    return (
+        node["variant_type"] == "Boolean"
+        and not node["writable"]
+        and settings.get("platform", "auto") == "auto"
+    )
 
 
 def _panel_nodes(coordinator):
@@ -100,11 +119,14 @@ def endpoint_snapshot(hass, entry):
     c = _coordinator(hass, entry)
     available_nodes = _panel_nodes(c) if c else {}
     rows = []
+    reclassifiable_booleans = 0
     manual = entry.options.get(CONF_MANUAL_NODES, {})
     nodes = {**manual, **(c.nodes if c else {})}
     for key, node in nodes.items():
         settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
         platform = effective_platform(node, settings)
+        if _is_auto_readonly_boolean(node, settings):
+            reclassifiable_booleans += 1
         entity_id = registry.async_get_entity_id(
             platform, DOMAIN, f"{entry.entry_id}:{key}"
         )
@@ -208,6 +230,7 @@ def endpoint_snapshot(hass, entry):
         "connected": bool(c and c.enabled and c.hub.is_connected),
         "revision": revision,
         "rows": rows,
+        "reclassifiable_booleans": reclassifiable_booleans,
         "nodes": list(available_nodes.values()),
         "subscription_entity": registry.async_get_entity_id(
             "switch", DOMAIN, f"{entry.entry_id}:subscription_enabled"
@@ -561,6 +584,60 @@ async def async_remove_all_orphans(hass, msg):
         return {"removed": removed}
 
 
+async def async_reclassify_boolean_sensors(hass, msg):
+    """Explicitly opt existing read-only Boolean sensors into binary_sensor.
+
+    A newly discovered read-only Boolean node already gets binary_sensor by
+    default; this never applies retroactively on its own (see set_nodes()),
+    so an installation with Boolean nodes discovered before that default
+    existed is stuck with plain sensors showing a raw "True"/"False" state
+    unless it opts in here, one endpoint at a time. Only nodes still left on
+    Auto are touched - an explicit past choice (including an explicit
+    "sensor") is never overridden.
+
+    Applies the change to the live coordinator directly (mirroring a normal
+    discovery-driven classification) instead of forcing a full reload: the
+    new binary_sensor entities appear via the platform's own discovery
+    listener, and the old sensor entities are picked up by the orphan
+    detection right away, ready for the existing "Delete all missing" flow.
+    """
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        if endpoint_snapshot(hass, entry)["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        c = _coordinator(hass, entry)
+        if c is None:
+            raise ValueError("endpoint_not_loaded")
+        options = deepcopy(dict(entry.options))
+        node_settings_opt = options.setdefault(CONF_NODE_SETTINGS, {})
+        reclassified = []
+        for key, node in c.nodes.items():
+            saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
+            if not _is_auto_readonly_boolean(node, saved):
+                continue
+            settings = validate_settings(node, {**saved, "platform": "binary_sensor"})
+            node_settings_opt[key] = settings
+            c.node_settings[key] = settings
+            c._platforms[key] = "binary_sensor"
+            reclassified.append(key)
+        if not reclassified:
+            return {"reclassified": []}
+        # Already applied above; sync so async_options_updated takes its
+        # "apply live, don't reload" branch instead of racing a reload
+        # against the live change just made (same reasoning as
+        # _persist_discovery_state in __init__.py).
+        c.reload_options = _reload_options(options)
+        hass.config_entries.async_update_entry(entry, options=options)
+        c.async_update_listeners()
+        async_sync_orphan_repairs(hass, entry)
+        return {"reclassified": reclassified}
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/node/remove",
@@ -628,6 +705,24 @@ async def ws_remove_orphan(hass, connection, msg):
 async def ws_remove_orphans(hass, connection, msg):
     try:
         result = await async_remove_all_orphans(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/entity/reclassify_boolean_sensors",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_reclassify_boolean_sensors(hass, connection, msg):
+    try:
+        result = await async_reclassify_boolean_sensors(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
     else:

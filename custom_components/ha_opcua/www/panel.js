@@ -56,6 +56,12 @@ const TEXT = {
     deleteAllHelp:
       "Tutte le entità il cui nodo non è più fornito dal PLC dopo una rilevazione completa, e quelle rimaste da un cambio di categoria, verranno eliminate. Le automazioni e le dashboard che le usano dovranno essere aggiornate. Il PLC non viene modificato. Le impostazioni necessarie a entità sostitutive vengono mantenute; le impostazioni di nodi confermati come assenti possono invece essere rimosse se nessun'altra entità le referenzia.",
     deletedAll: "Entità orfane eliminate.",
+    reclassifyBooleans: "Riclassifica come binary_sensor",
+    reclassifyBooleansTitle: "Riclassifica i sensori Boolean esistenti",
+    reclassifyBooleansHelp:
+      "I nodi Boolean di sola lettura lasciati su Automatico verranno impostati su binary_sensor invece di sensor, cosicché mostrino Acceso/Spento invece di un valore grezzo True/False. Vengono modificati solo i nodi rimasti su Automatico: una scelta esplicita, incluso sensor, non viene mai sovrascritta. Le vecchie entità sensor risultanti compariranno come entità orfane, pronte per “Elimina tutte le mancanti”.",
+    reclassifying: "Riclassificazione…",
+    reclassified: "Sensori Boolean riclassificati.",
     not_orphan:
       "L’entità non è più orfana o non può essere verificata ora (connessione assente o rilevazione incompleta). Nulla è stato eliminato.",
     remove: "Rimuovi",
@@ -240,6 +246,12 @@ const TEXT = {
     deleteAllHelp:
       "Every entity whose node the PLC no longer provides after a complete discovery, and every entity left behind by a category change, will be deleted. Automations and dashboards using them will need updating. The PLC is unchanged. Settings needed by replacement entities are preserved; settings for nodes confirmed missing may also be removed when no other entity references them.",
     deletedAll: "Orphaned entities deleted.",
+    reclassifyBooleans: "Reclassify as binary_sensor",
+    reclassifyBooleansTitle: "Reclassify existing Boolean sensors",
+    reclassifyBooleansHelp:
+      'Read-only Boolean nodes left on Auto will be set to binary_sensor instead of sensor, so they show On/Off instead of a raw True/False value. Only nodes still left on Auto are changed - an explicit choice, including sensor, is never overridden. The resulting old sensor entities will show up as orphaned entities, ready for "Delete all missing".',
+    reclassifying: "Reclassifying…",
+    reclassified: "Boolean sensors reclassified.",
     not_orphan:
       "This entity is no longer orphaned or cannot be verified right now (connection down or discovery incomplete). Nothing was deleted.",
     node_in_use:
@@ -731,6 +743,15 @@ class OpcuaNodePanel extends HTMLElement {
       deleteAll.textContent = `${this._t("deleteAll")} (${orphans.length})`;
       endpointActions.append(deleteAll);
     }
+    // Read-only Boolean nodes discovered before binary_sensor became their
+    // default stay on Auto -> sensor forever unless opted in explicitly here.
+    if (endpoint.reclassifiable_booleans) {
+      const reclassify = this._button("reclassifyBooleans", () =>
+        this._reclassifyBooleans(endpoint.reclassifiable_booleans),
+      );
+      reclassify.textContent = `${this._t("reclassifyBooleans")} (${endpoint.reclassifiable_booleans})`;
+      endpointActions.append(reclassify);
+    }
     endpointPanel.append(meta);
     main.append(endpointPanel);
     const nav = element("nav", undefined, { "aria-label": this._t("all") });
@@ -1175,6 +1196,61 @@ class OpcuaNodePanel extends HTMLElement {
         busy = false;
         remove.disabled = cancel.disabled = false;
         remove.textContent = `${this._t("deleteAll")} (${count})`;
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+  }
+  _reclassifyBooleans(count) {
+    const endpoint = this._endpoint();
+    const dialog = element("dialog");
+    this._dialog = dialog;
+    const form = element("form");
+    dialog.append(form);
+    const error = element("div", "", { class: "error", role: "alert" });
+    const cancel = this._button("cancel", () => dialog.close());
+    const confirm = element(
+      "button",
+      `${this._t("reclassifyBooleans")} (${count})`,
+      { type: "submit", class: "primary" },
+    );
+    const footer = element("footer");
+    footer.append(cancel, confirm);
+    form.append(
+      element("h2", this._t("reclassifyBooleansTitle")),
+      element("p", this._t("reclassifyBooleansHelp")),
+      error,
+      footer,
+    );
+    let busy = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      busy = true;
+      confirm.disabled = cancel.disabled = true;
+      confirm.textContent = this._t("reclassifying");
+      error.textContent = "";
+      try {
+        await this._hass.callWS({
+          type: "ha_opcua/entity/reclassify_boolean_sensors",
+          entry_id: endpoint.entry_id,
+          revision: endpoint.revision,
+        });
+        this._notice = this._t("reclassified");
+        dialog.close();
+        await this._load();
+      } catch (err) {
+        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        busy = false;
+        confirm.disabled = cancel.disabled = false;
+        confirm.textContent = `${this._t("reclassifyBooleans")} (${count})`;
       }
     });
     this.shadowRoot.append(dialog);
