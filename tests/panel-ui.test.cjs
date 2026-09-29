@@ -1360,6 +1360,10 @@ for (const width of [1280, 390, 320]) {
     const page = await pageFor(width);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width, height: 620 });
+    await page.evaluate(async () => {
+      window.fixture.endpoints[0].nodes[2].writable = true;
+      await document.querySelector("opcua-node-panel")._load();
+    });
     await page
       .locator("article")
       .filter({ hasText: "Velocità linea" })
