@@ -241,6 +241,9 @@ async function pageFor(width = 1280, admin = true) {
             ...(Object.hasOwn(msg, "precision")
               ? { precision: msg.precision }
               : {}),
+            ...(Object.hasOwn(msg, "unit_of_measurement")
+              ? { unit_of_measurement: msg.unit_of_measurement }
+              : {}),
           },
           name: msg.name || row.name,
           custom_name: msg.name,
@@ -279,7 +282,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.3.0",
+    "Pannello 1.4.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1056,6 +1059,62 @@ test("REAL precision can be saved, cleared and reset on a non-REAL remap", async
     await page.evaluate(
       () =>
         window.calls.filter((m) => m.type.endsWith("/update")).at(-1).precision,
+    ),
+    null,
+  );
+  await page.close();
+});
+
+test("a unit of measurement can be saved, cleared and hidden for a non-numeric remap", async () => {
+  const page = await pageFor();
+  const card = page.locator("article").filter({ hasText: "Velocità linea" });
+  const edit = () =>
+    card.getByRole("button", { name: "Modifica", exact: true }).click();
+  const dialog = page.locator("dialog[open]");
+  const field = () => dialog.getByLabel("Unità di misura", { exact: true });
+  const save = async () => {
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  };
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().fill(" bar ");
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.find((m) => m.type.endsWith("/update"))
+          .unit_of_measurement,
+    ),
+    "bar",
+  );
+  await edit();
+  assert.equal(await field().inputValue(), "bar");
+  await field().fill("");
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+          .unit_of_measurement,
+    ),
+    null,
+  );
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().fill("bar");
+  await save();
+  await edit();
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .selectOption("ns=4;i=4");
+  assert.equal(await field().isVisible(), false);
+  await save();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+          .unit_of_measurement,
     ),
     null,
   );
