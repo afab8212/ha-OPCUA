@@ -154,12 +154,12 @@
   "issues": {
     "orphan_entity": {
       "title": "Remove orphaned entity: {entity_id}",
-      "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry together with its saved node settings. Before confirming, update any automations, scripts and dashboards that reference it. The PLC and other entities are not changed.",
+      "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry. Before confirming, update any automations, scripts and dashboards that reference it. The PLC and other entities are not changed. Settings needed by replacement entities are preserved; settings for nodes confirmed missing may also be removed when no other entity references them.",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Remove orphaned entity: {entity_id}",
-            "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry together with its saved node settings. Before confirming, update any automations, scripts and dashboards that reference it. The PLC and other entities are not changed."
+            "description": "Entity `{entity_id}` on endpoint **{endpoint}** is no longer used by the current configuration, or its node is absent after a complete discovery. You can delete the old entity from the Home Assistant registry. Before confirming, update any automations, scripts and dashboards that reference it. The PLC and other entities are not changed. Settings needed by replacement entities are preserved; settings for nodes confirmed missing may also be removed when no other entity references them."
           }
         },
         "abort": {
