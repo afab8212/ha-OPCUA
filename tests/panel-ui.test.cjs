@@ -1422,7 +1422,7 @@ for (const width of [1280, 390, 320]) {
     await assertActionsVisible();
     await shot(page, `editor-fixed-actions-error-${width}.png`);
     await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
-    assert.equal(await page.locator("dialog").count(), 0);
+    await dialog.waitFor({ state: "detached" });
     await page.close();
   });
 }
