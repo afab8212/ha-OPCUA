@@ -933,7 +933,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             }
             self.nodes[node_id] = node
             # A brand-new writable numeric/string node defaults to an editable
-            # control instead of the usual conservative read-only sensor.
+            # control instead of the usual conservative read-only sensor. A
+            # brand-new read-only Boolean node defaults to a binary_sensor
+            # instead of a generic sensor, since a sensor can only show a raw
+            # "True"/"False" state where a binary_sensor gets Home Assistant's
+            # proper on/off presentation (and an optional device class).
             # Never applies to a node that already has any saved settings
             # (including one from a previous run of this same logic), and
             # never retroactively to nodes that existed before this feature
@@ -944,6 +948,8 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                         saved = {"platform": "number"}
                     elif node["variant_type"] == "String":
                         saved = {"platform": "text"}
+                elif node["variant_type"] == "Boolean":
+                    saved = {"platform": "binary_sensor"}
                 # A brand-new REAL/LREAL node - number or sensor, writable or
                 # not - defaults to 2 decimal places instead of no rounding.
                 # Persisted immediately (like the platform above) so the
