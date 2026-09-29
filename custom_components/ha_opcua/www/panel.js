@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.0.0";
+const PANEL_VERSION = "1.0.1";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -101,7 +101,7 @@ const TEXT = {
     stateEmpty: "Testo vuoto",
     stateOn: "Acceso",
     stateOff: "Spento",
-    title: "Nodi OPC UA",
+    title: "OPC UA Connect",
     subtitle: "Configura le entità dei tuoi endpoint",
     endpoint: "Endpoint",
     refresh: "Aggiorna",
@@ -262,7 +262,7 @@ const TEXT = {
     stateEmpty: "Empty text",
     stateOn: "On",
     stateOff: "Off",
-    title: "OPC UA nodes",
+    title: "OPC UA Connect",
     subtitle: "Configure entities for your endpoints",
     endpoint: "Endpoint",
     refresh: "Refresh",
