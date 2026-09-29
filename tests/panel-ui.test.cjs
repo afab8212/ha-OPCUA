@@ -255,7 +255,14 @@ async function shot(page, name) {
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
   assert.equal(await page.locator("article").count(), 4);
-  assert.equal(await page.locator(".version").textContent(), "Versione 2.1.0");
+  assert.equal(
+    await page.locator(".integrationVersion").textContent(),
+    "Integrazione 2.1.0",
+  );
+  assert.equal(
+    await page.locator(".panelVersion").textContent(),
+    "Pannello 1.0.0",
+  );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
     0,
@@ -1266,3 +1273,156 @@ test("unavailable, missing and unloaded subscription switches cannot be controll
   assert.equal(await page.evaluate(() => window.serviceCalls.length), 0);
   await page.close();
 });
+
+for (const [width, dark] of [
+  [1440, false],
+  [1440, true],
+  [768, false],
+  [390, true],
+  [320, false],
+]) {
+  test(`panel layout keeps long values and controls readable at ${width}px, dark=${dark}`, async () => {
+    const page = await pageFor(width);
+    await page.evaluate(async (dark) => {
+      if (dark)
+        document.body.style.cssText +=
+          ";--primary-background-color:#111827;--card-background-color:#1f2937;--primary-text-color:#eef2f7;--secondary-text-color:#acb8c9;--divider-color:#374151;--secondary-background-color:#283548;--primary-color:#38bdf8;--text-primary-color:#111827";
+      const endpoint = window.fixture.endpoints[0];
+      endpoint.endpoint =
+        "opc.tcp://production-line-controller-with-a-long-name.local:4840";
+      for (let i = 0; i < 8; i++) {
+        const nodeId = `ns=4;s="ProductionLine"."Counter_${i}"`;
+        endpoint.rows.push({
+          ...endpoint.rows[2],
+          key: `extra${i}`,
+          node_id: nodeId,
+          name:
+            i === 0
+              ? "Descrizione_articolo_in_lavorazione_sulla_linea_di_produzione"
+              : `Contatore produzione ${i}`,
+          entity_id: `sensor.counter${i}`,
+          variant_type: i === 0 ? "String" : "Int32",
+        });
+        window.testHass.states[`sensor.counter${i}`] = {
+          state:
+            i === 0
+              ? "PIANO LAVORO CLINCIATO ZINCATO 1800MM / riferimento commessa 822101842"
+              : `${74030 + i}`,
+          attributes: {},
+        };
+      }
+      const panel = document.querySelector("opcua-node-panel");
+      panel.hass = { ...window.testHass };
+      await panel._load();
+    }, dark);
+    for (const mode of ["Vista a riquadri", "Vista a elenco"]) {
+      await page.getByRole("button", { name: mode, exact: true }).click();
+      await page.locator(".content").evaluate((el) => {
+        el.scrollTop = 0;
+      });
+      const overflow = await page
+        .locator(".content")
+        .evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+      assert.equal(overflow, false, "panel must not overflow horizontally");
+      const card = page
+        .locator("article")
+        .filter({ hasText: "Descrizione_articolo_in_lavorazione" });
+      const value = card.locator(".stateValue");
+      assert.match(await value.textContent(), /1800MM \/ riferimento/);
+      assert.equal(
+        await card.evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+        false,
+      );
+      if (mode === "Vista a elenco" && width >= 768) {
+        const title = await card.locator(".cardTop").boundingBox();
+        const state = await value.boundingBox();
+        const actions = await card.locator(".cardBottom").boundingBox();
+        assert.ok(
+          title.x + title.width <= state.x,
+          "state occupies its own column",
+        );
+        assert.ok(
+          state.x + state.width <= actions.x,
+          "actions occupy their own column",
+        );
+      }
+      await shot(
+        page,
+        `polish-${width}-${dark ? "dark" : "light"}-${mode.endsWith("elenco") ? "list" : "grid"}.png`,
+      );
+    }
+    await page.close();
+  });
+}
+
+for (const width of [1280, 390, 320]) {
+  test(`entity editor actions stay visible while fields scroll at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width, height: 620 });
+    await page.evaluate(async () => {
+      window.fixture.endpoints[0].nodes[2].writable = true;
+      await document.querySelector("opcua-node-panel")._load();
+    });
+    await page
+      .locator("article")
+      .filter({ hasText: "Velocità linea" })
+      .getByRole("button", { name: "Modifica" })
+      .click();
+    const dialog = page.locator("dialog");
+    await dialog
+      .getByLabel("Categoria", { exact: true })
+      .selectOption("number");
+    const body = dialog.locator(".editorBody");
+    const footer = dialog.locator("footer");
+    const assertActionsVisible = async () => {
+      const viewport = page.viewportSize();
+      for (const label of ["Annulla", "Salva"]) {
+        const button = dialog.getByRole("button", { name: label, exact: true });
+        const box = await button.boundingBox();
+        assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height);
+        assert.ok(box.x >= 0 && box.x + box.width <= viewport.width);
+        // Check actual hit testing, not just presence in the DOM.
+        assert.equal(
+          await button.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return (
+              el
+                .getRootNode()
+                .elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === el
+            );
+          }),
+          true,
+        );
+      }
+      const fields = await body.boundingBox();
+      const actions = await footer.boundingBox();
+      assert.ok(fields.y + fields.height <= actions.y + 1);
+    };
+    await body.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await assertActionsVisible();
+    const top = (await footer.boundingBox()).y;
+    await body.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    assert.ok(await body.evaluate((el) => el.scrollTop > 0));
+    await assertActionsVisible();
+    assert.ok(Math.abs((await footer.boundingBox()).y - top) < 1);
+    // A reduced viewport also covers landscape / constrained-height layouts.
+    await page.setViewportSize({ width, height: 400 });
+    await assertActionsVisible();
+    await shot(page, `editor-fixed-actions-${width}.png`);
+    await page.evaluate(() => {
+      window.failSave = true;
+    });
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await dialog.getByRole("alert").filter({ hasText: /.+/ }).waitFor();
+    await assertActionsVisible();
+    await shot(page, `editor-fixed-actions-error-${width}.png`);
+    await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    await page.close();
+  });
+}

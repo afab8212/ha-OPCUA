@@ -1,7 +1,9 @@
 """Panel authorization, registry edits, stable node remapping and boolean semantics."""
 
+import hashlib
 import json
 from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -192,7 +194,11 @@ async def test_panel_registration_is_once_and_versioned(hass):
         await async_setup_panel(hass)
     register.assert_awaited_once()
     assert register.call_args.kwargs["require_admin"] is True
-    assert register.call_args.kwargs["module_url"].endswith("?v=1.4.0")
+    source = Path("custom_components/ha_opcua/www/panel.js").read_bytes()
+    digest = hashlib.sha256(source).hexdigest()[:16]
+    assert register.call_args.kwargs["module_url"] == (
+        f"/ha-opcua-panel/panel.js?v=1.4.0&panel={digest}"
+    )
     assert commands.call_count == 8
     assert panel_snapshot(hass)["version"] == "1.4.0"
 

@@ -93,7 +93,7 @@ By default, updates use polling only. Subscriptions require both an explicit per
 
 ## OPC UA side panel (2.1.0)
 
-After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Categories can be filtered or collapsed. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
+After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Connection details, endpoint actions and Auto-Subscription are grouped in one control card. Categories can be filtered or collapsed, and the grid/list preference is retained in the browser. Cards emphasize the live value; on desktop, the compact list aligns names, values and actions in separate columns. Long text and NodeIds wrap without horizontal overflow, and narrow screens stack the content. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
 Each entity card shows its live Home Assistant state, including localized binary device-class labels, numeric units, text and date/time formatting. Values update as Home Assistant receives state changes without refreshing the panel or interrupting open dialogs. Unknown, unavailable, unregistered and excluded entities are clearly distinguished. This uses Home Assistant's existing state stream and adds no PLC polling. Values update after reads at the endpoint's configured polling interval and, for opted-in entities while Auto-Subscription is enabled, after server data-change notifications. Boolean inversion is already reflected in the displayed entity state.
 
@@ -133,9 +133,11 @@ A disabled mapping is retained to prevent discovery from recreating the removed 
 
 OPC UA values are normalized to UTC, and Home Assistant displays them in the frontend's configured timezone. Home Assistant's `datetime.set_value` service treats a timezone-free input as local HA time; for unambiguous automation commands (especially during daylight-saving transitions), include the UTC offset. The direct `ha_opcua.opcua_set_value` service requires an ISO 8601 timestamp with an explicit offset or `Z`, for example `2026-09-14T18:30:00+02:00`. Bare dates, timezone-free direct writes and dates before 1601-01-01 UTC are rejected. Strings and integer timestamps are not automatically interpreted as OPC UA DateTime nodes.
 
-The panel header displays the installed integration version, read from the backend manifest.
+The panel header displays both the installed integration version (from the backend manifest) and the independent panel version (from the JavaScript actually loaded by the browser). The panel starts at **1.0.0**; maintainers should increment `PANEL_VERSION` in `www/panel.js` for each frontend change.
 
-Panel JavaScript is bundled with the integration and uses a versioned URL; no separate Lovelace resource or frontend build is required.
+In the entity editor, **Cancel** and **Save** stay at the bottom of the dialog while the fields scroll independently, including on mobile. Save errors appear above these buttons.
+
+Panel JavaScript is bundled with the integration and uses a URL containing the integration version and a hash of the JavaScript content to invalidate the browser cache after panel-only updates; no separate Lovelace resource or frontend build is required.
 
 ## Polling and subscriptions
 
