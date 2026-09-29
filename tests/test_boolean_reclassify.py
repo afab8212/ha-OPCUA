@@ -41,18 +41,26 @@ NON_BOOLEAN = {
     "variant_type": "Int16",
     "writable": False,
 }
+AUTO_BOOLEAN_2 = {
+    "name": "Overheat",
+    "node_id": "ns=2;i=5",
+    "variant_type": "Boolean",
+    "writable": False,
+}
 
 
-async def prepare(hass, entry):
+async def prepare(hass, entry, extra_nodes=None):
+    extra_nodes = extra_nodes or []
     hub = OpcuaHub("PLC", "opc.tcp://localhost:4840", "ns=2;i=1")
-    hub.get_values = AsyncMock(
-        return_value={
-            "ns=2;i=1": True,
-            "ns=2;i=2": False,
-            "ns=2;i=3": True,
-            "ns=2;i=4": 3,
-        }
-    )
+    values = {
+        "ns=2;i=1": True,
+        "ns=2;i=2": False,
+        "ns=2;i=3": True,
+        "ns=2;i=4": 3,
+    }
+    for node in extra_nodes:
+        values[node["node_id"]] = True
+    hub.get_values = AsyncMock(return_value=values)
     hub.set_value = AsyncMock()
     c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
     hass.config_entries.async_update_entry(
@@ -61,7 +69,15 @@ async def prepare(hass, entry):
             CONF_NODE_SETTINGS: {"ns=2;i=2": {"platform": "sensor"}},
         },
     )
-    c.set_nodes([AUTO_BOOLEAN, EXPLICIT_SENSOR_BOOLEAN, WRITABLE_BOOLEAN, NON_BOOLEAN])
+    c.set_nodes(
+        [
+            AUTO_BOOLEAN,
+            EXPLICIT_SENSOR_BOOLEAN,
+            WRITABLE_BOOLEAN,
+            NON_BOOLEAN,
+            *extra_nodes,
+        ]
+    )
     hass.data[DOMAIN] = {"PLC": c}
     registry = er.async_get(hass)
     old_sensor = registry.async_get_or_create(
@@ -152,6 +168,58 @@ async def test_reclassify_preserves_custom_name_and_area_and_disables_old_entity
 
     old_entity = registry.async_get(old_sensor.entity_id)
     assert old_entity.disabled_by == er.RegistryEntryDisabler.INTEGRATION
+
+    await c.async_shutdown()
+
+
+async def test_unselected_eligible_node_is_left_untouched(hass, entry):
+    """Selecting one of two eligible nodes must not touch the other.
+
+    Not just absent from the result - its saved settings, live coordinator
+    state and registry entry must all stay exactly as they were, the same
+    as an explicit past choice is already protected from this action.
+    """
+    c, _ = await prepare(hass, entry, extra_nodes=[AUTO_BOOLEAN_2])
+    registry = er.async_get(hass)
+    other_sensor = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        entity_unique_id(entry.entry_id, "ns=2;i=5"),
+        config_entry=entry,
+        original_name="Overheat",
+    )
+
+    snapshot = endpoint_snapshot(hass, entry)
+    assert snapshot["reclassifiable_booleans"] == 2
+    keys = sorted(row["key"] for row in snapshot["rows"] if row["reclassifiable"])
+    assert keys == ["ns=2;i=1", "ns=2;i=5"]
+
+    result = await async_reclassify_boolean_sensors(
+        hass,
+        {
+            "entry_id": entry.entry_id,
+            "revision": snapshot["revision"],
+            "keys": ["ns=2;i=1"],
+        },
+    )
+
+    assert result["reclassified"] == ["ns=2;i=1"]
+    assert c.node_settings["ns=2;i=1"]["platform"] == "binary_sensor"
+
+    # The unselected, equally-eligible node is untouched.
+    assert "ns=2;i=5" not in entry.options.get(CONF_NODE_SETTINGS, {})
+    assert "ns=2;i=5" not in c.node_settings
+    assert c._platforms["ns=2;i=5"] == "sensor"
+    unchanged = registry.async_get(other_sensor.entity_id)
+    assert unchanged.disabled_by is None
+    assert unchanged.name is None
+    assert unchanged.area_id is None
+    assert (
+        registry.async_get_entity_id(
+            "binary_sensor", DOMAIN, entity_unique_id(entry.entry_id, "ns=2;i=5")
+        )
+        is None
+    )
 
     await c.async_shutdown()
 
