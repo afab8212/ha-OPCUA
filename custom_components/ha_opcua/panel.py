@@ -256,6 +256,46 @@ def panel_snapshot(hass):
     }
 
 
+def _migrate_entity_registry(
+    hass, entry, node, key, platform, related, *, name, area_id, suggested_object_id
+):
+    """Move a node's registered entity to `platform`, preserving name/area.
+
+    Any other related entry (same unique_id, different platform) is left
+    disabled instead of dangling, matching a manual category change. Shared
+    by a panel-driven edit and the bulk Boolean reclassification so both go
+    through identical registry handling.
+    """
+    registry = er.async_get(hass)
+    unique_id = f"{entry.entry_id}:{key}"
+    selected = None
+    if platform != "disabled":
+        device = async_register_device(hass, entry)
+        selected = registry.async_get_or_create(
+            platform,
+            DOMAIN,
+            unique_id,
+            config_entry=entry,
+            device_id=device.id,
+            original_name=node["name"],
+            suggested_object_id=suggested_object_id,
+        )
+        changes = {"name": name, "area_id": area_id}
+        if platform == "binary_sensor":
+            changes["device_class"] = None
+        if selected.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
+            changes["disabled_by"] = None
+        registry.async_update_entity(selected.entity_id, **changes)
+    for old in related:
+        if selected is not None and old.entity_id == selected.entity_id:
+            continue
+        changes = {"name": name, "area_id": area_id}
+        if old.disabled_by is None:
+            changes["disabled_by"] = er.RegistryEntryDisabler.INTEGRATION
+        registry.async_update_entity(old.entity_id, **changes)
+    return selected.entity_id if selected else None
+
+
 async def async_save_entity(hass, msg):
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if entry is None or entry.domain != DOMAIN:
@@ -300,35 +340,21 @@ async def async_save_entity(hass, msg):
             for e in er.async_entries_for_config_entry(registry, entry.entry_id)
             if e.platform == DOMAIN and e.unique_id == unique_id
         ]
-        selected = None
-        if platform != "disabled":
-            device = async_register_device(hass, entry)
-            selected = registry.async_get_or_create(
-                platform,
-                DOMAIN,
-                unique_id,
-                config_entry=entry,
-                device_id=device.id,
-                original_name=c.nodes[msg["key"]]["name"],
-                suggested_object_id=(
-                    row["entity_id"].split(".", 1)[1]
-                    if row["entity_id"]
-                    else name or row["name"]
-                ),
-            )
-            changes = {"name": name, "area_id": area_id}
-            if platform == "binary_sensor":
-                changes["device_class"] = None
-            if selected.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
-                changes["disabled_by"] = None
-            registry.async_update_entity(selected.entity_id, **changes)
-        for old in related:
-            if selected is not None and old.entity_id == selected.entity_id:
-                continue
-            changes = {"name": name, "area_id": area_id}
-            if old.disabled_by is None:
-                changes["disabled_by"] = er.RegistryEntryDisabler.INTEGRATION
-            registry.async_update_entity(old.entity_id, **changes)
+        selected_entity_id = _migrate_entity_registry(
+            hass,
+            entry,
+            c.nodes[msg["key"]],
+            msg["key"],
+            platform,
+            related,
+            name=name,
+            area_id=area_id,
+            suggested_object_id=(
+                row["entity_id"].split(".", 1)[1]
+                if row["entity_id"]
+                else name or row["name"]
+            ),
+        )
         if platform != row["platform"]:
             # Prevent old controls from writing while the new domain loads.
             c._platforms[msg["key"]] = "disabled"
@@ -342,7 +368,7 @@ async def async_save_entity(hass, msg):
         return {
             "saved": True,
             "reload": reload_needed,
-            "entity_id": selected.entity_id if selected else None,
+            "entity_id": selected_entity_id,
         }
 
 
@@ -600,6 +626,11 @@ async def async_reclassify_boolean_sensors(hass, msg):
     new binary_sensor entities appear via the platform's own discovery
     listener, and the old sensor entities are picked up by the orphan
     detection right away, ready for the existing "Delete all missing" flow.
+
+    The old sensor's custom name and area, if any, are carried over to the
+    new binary_sensor (same registry handling a manual category change
+    uses), and the old entity is left disabled instead of dangling enabled
+    - a normal category change leaves it exactly that way too.
     """
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if entry is None or entry.domain != DOMAIN:
@@ -613,6 +644,7 @@ async def async_reclassify_boolean_sensors(hass, msg):
         c = _coordinator(hass, entry)
         if c is None:
             raise ValueError("endpoint_not_loaded")
+        registry = er.async_get(hass)
         options = deepcopy(dict(entry.options))
         node_settings_opt = options.setdefault(CONF_NODE_SETTINGS, {})
         reclassified = []
@@ -625,6 +657,27 @@ async def async_reclassify_boolean_sensors(hass, msg):
             c.node_settings[key] = settings
             c._platforms[key] = "binary_sensor"
             reclassified.append(key)
+            unique_id = f"{entry.entry_id}:{key}"
+            related = [
+                e
+                for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+                if e.platform == DOMAIN and e.unique_id == unique_id
+            ]
+            _migrate_entity_registry(
+                hass,
+                entry,
+                node,
+                key,
+                "binary_sensor",
+                related,
+                name=next((e.name for e in related if e.name is not None), None),
+                area_id=next(
+                    (e.area_id for e in related if e.area_id is not None), None
+                ),
+                suggested_object_id=(
+                    related[0].entity_id.split(".", 1)[1] if related else None
+                ),
+            )
         if not reclassified:
             return {"reclassified": []}
         # Already applied above; sync so async_options_updated takes its

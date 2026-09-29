@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.ha_opcua import AsyncuaCoordinator, OpcuaHub, entity_unique_id
@@ -97,6 +98,43 @@ async def test_only_auto_readonly_boolean_nodes_are_reclassified(hass, entry):
     # The old sensor entity's domain no longer matches the saved platform -
     # it is now a category-change orphan, ready for "Delete all missing".
     assert is_orphan(hass, entry, old_sensor)
+
+    await c.async_shutdown()
+
+
+async def test_reclassify_preserves_custom_name_and_area_and_disables_old_entity(
+    hass, entry
+):
+    """Mirrors a manual category change: rename/area travel, old entity is disabled.
+
+    A targeted test by the maintainer found the bulk reclassification only
+    updated in-memory options/coordinator state, leaving the new
+    binary_sensor with the raw node name and no area, and the old sensor
+    enabled - unlike a manual category change through the panel, which
+    preserves both and disables the replaced entity.
+    """
+    await ar.async_load(hass)
+    area = ar.async_get(hass).async_create("Utility Room")
+    c, old_sensor = await prepare(hass, entry)
+    registry = er.async_get(hass)
+    registry.async_update_entity(
+        old_sensor.entity_id, name="Front Door Alarm", area_id=area.id
+    )
+
+    snapshot = endpoint_snapshot(hass, entry)
+    await async_reclassify_boolean_sensors(
+        hass, {"entry_id": entry.entry_id, "revision": snapshot["revision"]}
+    )
+
+    new_entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, entity_unique_id(entry.entry_id, "ns=2;i=1")
+    )
+    new_entity = registry.async_get(new_entity_id)
+    assert new_entity.name == "Front Door Alarm"
+    assert new_entity.area_id == area.id
+
+    old_entity = registry.async_get(old_sensor.entity_id)
+    assert old_entity.disabled_by == er.RegistryEntryDisabler.INTEGRATION
 
     await c.async_shutdown()
 
