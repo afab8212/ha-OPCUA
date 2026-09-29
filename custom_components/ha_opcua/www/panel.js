@@ -1,10 +1,22 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.0.1";
+const PANEL_VERSION = "1.2.0";
 const TEXT = {
   it: {
     version: "Integrazione",
     panelVersion: "Pannello",
+    customizations: "Personalizzazioni salvate",
+    invertedBadge: "Stato invertito",
+    classBadge: "Classe",
+    rangeBadge: "Limiti",
+    lengthBadge: "Caratteri",
+    remappedBadge: "NodeId riassegnato",
+    subscriptionBadge: "Subscription configurata",
+    valueLabel: "Valore",
+    textLabel: "Testo",
+    dateLabel: "Data e ora",
+    retainedValue: "Ultimo valore",
+    retainedHelp: "Valore conservato: in attesa di una nuova lettura dal PLC.",
     alwaysAvailable: "Sempre disponibile",
     alwaysAvailableHelp:
       "Mantiene l’ultimo valore noto quando il PLC è scollegato o la connessione è disabilitata. Senza un valore salvato lo stato è sconosciuto. Le scritture richiedono la connessione e una lettura aggiornata.",
@@ -170,6 +182,18 @@ const TEXT = {
   en: {
     version: "Integration",
     panelVersion: "Panel",
+    customizations: "Saved customizations",
+    invertedBadge: "Inverted state",
+    classBadge: "Class",
+    rangeBadge: "Limits",
+    lengthBadge: "Characters",
+    remappedBadge: "Reassigned NodeId",
+    subscriptionBadge: "Subscription configured",
+    valueLabel: "Value",
+    textLabel: "Text",
+    dateLabel: "Date and time",
+    retainedValue: "Last known value",
+    retainedHelp: "Retained value: waiting for a fresh reading from the PLC.",
     alwaysAvailable: "Always available",
     alwaysAvailableHelp:
       "Keeps the last known value when the PLC is disconnected or the connection is disabled. Without a saved value the state is unknown. Writes require a connection and a fresh reading.",
@@ -355,6 +379,51 @@ function element(tag, text, attributes = {}) {
     node.setAttribute(key, value);
   return node;
 }
+function valueType(row) {
+  if (
+    ["switch", "binary_sensor"].includes(row.platform) ||
+    row.variant_type === "Boolean"
+  )
+    return "boolean";
+  if (row.platform === "datetime" || row.variant_type === "DateTime")
+    return "datetime";
+  if (row.platform === "number" || NUMERIC.has(row.variant_type))
+    return "numeric";
+  return "text";
+}
+// Decorative icons only: the adjacent localized text always describes the state.
+const VALUE_ICONS = {
+  numeric: "M9 3 7 21M17 3l-2 18M4 9h17M3 15h17",
+  text: "M4 5h16M4 10h16M4 15h10M4 20h7",
+  datetime:
+    "M7 3v4M17 3v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2M8 14h2M14 14h2M8 18h2",
+  boolean: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18",
+  on: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18M8 12l3 3 5-6",
+  off: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18M8 12h8",
+  alert: "m12 3 10 18H2L12 3ZM12 9v5M12 17v1",
+  unavailable: "M3 3l18 18M8 5a9 9 0 0 1 11 12M16 19A9 9 0 0 1 5 7",
+  unknown: "M9 8a3 3 0 1 1 5 2c-2 1-2 2-2 4M12 18v1",
+  pending: "M5 3h14M5 21h14M7 3v4l10 10v4M17 3v4L7 17v4",
+  disabled: "M9 5v14M15 5v14",
+  empty: "M5 6h14v12H5zM9 12h6",
+};
+function valueIcon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  for (const [key, val] of Object.entries({
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.7",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    "aria-hidden": "true",
+  }))
+    svg.setAttribute(key, val);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", VALUE_ICONS[name] || VALUE_ICONS.text);
+  svg.append(path);
+  return svg;
+}
 function emptyMessage(text) {
   const div = element("div", undefined, { class: "message empty" });
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -397,6 +466,11 @@ dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:mi
 .entityForm{padding:0;gap:0;overflow:hidden;max-height:inherit;flex:0 1 auto}.editorBody{display:flex;flex-direction:column;gap:17px;padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1}.editorBody>*{flex-shrink:0}.entityForm footer{position:static;flex-shrink:0;flex-wrap:wrap;margin:0;padding:16px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color,#dce2ea)}.entityForm footer .error{flex-basis:100%;overflow-wrap:anywhere}.entityForm footer .error:empty{display:none}
 @media(max-width:870px){.menu{display:inline-flex;align-items:center;justify-content:center}.grid.list .card{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(140px,.8fr);gap:12px}}
 @media(max-width:650px){header{padding:14px 12px;gap:8px}h1{font-size:20px}.content{padding:16px 12px 32px}.endpointPanel{padding:15px;margin-bottom:18px}.toolbar{grid-template-columns:1fr;gap:12px}.endpointMeta{gap:12px}.endpointIdentity{flex-basis:100%}.endpointActions{width:100%}.endpointActions button{flex:1;min-height:44px}.endpointSubscription{gap:5px;padding-top:12px}.endpointSubscription .toggle{width:100%;min-height:44px}.grid{grid-template-columns:1fr}.navRow{gap:10px}nav{gap:3px}nav button{padding:8px 10px;min-height:42px}.card{padding:15px}.grid.list .card{grid-template-columns:minmax(0,1fr);gap:12px;padding:14px}.grid.list .cardBottom{flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--divider-color,#e2e7ef);padding-top:10px}.grid.list .cardBottom .meta{text-align:left}.grid.list .entityState{display:flex;align-items:baseline;gap:10px}.actions button{min-height:42px}form{padding:20px}.entityForm{padding:0}.editorBody{padding:20px}.entityForm footer{padding-left:20px;padding-right:20px}.entityForm footer button{min-height:44px}.headerText p{font-size:12px}}
+.grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:10px;align-items:start}.card{padding:12px 14px;border-radius:11px}.card h3{font-size:14px;margin-bottom:3px}.address{font-size:10px}.cardTop .badge{font-size:10px;padding:2px 6px}.entityState{display:flex;align-items:center;gap:12px;flex:0 0 auto;margin-top:12px;min-height:48px}.valueIcon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;flex:0 0 38px;border-radius:10px;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}.valueIcon svg{width:23px;height:23px}.stateContent{min-width:0;flex:1}.stateLabel{font-size:10px;margin-bottom:2px}.stateValue{font-size:26px;font-weight:650;line-height:1.25;max-height:5em}.card[data-value-type="text"] .stateValue{font-size:15px;font-weight:400;line-height:1.45}.card[data-value-type="text"] .valueIcon{color:var(--accent-text);background:color-mix(in srgb,var(--accent-text) 10%,transparent)}.card[data-value-type="datetime"] .stateValue{font-size:15px;font-weight:500;line-height:1.45}.card[data-value-type="boolean"] .stateValue{font-size:16px;font-weight:600}.card[data-value-type="boolean"] .valueIcon{border-radius:50%;color:var(--secondary-text-color,#637487);background:color-mix(in srgb,var(--secondary-text-color,#637487) 10%,transparent)}.card[data-tone="active"] .valueIcon{color:var(--primary-color,#008fac);background:color-mix(in srgb,var(--primary-color,#008fac) 15%,transparent)}.card[data-tone="active"] .stateValue{color:var(--primary-color,#008fac)}.card[data-tone="alert"] .valueIcon{color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 12%,transparent)}.card[data-tone="alert"] .stateValue{color:var(--error-color,#be3131)}.card:not([data-state-kind="value"]) .stateValue{font-size:14px;font-weight:400;color:var(--secondary-text-color,#637487)}.card:not([data-state-kind="value"]) .valueIcon{color:var(--secondary-text-color,#637487);background:color-mix(in srgb,var(--secondary-text-color,#637487) 8%,transparent)}.card[data-state-kind="empty"] .stateValue{font-style:italic}.retainedValue{display:inline-block;font-size:10px;line-height:1.4;margin-top:5px;padding:2px 6px;border-radius:4px;color:var(--primary-text-color,#243346);background:color-mix(in srgb,var(--warning-color,#e0a000) 18%,var(--card-background-color,#fff))}.cardBottom{margin-top:8px;padding-top:0;border-top:0;gap:8px}.cardBottom .meta{font-size:11px}.cardBottom .actions button{padding:5px 10px;min-height:32px;font-size:12px}.grid.list .card{padding:10px 14px;gap:16px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(150px,.55fr)}.grid.list .entityState{margin:0;min-height:40px;gap:10px}.grid.list .stateValue{font-size:21px}.grid.list .card[data-value-type="text"] .stateValue,.grid.list .card[data-value-type="datetime"] .stateValue{font-size:14px}.grid.list .card[data-value-type="boolean"] .stateValue{font-size:15px}.grid.list .card:not([data-state-kind="value"]) .stateValue{font-size:14px}.grid.list .valueIcon{width:32px;height:32px;flex-basis:32px}.grid.list .valueIcon svg{width:20px;height:20px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.card{padding:12px}.grid.list .card{grid-template-columns:minmax(0,1fr);gap:10px;padding:12px}.grid.list .entityState{align-items:center}.cardBottom .actions button{min-height:44px;padding:8px 12px}.cardBottom .meta{font-size:11px}}
+.card{--value-accent:var(--accent)}.card[data-value-type="text"]{--value-accent:var(--accent-text)}.card[data-value-type="datetime"]{--value-accent:var(--accent-datetime)}.card[data-value-type="boolean"]{--value-accent:var(--secondary-text-color,#637487)}.card[data-tone="active"]{--value-accent:var(--primary-color,#008fac)}.card[data-tone="alert"]{--value-accent:var(--error-color,#be3131)}.card:not([data-state-kind="value"]){--value-accent:var(--secondary-text-color,#637487)}.entityState{margin-top:8px;padding:6px 10px;gap:10px;border:1px solid color-mix(in srgb,var(--value-accent) 24%,transparent);border-radius:10px;background:color-mix(in srgb,var(--value-accent) 9%,var(--card-background-color,#fff));max-width:100%}.card .entityState .valueIcon{width:30px;height:30px;flex-basis:30px;background:transparent;color:var(--value-accent)}.grid.list .entityState{width:fit-content;max-width:100%;padding:6px 10px}.card[data-tone="alert"] .stateValue{color:color-mix(in srgb,var(--error-color,#be3131) 70%,var(--primary-text-color,#243346))}
+.customizations{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;min-width:0;order:2}.customizationBadge{padding:3px 7px;border-radius:5px;background:color-mix(in srgb,var(--secondary-text-color,#637487) 8%,transparent);border:1px solid var(--divider-color,#dce2ea);color:var(--secondary-text-color,#637487);font-size:11px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}.cardBottom{order:3}.grid.list .cardBottom{order:0}.grid.list .customizations{grid-column:1/-1;order:1;margin-top:-4px}.grid.list .card:has(.customizations){row-gap:10px}
+@media(max-width:650px){.grid.list .customizations{margin-top:0}.grid.list .cardBottom{order:2}}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
@@ -713,6 +787,92 @@ class OpcuaNodePanel extends HTMLElement {
     main.append(element("p", this._t("info"), { class: "hint" }));
     this._paintStates();
   }
+  _customizations(row) {
+    // Orphans may share settings with a replacement entity; do not attribute
+    // that replacement's configuration to the obsolete entity.
+    if (row.orphan) return null;
+    const settings = row.settings || {};
+    const badges = element("div", undefined, {
+      class: "customizations",
+      role: "list",
+      "aria-label": this._t("customizations"),
+    });
+    const add = (key, text, help = text) =>
+      badges.append(
+        element("span", text, {
+          class: "customizationBadge",
+          role: "listitem",
+          "data-setting": key,
+          title: help,
+        }),
+      );
+    const number = (n) =>
+      new Intl.NumberFormat(this._hass?.language || "en", {
+        maximumSignificantDigits: 17,
+      }).format(n);
+    const floating = ["Float", "Double"].includes(row.variant_type);
+    if (row.invert_state) add("invert_state", this._t("invertedBadge"));
+    if (row.platform === "binary_sensor" && row.device_class) {
+      const name =
+        this._hass.localize?.(
+          `component.binary_sensor.entity_component.${row.device_class}.name`,
+        ) || row.device_class;
+      add("device_class", `${this._t("classBadge")}: ${name}`);
+    }
+    if (floating && settings.precision != null)
+      add(
+        "precision",
+        `${this._t("precision")}: ${settings.precision}`,
+        this._t("precisionHelp"),
+      );
+    if (settings.always_available === true)
+      add(
+        "always_available",
+        this._t("alwaysAvailable"),
+        this._t("alwaysAvailableHelp"),
+      );
+    if (settings.update_mode === "subscription") {
+      add(
+        "update_mode",
+        this._t("subscriptionBadge"),
+        this._t("updateModeHelp"),
+      );
+      const deadband = settings.deadband;
+      if (
+        ["sensor", "number"].includes(row.platform) &&
+        NUMERIC.has(row.variant_type) &&
+        Number.isFinite(deadband) &&
+        deadband !== (floating ? 0.01 : 1)
+      ) {
+        add(
+          "deadband",
+          `${this._t("deadband")}: ${number(deadband)}`,
+          this._t("deadbandHelp"),
+        );
+      }
+    }
+    if (row.platform === "number") {
+      const min = settings.min ?? 0;
+      const max = settings.max ?? 100;
+      if (min !== 0 || max !== 100)
+        add(
+          "range",
+          `${this._t("rangeBadge")}: ${number(min)} – ${number(max)}`,
+        );
+      const step = settings.step;
+      if (Number.isFinite(step) && step !== (floating ? 0.1 : 1))
+        add("step", `${this._t("step")}: ${number(step)}`);
+    }
+    if (row.platform === "text") {
+      const min = settings.min_length ?? 0;
+      const max = settings.max_length ?? 255;
+      if (min !== 0 || max !== 255)
+        add("length", `${this._t("lengthBadge")}: ${min} – ${max}`);
+    }
+    if (row.key && row.node_id && row.node_id !== row.key)
+      add("node_id", this._t("remappedBadge"), `${row.key} → ${row.node_id}`);
+    return badges.childElementCount ? badges : null;
+  }
   _renderRows() {
     if (!this._rows) return;
     this._rows.replaceChildren();
@@ -744,9 +904,11 @@ class OpcuaNodePanel extends HTMLElement {
         class: this._viewMode === "list" ? "grid list" : "grid",
       });
       for (const row of items) {
+        const type = valueType(row);
         const card = element("article", undefined, {
           class: row.orphan ? "card orphan" : "card",
           "data-platform": row.platform,
+          "data-value-type": type,
         });
         const top = element("div", undefined, { class: "cardTop" });
         const text = element("div", undefined, { class: "cardTitle" });
@@ -793,15 +955,35 @@ class OpcuaNodePanel extends HTMLElement {
         }
         bottom.append(actions);
         const state = element("div", undefined, { class: "entityState" });
-        state.append(
-          element("span", this._t("state"), { class: "stateLabel" }),
+        const icon = element("span", undefined, {
+          class: "valueIcon",
+          "aria-hidden": "true",
+        });
+        const content = element("div", undefined, { class: "stateContent" });
+        const labelKey = {
+          numeric: "valueLabel",
+          text: "textLabel",
+          datetime: "dateLabel",
+          boolean: "state",
+        }[type];
+        content.append(
+          element("span", this._t(labelKey), { class: "stateLabel" }),
           element("span", "", {
             class: "stateValue",
             "data-entity-state": row.entity_id || "",
             "data-platform": row.platform,
           }),
         );
+        const retained = element("span", this._t("retainedValue"), {
+          class: "retainedValue",
+          title: this._t("retainedHelp"),
+          hidden: "",
+        });
+        content.append(retained);
+        state.append(icon, content);
         card.append(top, state, bottom);
+        const customizations = this._customizations(row);
+        if (customizations) card.append(customizations);
         grid.append(card);
       }
       details.append(grid);
@@ -883,6 +1065,7 @@ class OpcuaNodePanel extends HTMLElement {
         kind = "unknown";
         label = this._t("stateUnknown");
       } else if (entity.state === "") {
+        kind = "empty";
         label = this._t("stateEmpty");
       } else {
         // HA applies device-class labels, units, locale and timezone preferences.
@@ -901,6 +1084,39 @@ class OpcuaNodePanel extends HTMLElement {
       }
       if (value.textContent !== label) value.textContent = label;
       if (value.dataset.kind !== kind) value.dataset.kind = kind;
+      const card = value.closest(".card");
+      const type = card.dataset.valueType;
+      let visual = kind === "value" ? type : kind;
+      let tone = "neutral";
+      if (kind === "value" && type === "boolean") {
+        const raw = entity.state.toLowerCase();
+        if (["on", "true"].includes(raw)) {
+          visual = "on";
+          tone = [
+            "problem",
+            "safety",
+            "smoke",
+            "gas",
+            "carbon_monoxide",
+            "moisture",
+            "tamper",
+          ].includes(entity.attributes?.device_class)
+            ? "alert"
+            : "active";
+          if (tone === "alert") visual = "alert";
+        } else if (["off", "false"].includes(raw)) visual = "off";
+      }
+      card.dataset.stateKind = kind;
+      card.dataset.tone = tone;
+      const icon = card.querySelector(".valueIcon");
+      if (icon.dataset.icon !== visual) {
+        icon.replaceChildren(valueIcon(visual));
+        icon.dataset.icon = visual;
+      }
+      card.querySelector(".retainedValue").hidden = !(
+        ["value", "empty"].includes(kind) &&
+        entity?.attributes?.value_stale === true
+      );
     }
     for (const badge of this.shadowRoot.querySelectorAll("[data-connection]")) {
       const state = states[badge.dataset.connection];
