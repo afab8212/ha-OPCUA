@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.3.0";
+const PANEL_VERSION = "1.4.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -44,6 +44,11 @@ const TEXT = {
     deadband: "Deadband",
     deadbandHelp:
       "Solo Auto-Subscription: sopprime un aggiornamento push più piccolo di questa variazione assoluta (es. 0,01 nasconde il rumore in virgola mobile oltre la 2ª cifra decimale). 0 disattiva il filtro. Il polling non è interessato e legge sempre il valore esatto.",
+    unit: "Unità di misura",
+    unitHelp:
+      "Testo libero (es. °C, bar, l/min), mostrato accanto al valore. Lascia vuoto per nessuna unità.",
+    unitBadge: "Unità",
+    invalid_unit: "Inserisci un'unità di misura di massimo 50 caratteri.",
     orphan: "Nodo mancante",
     deleteEntity: "Elimina entità",
     deleting: "Eliminazione…",
@@ -228,6 +233,11 @@ const TEXT = {
     deadband: "Deadband",
     deadbandHelp:
       "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value.",
+    unit: "Unit of measurement",
+    unitHelp:
+      "Free text (e.g. °C, bar, l/min), shown next to the value. Leave empty for no unit.",
+    unitBadge: "Unit",
+    invalid_unit: "Enter a unit of measurement of at most 50 characters.",
     remove: "Remove",
     removing: "Removing…",
     removeTitle: "Remove manual node",
@@ -851,6 +861,14 @@ class OpcuaNodePanel extends HTMLElement {
         "precision",
         `${this._t("precision")}: ${settings.precision}`,
         this._t("precisionHelp"),
+      );
+    if (
+      ["sensor", "number"].includes(row.platform) &&
+      settings.unit_of_measurement
+    )
+      add(
+        "unit_of_measurement",
+        `${this._t("unitBadge")}: ${settings.unit_of_measurement}`,
       );
     if (settings.always_available === true)
       add(
@@ -1703,6 +1721,15 @@ class OpcuaNodePanel extends HTMLElement {
       class: "hint",
     });
     body.append(deadbandField, deadbandHelp);
+    const unit = element("input", undefined, {
+      type: "text",
+      name: "unit_of_measurement",
+      maxlength: "50",
+    });
+    unit.value = initial.unit_of_measurement || "";
+    const unitField = this._field("unit", unit);
+    const unitHelp = element("p", this._t("unitHelp"), { class: "hint" });
+    body.append(unitField, unitHelp);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     for (const cls of this._data.device_classes)
@@ -1743,6 +1770,11 @@ class OpcuaNodePanel extends HTMLElement {
         NUMERIC.has(selectedNode()?.variant_type)
       );
       deadband.disabled = deadbandField.hidden;
+      unitField.hidden = unitHelp.hidden = !(
+        ["number", "sensor"].includes(platform) &&
+        NUMERIC.has(selectedNode()?.variant_type)
+      );
+      unit.disabled = unitField.hidden;
       toggle.hidden = invertHelp.hidden =
         selectedNode()?.variant_type !== "Boolean";
       for (const [kind, group] of Object.entries(limitGroups)) {
@@ -1824,6 +1856,13 @@ class OpcuaNodePanel extends HTMLElement {
                   precision.disabled || precision.value === ""
                     ? null
                     : Number(precision.value),
+              }
+            : {}),
+          ...(!unit.disabled || initial.unit_of_measurement != null
+            ? {
+                unit_of_measurement: unit.disabled
+                  ? null
+                  : unit.value.trim() || null,
               }
             : {}),
           name: name.value,

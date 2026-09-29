@@ -64,6 +64,11 @@ def supports_deadband(node, platform):
     return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
 
 
+def supports_unit(node, platform):
+    """A unit of measurement only makes sense for an analog sensor or number."""
+    return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
+
+
 def validate_settings(node, settings):
     """Return normalized settings; shared by the options flow and entity setup."""
     platform = settings.get("platform", "auto")
@@ -132,6 +137,18 @@ def validate_settings(node, settings):
         ] not in {item.value for item in BinarySensorDeviceClass}:
             raise ValueError("invalid_device_class")
         result["device_class"] = settings["device_class"]
+    if settings.get("unit_of_measurement") is not None:
+        unit = settings["unit_of_measurement"]
+        if not isinstance(unit, str):
+            raise ValueError("invalid_unit")
+        unit = unit.strip()
+        if (
+            not unit
+            or len(unit) > 50
+            or not supports_unit(node, effective_platform(node, settings))
+        ):
+            raise ValueError("invalid_unit")
+        result["unit_of_measurement"] = unit
     if platform == "number":
         defaults = number_defaults(node)
         if any(isinstance(settings.get(key), bool) for key in defaults):
