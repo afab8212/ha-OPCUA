@@ -1,6 +1,6 @@
 {
   "domain": "ha_opcua",
-  "name": "ha-OPCUA",
+  "name": "OPC UA Connect",
   "codeowners": [
     "@xtimmy86x"
   ],

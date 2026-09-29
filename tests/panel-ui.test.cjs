@@ -238,7 +238,7 @@ async function pageFor(width = 1280, admin = true) {
     document.querySelector("opcua-node-panel").hass = window.testHass;
   }, admin);
   await page
-    .getByRole("heading", { name: "Nodi OPC UA", exact: true })
+    .getByRole("heading", { name: "OPC UA Connect", exact: true })
     .waitFor();
   if (admin) await page.locator("article").first().waitFor();
   return page;
@@ -261,7 +261,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.0.0",
+    "Pannello 1.0.1",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),

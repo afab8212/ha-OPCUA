@@ -67,7 +67,7 @@ async def async_setup_panel(hass):
         hass,
         frontend_url_path=PANEL_PATH,
         webcomponent_name="opcua-node-panel",
-        sidebar_title="OPC UA",
+        sidebar_title="OPC UA Connect",
         sidebar_icon="mdi:lan-connect",
         module_url=f"/ha-opcua-panel/panel.js?v={version}&panel={panel_hash}",
         require_admin=True,

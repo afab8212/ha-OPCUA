@@ -1,4 +1,4 @@
-# 🏠 ha-OPCUA — OPC UA for Home Assistant
+# 🏠 ha-OPCUA — OPC UA Connect for Home Assistant
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
@@ -10,7 +10,7 @@
 
 ## 🔌 Overview
 
-**ha-OPCUA** is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number`, `text` or `datetime` entities in Home Assistant.
+**OPC UA Connect** (project **ha-OPCUA**) is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number`, `text` or `datetime` entities in Home Assistant.
 
 This integration uses the `asyncua` library for **local polling**, with optional **OPC UA data-change subscriptions selected per entity**. Polling remains enabled in both update modes; subscriptions provide additional updates when the server reports a value change.
 
@@ -48,7 +48,7 @@ This integration uses the `asyncua` library for **local polling**, with optional
 2. Add this repository: [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA)
 3. Select category: **Integration**
 4. Click **Add**
-5. Install the `ha-OPCUA` integration
+5. Install the **OPC UA Connect** integration
 6. Restart Home Assistant
 
 ### Option 2: Manual
@@ -63,7 +63,7 @@ This integration uses the `asyncua` library for **local polling**, with optional
 
 The project is maintained independently at [xtimmy86x/ha-OPCUA](https://github.com/xtimmy86x/ha-OPCUA). Use this URL when adding the custom repository in HACS.
 
-Starting with 2.0.0, the integration directory and Home Assistant domain are **`ha_opcua`**. The repository name remains **ha-OPCUA**, and the integration appears as **ha-OPCUA** in Home Assistant. Install it at `/config/custom_components/ha_opcua`; do not use a hyphen in the directory name.
+Starting with 2.0.0, the integration directory and Home Assistant domain are **`ha_opcua`**. The repository name remains **ha-OPCUA**, and the integration appears as **OPC UA Connect** in Home Assistant and HACS. Install it at `/config/custom_components/ha_opcua`; do not use a hyphen in the directory name.
 
 This is a fresh-install domain change with no automatic migration from the previous domain. If an older version was installed, remove its integration entries and old custom-component directory before installing this version, then configure the endpoints again. Existing entity references and automations may need updating. Direct service calls now use `ha_opcua.opcua_set_value`.
 
@@ -78,7 +78,7 @@ See [Home Assistant's brand image documentation](https://developers.home-assista
 ### Setup via Home Assistant UI
 
 1. Go to **Settings > Devices & Services > Add Integration**
-2. Search for **ha-OPCUA**
+2. Search for **OPC UA Connect**
 3. Enter the required connection info:
 - **Server URL** (e.g., `opc.tcp://192.168.0.10:4840`)
 - **Username** (optional)
@@ -93,7 +93,7 @@ By default, updates use polling only. Subscriptions require both an explicit per
 
 ## OPC UA side panel (2.1.0)
 
-After updating and restarting Home Assistant, administrators will see **OPC UA** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Connection details, endpoint actions and Auto-Subscription are grouped in one control card. Categories can be filtered or collapsed, and the grid/list preference is retained in the browser. Cards emphasize the live value; on desktop, the compact list aligns names, values and actions in separate columns. Long text and NodeIds wrap without horizontal overflow, and narrow screens stack the content. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
+After updating and restarting Home Assistant, administrators will see **OPC UA Connect** in the sidebar. Select an endpoint, search by name/NodeId, and browse entities grouped into sensors, binary sensors, switches, numbers, text and date/time entities. Connection details, endpoint actions and Auto-Subscription are grouped in one control card. Categories can be filtered or collapsed, and the grid/list preference is retained in the browser. Cards emphasize the live value; on desktop, the compact list aligns names, values and actions in separate columns. Long text and NodeIds wrap without horizontal overflow, and narrow screens stack the content. The panel follows the Home Assistant light/dark theme and supports mobile screens; English and Italian labels are included.
 
 Each entity card shows its live Home Assistant state, including localized binary device-class labels, numeric units, text and date/time formatting. Values update as Home Assistant receives state changes without refreshing the panel or interrupting open dialogs. Unknown, unavailable, unregistered and excluded entities are clearly distinguished. This uses Home Assistant's existing state stream and adds no PLC polling. Values update after reads at the endpoint's configured polling interval and, for opted-in entities while Auto-Subscription is enabled, after server data-change notifications. Boolean inversion is already reflected in the displayed entity state.
 
@@ -133,7 +133,7 @@ A disabled mapping is retained to prevent discovery from recreating the removed 
 
 OPC UA values are normalized to UTC, and Home Assistant displays them in the frontend's configured timezone. Home Assistant's `datetime.set_value` service treats a timezone-free input as local HA time; for unambiguous automation commands (especially during daylight-saving transitions), include the UTC offset. The direct `ha_opcua.opcua_set_value` service requires an ISO 8601 timestamp with an explicit offset or `Z`, for example `2026-09-14T18:30:00+02:00`. Bare dates, timezone-free direct writes and dates before 1601-01-01 UTC are rejected. Strings and integer timestamps are not automatically interpreted as OPC UA DateTime nodes.
 
-The panel header displays both the installed integration version (from the backend manifest) and the independent panel version (from the JavaScript actually loaded by the browser). The panel starts at **1.0.0**; maintainers should increment `PANEL_VERSION` in `www/panel.js` for each frontend change.
+The panel header displays both the installed integration version (from the backend manifest) and the independent panel version (from the JavaScript actually loaded by the browser). Maintainers should increment `PANEL_VERSION` in `www/panel.js` for each frontend change.
 
 In the entity editor, **Cancel** and **Save** stay at the bottom of the dialog while the fields scroll independently, including on mobile. Save errors appear above these buttons.
 
@@ -143,7 +143,7 @@ Panel JavaScript is bundled with the integration and uses a URL containing the i
 
 ### Enable subscriptions for selected entities
 
-1. Open **OPC UA** in the Home Assistant sidebar and select the endpoint.
+1. Open **OPC UA Connect** in the Home Assistant sidebar and select the endpoint.
 2. Click **Edit** (**Modifica**) on an entity. Under **Update mode** (**Modalità aggiornamento**), select **Polling + subscription**. This is also available when adding a manual node.
 3. For numeric sensors or numbers, optionally adjust **Deadband**. Save and allow the endpoint to reload. Repeat for the other entities that should receive notifications.
 4. Turn on **Endpoint Auto-Subscription** (**Auto-Subscription endpoint**) next to **Rediscover** at the top of the panel. It controls the same switch entity available on the device page and in automations. Connection options remain another way to set it. You can save the choice with the PLC offline or the connection disabled; notifications start when the connection is enabled and the PLC is reachable.
@@ -186,7 +186,7 @@ The connectivity sensor’s **`subscription_active`** attribute reports whether 
 
 The `asyncua` library logs routine reads, browsing and subscription notifications at INFO level. ha-OPCUA defaults that library to **WARNING** to keep normal operation quiet. Warnings and errors remain visible. An explicitly configured library logger level is preserved; no root/Home Assistant logging level is changed.
 
-For troubleshooting, use **Enable debug logging** on the ha-OPCUA integration in Home Assistant. The integration declares `asyncua` as a library logger, so Home Assistant can include its detailed messages as well. Disable debug logging after reproducing the issue.
+For troubleshooting, use **Enable debug logging** on the OPC UA Connect integration in Home Assistant. The integration declares `asyncua` as a library logger, so Home Assistant can include its detailed messages as well. Disable debug logging after reproducing the issue.
 
 If you have an existing logging override and still see routine INFO messages, set the library level explicitly in your existing `configuration.yaml` logger section:
 
@@ -222,7 +222,7 @@ Connection controls are also available when the PLC is offline at startup. Node 
 
 ## Per-node entity configuration (1.1.0)
 
-Open the **OPC UA** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and update mode and, for `number` or `text`, set its limits in the same form. Numeric entities in subscription mode also offer a deadband setting. Save to reload the endpoint. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → ha-OPCUA → Configure**. English and Italian translations are included.
+Open the **OPC UA Connect** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and update mode and, for `number` or `text`, set its limits in the same form. Numeric entities in subscription mode also offer a deadband setting. Save to reload the endpoint. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → OPC UA Connect → Configure**. English and Italian translations are included.
 
 | Choice | Compatible nodes | Behavior |
 | --- | --- | --- |

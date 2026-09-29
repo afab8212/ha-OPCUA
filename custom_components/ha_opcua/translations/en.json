@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "ha-OPCUA",
+        "title": "OPC UA Connect",
         "data": {
           "name": "Hub name",
           "url": "URL server OPC UA",
