@@ -125,7 +125,8 @@ def endpoint_snapshot(hass, entry):
     for key, node in nodes.items():
         settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
         platform = effective_platform(node, settings)
-        if _is_auto_readonly_boolean(node, settings):
+        reclassifiable = _is_auto_readonly_boolean(node, settings)
+        if reclassifiable:
             reclassifiable_booleans += 1
         entity_id = registry.async_get_entity_id(
             platform, DOMAIN, f"{entry.entry_id}:{key}"
@@ -172,6 +173,7 @@ def endpoint_snapshot(hass, entry):
                 },
                 "manual": key in manual,
                 "orphan": False,
+                "reclassifiable": reclassifiable,
             }
         )
     # Entities whose node vanished from the PLC (or that a category change
@@ -204,6 +206,7 @@ def endpoint_snapshot(hass, entry):
                 },
                 "manual": False,
                 "orphan": True,
+                "reclassifiable": False,
             }
         )
     revision = hashlib.sha256(
@@ -611,15 +614,22 @@ async def async_remove_all_orphans(hass, msg):
 
 
 async def async_reclassify_boolean_sensors(hass, msg):
-    """Explicitly opt existing read-only Boolean sensors into binary_sensor.
+    """Explicitly opt selected read-only Boolean sensors into binary_sensor.
 
     A newly discovered read-only Boolean node already gets binary_sensor by
     default; this never applies retroactively on its own (see set_nodes()),
     so an installation with Boolean nodes discovered before that default
     existed is stuck with plain sensors showing a raw "True"/"False" state
     unless it opts in here, one endpoint at a time. Only nodes still left on
-    Auto are touched - an explicit past choice (including an explicit
+    Auto are eligible - an explicit past choice (including an explicit
     "sensor") is never overridden.
+
+    `msg["keys"]` is the caller's selection (the panel lets the user pick
+    which eligible entities to convert instead of an all-or-nothing action).
+    Each key is re-validated against the current live state rather than
+    trusted as-is, since it may be stale by the time the user confirms; a
+    key that is missing or no longer eligible is silently skipped, matching
+    how the rest of this action already tolerates a state that moved on.
 
     Applies the change to the live coordinator directly (mirroring a normal
     discovery-driven classification) instead of forcing a full reload: the
@@ -648,7 +658,10 @@ async def async_reclassify_boolean_sensors(hass, msg):
         options = deepcopy(dict(entry.options))
         node_settings_opt = options.setdefault(CONF_NODE_SETTINGS, {})
         reclassified = []
-        for key, node in c.nodes.items():
+        for key in dict.fromkeys(msg["keys"]):
+            node = c.nodes.get(key)
+            if node is None:
+                continue
             saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
             if not _is_auto_readonly_boolean(node, saved):
                 continue
@@ -769,6 +782,7 @@ async def ws_remove_orphans(hass, connection, msg):
         vol.Required("type"): f"{DOMAIN}/entity/reclassify_boolean_sensors",
         vol.Required("entry_id"): str,
         vol.Required("revision"): str,
+        vol.Required("keys"): [str],
     }
 )
 @websocket_api.require_admin
