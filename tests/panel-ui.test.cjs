@@ -1515,7 +1515,7 @@ for (const [width, dark] of [
       await page.getByRole("button", { name: label, exact: true }).click();
       await page.locator(".content").evaluate((el) => {
         el.scrollTop +=
-          el.querySelector("section").getBoundingClientRect().top -
+          el.querySelector(".group").getBoundingClientRect().top -
           el.getBoundingClientRect().top;
       });
       assert.equal(
@@ -1537,6 +1537,16 @@ for (const [width, dark] of [
       await shot(
         page,
         `typed-states-${width}-${dark ? "dark" : "light"}-${mode}.png`,
+      );
+      await page.locator(".content").evaluate((el) => {
+        el.scrollTop +=
+          el
+            .querySelector('.group[data-platform="binary_sensor"]')
+            .getBoundingClientRect().top - el.getBoundingClientRect().top;
+      });
+      await shot(
+        page,
+        `boolean-states-${width}-${dark ? "dark" : "light"}-${mode}.png`,
       );
     }
     // A live update clears both stale and active/alarm visuals without rebuilding the card.
