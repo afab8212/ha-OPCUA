@@ -143,6 +143,7 @@ async function pageFor(width = 1280, admin = true) {
         sensor: ["temperature", "timestamp"],
         switch: ["outlet", "switch"],
       },
+      units: ["%", "Hz", "bar", "kWh", "l/min", "°C"],
     };
     window.testHass = {
       language: "it",
@@ -246,6 +247,9 @@ async function pageFor(width = 1280, admin = true) {
             ...(Object.hasOwn(msg, "precision")
               ? { precision: msg.precision }
               : {}),
+            ...(Object.hasOwn(msg, "unit_of_measurement")
+              ? { unit_of_measurement: msg.unit_of_measurement }
+              : {}),
           },
           name: msg.name || row.name,
           custom_name: msg.name,
@@ -284,7 +288,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.3.0",
+    "Pannello 1.6.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1089,6 +1093,89 @@ test("REAL precision can be saved, cleared and reset on a non-REAL remap", async
     ),
     null,
   );
+  await page.close();
+});
+
+test("a unit of measurement can be picked from a searchable list, set to a custom value, cleared and hidden for a non-numeric remap", async () => {
+  const page = await pageFor();
+  const card = page.locator("article").filter({ hasText: "Velocità linea" });
+  const edit = () =>
+    card.getByRole("button", { name: "Modifica", exact: true }).click();
+  const dialog = page.locator("dialog[open]");
+  const field = () => dialog.getByLabel("Unità di misura", { exact: true });
+  const filter = () => dialog.getByLabel("Filtra unità", { exact: true });
+  const custom = () =>
+    dialog.getByLabel("Unità personalizzata", { exact: true });
+  const lastUnit = () =>
+    page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+          .unit_of_measurement,
+    );
+  const save = async () => {
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  };
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  assert.equal(await custom().isVisible(), false);
+  // The filter narrows the standard list; "Nessuna" and "Personalizzata…"
+  // always stay pinned so a search never hides those two choices.
+  await filter().fill("kwh");
+  assert.deepEqual(await field().locator("option").allTextContents(), [
+    "Nessuna",
+    "kWh",
+    "Personalizzata…",
+  ]);
+  await filter().fill("");
+  await field().selectOption("bar");
+  await save();
+  assert.equal(await lastUnit(), "bar");
+  await edit();
+  assert.equal(await field().inputValue(), "bar");
+  assert.equal(await custom().isVisible(), false);
+  // Regression: selecting "None" and then typing into the filter must keep
+  // the explicit empty choice, not resurrect the unit that was there before.
+  await field().selectOption("");
+  await filter().fill("kwh");
+  assert.equal(await field().inputValue(), "");
+  await filter().fill("");
+  await save();
+  assert.equal(await lastUnit(), null);
+
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().selectOption("bar");
+  await save();
+  assert.equal(await lastUnit(), "bar");
+
+  await edit();
+  assert.equal(await field().inputValue(), "bar");
+  assert.equal(await custom().isVisible(), false);
+  await field().selectOption("__custom__");
+  assert.equal(await custom().isVisible(), true);
+  await custom().fill(" pieces/min ");
+  await save();
+  assert.equal(await lastUnit(), "pieces/min");
+  await edit();
+  assert.equal(await field().inputValue(), "__custom__");
+  assert.equal(await custom().inputValue(), "pieces/min");
+  await field().selectOption("");
+  assert.equal(await custom().isVisible(), false);
+  await save();
+  assert.equal(await lastUnit(), null);
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().selectOption("bar");
+  await save();
+  await edit();
+  await dialog
+    .getByLabel("NodeId associato", { exact: true })
+    .selectOption("ns=4;i=4");
+  assert.equal(await field().isVisible(), false);
+  assert.equal(await custom().isVisible(), false);
+  await save();
+  assert.equal(await lastUnit(), null);
   await page.close();
 });
 

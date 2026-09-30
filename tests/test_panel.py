@@ -314,12 +314,13 @@ async def test_panel_number_limits_and_enabling_unregistered_excluded_node(hass,
     await c.async_shutdown()
 
 
-async def test_panel_number_device_class_is_saved_and_applied(hass, entry):
+async def test_panel_number_device_class_and_unit_are_saved_and_applied(hass, entry):
     c, _, msg = await prepare(hass, entry)
     msg.update(
         platform="number",
         node_id="ns=2;i=3",
         device_class="power",
+        unit_of_measurement="W",
         invert_state=False,
         limits={"min": 0, "max": 100, "step": 1},
     )
@@ -327,13 +328,12 @@ async def test_panel_number_device_class_is_saved_and_applied(hass, entry):
     result = await async_save_entity(hass, msg)
 
     assert result["saved"]
-    assert (
-        entry.options[CONF_NODE_SETTINGS]["ns=2;i=1"]["device_class"] == "power"
-    )
+    assert entry.options[CONF_NODE_SETTINGS]["ns=2;i=1"]["device_class"] == "power"
     restored = AsyncuaCoordinator(hass, "PLC", c.hub, config_entry=entry)
     restored.set_nodes(NODES)
     number = AsyncuaNumber(restored, "Speed", "ns=2;i=1", entry.entry_id)
     assert number.device_class == "power"
+    assert number.native_unit_of_measurement == "W"
     await c.async_shutdown()
     await restored.async_shutdown()
 

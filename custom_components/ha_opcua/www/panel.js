@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.3.0";
+const PANEL_VERSION = "1.6.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -44,6 +44,14 @@ const TEXT = {
     deadband: "Deadband",
     deadbandHelp:
       "Solo Auto-Subscription: sopprime un aggiornamento push più piccolo di questa variazione assoluta (es. 0,01 nasconde il rumore in virgola mobile oltre la 2ª cifra decimale). 0 disattiva il filtro. Il polling non è interessato e legge sempre il valore esatto.",
+    unit: "Unità di misura",
+    unitHelp:
+      "Scegli un'unità standard di Home Assistant, «Nessuna» oppure «Personalizzata…» per digitarne una (es. pieces/min), mostrata accanto al valore.",
+    filterUnits: "Filtra unità",
+    unitCustom: "Personalizzata…",
+    unitCustomLabel: "Unità personalizzata",
+    unitBadge: "Unità",
+    invalid_unit: "Inserisci un'unità di misura di massimo 50 caratteri.",
     orphan: "Nodo mancante",
     deleteEntity: "Elimina entità",
     deleting: "Eliminazione…",
@@ -228,6 +236,14 @@ const TEXT = {
     deadband: "Deadband",
     deadbandHelp:
       "Auto-Subscription only: suppress a push update smaller than this absolute change (e.g. 0.01 hides float noise below the 2nd decimal). 0 disables filtering. Polling is unaffected and always reads the exact value.",
+    unit: "Unit of measurement",
+    unitHelp:
+      "Pick a standard Home Assistant unit, “None”, or “Custom…” to type one (e.g. pieces/min), shown next to the value.",
+    filterUnits: "Filter units",
+    unitCustom: "Custom…",
+    unitCustomLabel: "Custom unit",
+    unitBadge: "Unit",
+    invalid_unit: "Enter a unit of measurement of at most 50 characters.",
     remove: "Remove",
     removing: "Removing…",
     removeTitle: "Remove manual node",
@@ -851,6 +867,14 @@ class OpcuaNodePanel extends HTMLElement {
         "precision",
         `${this._t("precision")}: ${settings.precision}`,
         this._t("precisionHelp"),
+      );
+    if (
+      ["sensor", "number"].includes(row.platform) &&
+      settings.unit_of_measurement
+    )
+      add(
+        "unit_of_measurement",
+        `${this._t("unitBadge")}: ${settings.unit_of_measurement}`,
       );
     if (settings.always_available === true)
       add(
@@ -1703,6 +1727,57 @@ class OpcuaNodePanel extends HTMLElement {
       class: "hint",
     });
     body.append(deadbandField, deadbandHelp);
+    const UNIT_CUSTOM = "__custom__";
+    const unitFilter = element("input", undefined, {
+      type: "search",
+      placeholder: this._t("filterUnits"),
+    });
+    const unit = element("select", undefined, { name: "unit_choice" });
+    // Read once from the saved setting; every later call must instead trust
+    // the select's own current value - including an explicitly empty "None"
+    // - so re-filtering never resurrects the original unit from under it.
+    let chosenUnit = this._data.units.includes(initial.unit_of_measurement)
+      ? initial.unit_of_measurement
+      : initial.unit_of_measurement
+        ? UNIT_CUSTOM
+        : "";
+    const populateUnits = () => {
+      if (unit.options.length) chosenUnit = unit.value;
+      const isStandard = this._data.units.includes(chosenUnit);
+      unit.replaceChildren(element("option", this._t("none"), { value: "" }));
+      for (const value of this._data.units)
+        if (
+          !unitFilter.value ||
+          value.toLowerCase().includes(unitFilter.value.toLowerCase()) ||
+          value === chosenUnit
+        )
+          unit.append(element("option", value, { value }));
+      unit.append(
+        element("option", this._t("unitCustom"), { value: UNIT_CUSTOM }),
+      );
+      unit.value =
+        chosenUnit === "" ? "" : isStandard ? chosenUnit : UNIT_CUSTOM;
+    };
+    populateUnits();
+    unitFilter.addEventListener("input", populateUnits);
+    const unitFilterField = this._field("filterUnits", unitFilter);
+    const unitField = this._field("unit", unit);
+    const unitHelp = element("p", this._t("unitHelp"), { class: "hint" });
+    const unitCustom = element("input", undefined, {
+      type: "text",
+      name: "unit_of_measurement",
+      maxlength: "50",
+    });
+    unitCustom.value = this._data.units.includes(initial.unit_of_measurement)
+      ? ""
+      : initial.unit_of_measurement || "";
+    const unitCustomField = this._field("unitCustomLabel", unitCustom);
+    const updateUnitCustomVisibility = () => {
+      unitCustomField.hidden = unitField.hidden || unit.value !== UNIT_CUSTOM;
+      unitCustom.disabled = unitCustomField.hidden;
+    };
+    unit.addEventListener("change", updateUnitCustomVisibility);
+    body.append(unitFilterField, unitField, unitHelp, unitCustomField);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
     const classesFor = (platform) => {
@@ -1768,6 +1843,15 @@ class OpcuaNodePanel extends HTMLElement {
         NUMERIC.has(selectedNode()?.variant_type)
       );
       deadband.disabled = deadbandField.hidden;
+      unitFilterField.hidden =
+        unitField.hidden =
+        unitHelp.hidden =
+          !(
+            ["number", "sensor"].includes(platform) &&
+            NUMERIC.has(selectedNode()?.variant_type)
+          );
+      unit.disabled = unitFilter.disabled = unitField.hidden;
+      updateUnitCustomVisibility();
       toggle.hidden = invertHelp.hidden =
         selectedNode()?.variant_type !== "Boolean";
       for (const [kind, group] of Object.entries(limitGroups)) {
@@ -1849,6 +1933,15 @@ class OpcuaNodePanel extends HTMLElement {
                   precision.disabled || precision.value === ""
                     ? null
                     : Number(precision.value),
+              }
+            : {}),
+          ...(!unit.disabled || initial.unit_of_measurement != null
+            ? {
+                unit_of_measurement: unit.disabled
+                  ? null
+                  : unit.value === UNIT_CUSTOM
+                    ? unitCustom.value.trim() || null
+                    : unit.value || null,
               }
             : {}),
           name: name.value,

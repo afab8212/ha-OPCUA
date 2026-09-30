@@ -85,9 +85,12 @@ def test_device_class_is_validated_for_each_entity_domain(node, settings, device
 def test_datetime_sensor_only_accepts_timestamp_device_class():
     node = {**INTEGER_NODE, "variant_type": "DateTime", "writable": False}
 
-    assert validate_settings(
-        node, {"platform": "sensor", "device_class": "timestamp"}
-    )["device_class"] == "timestamp"
+    assert (
+        validate_settings(node, {"platform": "sensor", "device_class": "timestamp"})[
+            "device_class"
+        ]
+        == "timestamp"
+    )
     with pytest.raises(ValueError, match="invalid_device_class"):
         validate_settings(node, {"platform": "sensor", "device_class": "power"})
 
