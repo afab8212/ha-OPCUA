@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.5.0";
+const PANEL_VERSION = "1.5.1";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -868,7 +868,7 @@ class OpcuaNodePanel extends HTMLElement {
             } catch {
               /* private browsing / blocked storage: not persisted this time */
             }
-            this._renderRows();
+            this._render();
           },
           this._groupMode === mode ? "selected" : "",
         );
