@@ -15,6 +15,7 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_integration
 
+from .arrays import array_element_name, parse_array_element
 from .connection import connection_attributes
 from .const import (
     CONF_HUB_ID,
@@ -88,6 +89,7 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_remove_orphan)
     websocket_api.async_register_command(hass, ws_remove_orphans)
     websocket_api.async_register_command(hass, ws_reclassify_boolean_sensors)
+    websocket_api.async_register_command(hass, ws_rename_array_fields)
     hass.data[PANEL_DATA] = {"locks": {}, "version": version}
 
 
@@ -108,6 +110,19 @@ def _is_auto_readonly_boolean(node, settings):
     )
 
 
+def _is_unrenamed_array_field(node_id, name, custom_name, parsed_array):
+    """A field of a PLC array-of-struct element still showing its raw, colliding name.
+
+    Never matches a row with a custom name already set - a past rename,
+    even to the same words, is a deliberate choice and is never
+    overridden, the same guard the Boolean reclassify action uses for an
+    explicit platform choice.
+    """
+    if custom_name is not None or parsed_array is None:
+        return False
+    return array_element_name(node_id, parsed_array["field"]) != name
+
+
 def _panel_nodes(coordinator):
     """Prefer live discovery, retaining verified metadata for offline editors."""
     return {
@@ -122,6 +137,7 @@ def endpoint_snapshot(hass, entry):
     available_nodes = _panel_nodes(c) if c else {}
     rows = []
     reclassifiable_booleans = 0
+    renamable_array_fields = 0
     manual = entry.options.get(CONF_MANUAL_NODES, {})
     nodes = {**manual, **(c.nodes if c else {})}
     for key, node in nodes.items():
@@ -144,19 +160,40 @@ def endpoint_snapshot(hass, entry):
                 None,
             )
             entity_id = registered.entity_id if registered else None
+        node_id = node.get("target_node_id", settings.get("node_id", key))
+        name = (
+            (registered.name or registered.original_name)
+            if registered
+            else node["name"]
+        )
+        custom_name = registered.name if registered else None
+        parsed_array = parse_array_element(node_id)
+        renamable = _is_unrenamed_array_field(node_id, name, custom_name, parsed_array)
+        if renamable:
+            renamable_array_fields += 1
         rows.append(
             {
                 "key": key,
                 "entity_id": entity_id,
                 "platform": platform,
-                "name": (
-                    (registered.name or registered.original_name)
-                    if registered
-                    else node["name"]
-                ),
-                "custom_name": registered.name if registered else None,
+                "name": name,
+                "custom_name": custom_name,
                 "area_id": registered.area_id if registered else None,
-                "node_id": node.get("target_node_id", settings.get("node_id", key)),
+                "node_id": node_id,
+                "array_group": parsed_array["group_key"] if parsed_array else None,
+                "array_label": (
+                    f"{parsed_array['array']} {parsed_array['index']}"
+                    if parsed_array
+                    else None
+                ),
+                "array_field": parsed_array["field"] if parsed_array else None,
+                "array_index": parsed_array["index"] if parsed_array else None,
+                "proposed_name": (
+                    array_element_name(node_id, parsed_array["field"])
+                    if parsed_array
+                    else None
+                ),
+                "renamable": renamable,
                 "variant_type": node["variant_type"],
                 "device_class": (
                     (registered.device_class or settings.get("device_class"))
@@ -209,6 +246,12 @@ def endpoint_snapshot(hass, entry):
                 "manual": False,
                 "orphan": True,
                 "reclassifiable": False,
+                "array_group": None,
+                "array_label": None,
+                "array_field": None,
+                "array_index": None,
+                "proposed_name": None,
+                "renamable": False,
             }
         )
     revision = hashlib.sha256(
@@ -236,6 +279,7 @@ def endpoint_snapshot(hass, entry):
         "revision": revision,
         "rows": rows,
         "reclassifiable_booleans": reclassifiable_booleans,
+        "renamable_array_fields": renamable_array_fields,
         "nodes": list(available_nodes.values()),
         "subscription_entity": registry.async_get_entity_id(
             "switch", DOMAIN, f"{entry.entry_id}:subscription_enabled"
@@ -719,6 +763,47 @@ async def async_reclassify_boolean_sensors(hass, msg):
         return {"reclassified": reclassified}
 
 
+async def async_rename_array_fields(hass, msg):
+    """Explicitly disambiguate selected PLC array-of-struct fields by index.
+
+    A field inside one element of a PLC array-of-struct (e.g.
+    "astMeldungen[10].xAktiv") shares its raw name with every other
+    element; set_nodes() only disambiguates this for a newly discovered
+    node (see its own docstring), never retroactively for one an
+    installation already has. This lets the user opt in per entity,
+    setting the same disambiguated text a new node gets by default as
+    the entity's custom name - exactly like a manual rename through the
+    entity editor, just for many at once.
+
+    `msg["keys"]` is the caller's selection; each key is re-validated
+    against a fresh snapshot rather than trusted as-is, since it may be
+    stale by the time the user confirms (a manual rename or a category
+    change elsewhere makes a key no longer eligible).
+    """
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        snapshot = endpoint_snapshot(hass, entry)
+        if snapshot["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        if _coordinator(hass, entry) is None:
+            raise ValueError("endpoint_not_loaded")
+        registry = er.async_get(hass)
+        rows_by_key = {row["key"]: row for row in snapshot["rows"]}
+        renamed = []
+        for key in dict.fromkeys(msg["keys"]):
+            row = rows_by_key.get(key)
+            if row is None or not row["renamable"] or not row["entity_id"]:
+                continue
+            registry.async_update_entity(row["entity_id"], name=row["proposed_name"])
+            renamed.append(key)
+        return {"renamed": renamed}
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/node/remove",
@@ -805,6 +890,25 @@ async def ws_remove_orphans(hass, connection, msg):
 async def ws_reclassify_boolean_sensors(hass, connection, msg):
     try:
         result = await async_reclassify_boolean_sensors(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/entity/rename_array_fields",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+        vol.Required("keys"): [str],
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_rename_array_fields(hass, connection, msg):
+    try:
+        result = await async_rename_array_fields(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
     else:
