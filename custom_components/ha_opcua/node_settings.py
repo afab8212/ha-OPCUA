@@ -1,8 +1,10 @@
 """Entity choices and editable limits for discovered scalar nodes."""
 
 import math
+from enum import Enum
 
 from asyncua import ua
+from homeassistant import const as ha_const
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 from .const import CONF_OFFLINE_NODES
@@ -67,6 +69,24 @@ def supports_deadband(node, platform):
 def supports_unit(node, platform):
     """A unit of measurement only makes sense for an analog sensor or number."""
     return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
+
+
+def standard_units():
+    """Every unit string HA's own canonical UnitOf* enums define, plus percentage.
+
+    Introspected from homeassistant.const rather than a hand-kept copy, so the
+    list offered by the panel always matches whatever unit categories the
+    running HA core version defines - this integration has no unit categories
+    of its own, it only ever displays a PLC's raw value next to one of these.
+    """
+    values = {ha_const.PERCENTAGE}
+    for name in dir(ha_const):
+        if not name.startswith("UnitOf"):
+            continue
+        candidate = getattr(ha_const, name)
+        if isinstance(candidate, type) and issubclass(candidate, Enum):
+            values.update(item.value for item in candidate)
+    return sorted(values)
 
 
 def validate_settings(node, settings):

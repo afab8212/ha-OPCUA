@@ -7,13 +7,15 @@ import pytest
 from test_panel import NODES, prepare
 
 from custom_components.ha_opcua import AsyncuaCoordinator
+from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
 from custom_components.ha_opcua.const import CONF_NODE_SETTINGS
-from custom_components.ha_opcua.node_settings import validate_settings
+from custom_components.ha_opcua.node_settings import standard_units, validate_settings
 from custom_components.ha_opcua.number import AsyncuaNumber
 from custom_components.ha_opcua.panel import (
     async_create_entity,
     async_save_entity,
     endpoint_snapshot,
+    panel_snapshot,
 )
 from custom_components.ha_opcua.sensor import AsyncuaSensor
 
@@ -150,3 +152,50 @@ async def test_manual_real_creation_preserves_unit(hass, entry):
     )
     c.hub.set_value.assert_not_awaited()
     await c.async_shutdown()
+
+
+@pytest.mark.asyncio
+async def test_options_flow_preserves_unit_of_measurement(hass, entry):
+    """Editing an unrelated limit through the stock options flow must not
+    silently drop a unit configured earlier through the panel - the same
+    "preserve panel metadata" contract _save_node() already gives precision,
+    device_class and deadband.
+    """
+    c, _, msg = await prepare(hass, entry)
+    c.hub.inspect_node = AsyncMock(return_value=REAL)
+    msg.update(
+        node_id=REAL["node_id"],
+        platform="number",
+        invert_state=False,
+        unit_of_measurement="bar",
+    )
+    await async_create_entity(hass, msg)
+    assert (
+        entry.options[CONF_NODE_SETTINGS][REAL["node_id"]]["unit_of_measurement"]
+        == "bar"
+    )
+    flow = AsyncUAOptionsFlow(entry)
+    flow.hass = hass
+    flow._node_id = REAL["node_id"]
+    flow._node = REAL
+    saved = await flow.async_step_number({"min": 0, "max": 50, "step": 0.1})
+    assert (
+        saved["data"][CONF_NODE_SETTINGS][REAL["node_id"]]["unit_of_measurement"]
+        == "bar"
+    )
+    await c.async_shutdown()
+
+
+def test_standard_units_are_sourced_from_home_assistant_itself():
+    """The panel's unit picker must never drift from HA's own definitions."""
+    units = standard_units()
+    assert units == sorted(set(units)), "must be sorted and free of duplicates"
+    assert all(isinstance(unit, str) and unit for unit in units)
+    # A representative sample of HA's own canonical UnitOf* values.
+    for expected in ("°C", "%", "bar", "Hz", "kWh", "m/s", "hPa"):
+        assert expected in units
+
+
+async def test_panel_snapshot_offers_the_standard_unit_list(hass, entry):
+    await prepare(hass, entry)
+    assert panel_snapshot(hass)["units"] == standard_units()

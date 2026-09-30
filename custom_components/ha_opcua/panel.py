@@ -29,6 +29,7 @@ from .device import async_register_device
 from .node_settings import (
     allowed_platforms,
     effective_platform,
+    standard_units,
     update_offline_node,
     validate_settings,
 )
@@ -257,6 +258,7 @@ def panel_snapshot(hass):
             for area in ar.async_get(hass).async_list_areas()
         ],
         "device_classes": sorted(item.value for item in BinarySensorDeviceClass),
+        "units": standard_units(),
     }
 
 
