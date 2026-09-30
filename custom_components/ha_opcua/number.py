@@ -30,6 +30,10 @@ class AsyncuaNumber(OpcuaEntity, NumberEntity):
         self._attr_native_step = self._settings["step"]
 
     @property
+    def native_unit_of_measurement(self):
+        return self._settings.get("unit_of_measurement")
+
+    @property
     def native_value(self):
         value = self.node_value
         if (

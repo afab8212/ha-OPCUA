@@ -1,8 +1,10 @@
 """Entity choices and editable limits for discovered scalar nodes."""
 
 import math
+from enum import Enum
 
 from asyncua import ua
+from homeassistant import const as ha_const
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 from .const import CONF_OFFLINE_NODES
@@ -62,6 +64,29 @@ def deadband_default(node):
 def supports_deadband(node, platform):
     """Deadband applies to any numeric node exposed as a number or sensor."""
     return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
+
+
+def supports_unit(node, platform):
+    """A unit of measurement only makes sense for an analog sensor or number."""
+    return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
+
+
+def standard_units():
+    """Every unit string HA's own canonical UnitOf* enums define, plus percentage.
+
+    Introspected from homeassistant.const rather than a hand-kept copy, so the
+    list offered by the panel always matches whatever unit categories the
+    running HA core version defines - this integration has no unit categories
+    of its own, it only ever displays a PLC's raw value next to one of these.
+    """
+    values = {ha_const.PERCENTAGE}
+    for name in dir(ha_const):
+        if not name.startswith("UnitOf"):
+            continue
+        candidate = getattr(ha_const, name)
+        if isinstance(candidate, type) and issubclass(candidate, Enum):
+            values.update(item.value for item in candidate)
+    return sorted(values)
 
 
 def validate_settings(node, settings):
@@ -137,6 +162,18 @@ def validate_settings(node, settings):
         ] not in {item.value for item in BinarySensorDeviceClass}:
             raise ValueError("invalid_device_class")
         result["device_class"] = settings["device_class"]
+    if settings.get("unit_of_measurement") is not None:
+        unit = settings["unit_of_measurement"]
+        if not isinstance(unit, str):
+            raise ValueError("invalid_unit")
+        unit = unit.strip()
+        if (
+            not unit
+            or len(unit) > 50
+            or not supports_unit(node, effective_platform(node, settings))
+        ):
+            raise ValueError("invalid_unit")
+        result["unit_of_measurement"] = unit
     if platform == "number":
         defaults = number_defaults(node)
         if any(isinstance(settings.get(key), bool) for key in defaults):

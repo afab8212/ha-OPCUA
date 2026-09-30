@@ -28,6 +28,10 @@ class AsyncuaSensor(OpcuaEntity, SensorEntity):
         return None
 
     @property
+    def native_unit_of_measurement(self):
+        return self._settings.get("unit_of_measurement")
+
+    @property
     def state_class(self):
         """Return the state class based on the type of native_value."""
         value = self.native_value
