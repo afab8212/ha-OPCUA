@@ -111,7 +111,7 @@ Click **Edit** on an entity to configure:
 - **Name**: stored in Home Assistant's entity registry; leave empty to restore the original name.
 - **Area**: choose a Home Assistant area, or inherit the device area. Explicit entity areas remain independent of device areas.
 - **Associated NodeId**: choose a compatible node from those discovered on the selected endpoint. The entity's unique ID and entity ID remain unchanged, preserving automation/dashboard references. Other entities using the same target are retained; shared targets are read once per poll. The direct `opcua_set_value` service continues to use physical NodeIds.
-- **Device class** for binary sensors, including None.
+- **Device class** for sensors, binary sensors, numbers and switches, including None.
 - **Invert boolean state** for Boolean nodes. For switches this also inverts commands: with inversion enabled, turning the HA switch on writes `false` to the PLC. Nonboolean values are not inverted.
 
 Saving updates the native entity registry and integration options. NodeId, category, update-mode, deadband, limits, inversion and device-class changes reload the endpoint; wait for it to finish and use Refresh if needed. Cancel leaves the saved configuration unchanged. Stale forms are rejected if another editor has changed the endpoint; cancel, refresh and reopen the entity. Panel APIs require administrator access and do not perform PLC writes.
