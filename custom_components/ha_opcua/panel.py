@@ -775,6 +775,12 @@ async def async_rename_array_fields(hass, msg):
     the entity's custom name - exactly like a manual rename through the
     entity editor, just for many at once.
 
+    Also persists the same text as this node's node_settings
+    display_name, so the raw name set_nodes() feeds to the unrelated
+    legacy duplicate-name check in _migrate_entity_ids() is disambiguated
+    too, from the next discovery onward - not just the registry's live
+    display, which that raw-name count never sees.
+
     `msg["keys"]` is the caller's selection; each key is re-validated
     against a fresh snapshot rather than trusted as-is, since it may be
     stale by the time the user confirms (a manual rename or a category
@@ -794,13 +800,21 @@ async def async_rename_array_fields(hass, msg):
             raise ValueError("endpoint_not_loaded")
         registry = er.async_get(hass)
         rows_by_key = {row["key"]: row for row in snapshot["rows"]}
+        options = deepcopy(dict(entry.options))
+        mappings = options.setdefault(CONF_NODE_SETTINGS, {})
         renamed = []
         for key in dict.fromkeys(msg["keys"]):
             row = rows_by_key.get(key)
             if row is None or not row["renamable"] or not row["entity_id"]:
                 continue
             registry.async_update_entity(row["entity_id"], name=row["proposed_name"])
+            mappings[key] = {
+                **mappings.get(key, {}),
+                "display_name": row["proposed_name"],
+            }
             renamed.append(key)
+        if renamed:
+            hass.config_entries.async_update_entry(entry, options=options)
         return {"renamed": renamed}
 
 
