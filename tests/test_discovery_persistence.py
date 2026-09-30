@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from custom_components.ha_opcua import AsyncuaCoordinator, async_options_updated
+from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
 from custom_components.ha_opcua.const import (
     CONF_KNOWN_NODE_IDS,
     CONF_NODE_SETTINGS,
@@ -393,3 +394,39 @@ async def test_existing_array_struct_field_never_retroactively_renamed(hass, ent
     assert c.nodes[existing_field["node_id"]]["name"] == "xAktiv"
 
     await c.async_shutdown()
+
+
+async def test_options_flow_preserves_the_generated_array_field_display_name(
+    hass, entry
+):
+    """Editing an unrelated setting through the stock options flow must not
+    silently drop a display_name the array-struct smart default computed at
+    discovery - the same "preserve panel metadata" contract _save_node()
+    already gives precision, device_class and deadband.
+    """
+    field = {
+        "name": "xAktiv",
+        "node_id": "ns=2;s=|var|PLC.PlantRelay.astMeldungen[10].xAktiv",
+        "variant_type": "Boolean",
+        "writable": False,
+    }
+    hass.config_entries.async_update_entry(
+        entry,
+        options={
+            CONF_NODE_SETTINGS: {
+                field["node_id"]: {
+                    "platform": "binary_sensor",
+                    "display_name": "astMeldungen 10 · xAktiv",
+                }
+            }
+        },
+    )
+    flow = AsyncUAOptionsFlow(entry)
+    flow.hass = hass
+    flow._node_id = field["node_id"]
+    flow._node = field
+    saved = await flow.async_step_node({"platform": "binary_sensor"})
+    assert (
+        saved["data"][CONF_NODE_SETTINGS][field["node_id"]]["display_name"]
+        == "astMeldungen 10 · xAktiv"
+    )

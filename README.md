@@ -145,6 +145,16 @@ In the entity editor, **Cancel** and **Save** stay at the bottom of the dialog w
 
 Panel JavaScript is bundled with the integration and uses a URL containing the integration version and a hash of the JavaScript content to invalidate the browser cache after panel-only updates; no separate Lovelace resource or frontend build is required.
 
+### Array-of-struct field naming and grouping
+
+Some PLCs (for example WAGO/CODESYS symbolic addressing) expose an array of structs as one discovered node per element field, such as `...Allarmi[1].Attivo`, `...Allarmi[2].Attivo`, and so on. Detection relies entirely on a symbolic NodeId matching this dotted `name[index].field` pattern; a numeric NodeId (e.g. `ns=4;i=123`) carries no such information and is never affected. This organizes fields that are already individually exposed as their own scalar nodes - it does not add support for reading or writing an OPC UA array value as a whole.
+
+On first discovery, a brand-new field inside such an array element gets its display name disambiguated with the array index (e.g. "Allarmi 1 · Attivo") instead of the raw, colliding field name every other element shares. Like the other smart defaults above, this only applies once, at a node's first discovery, and is never retroactively applied to an already-known node.
+
+For nodes discovered before this disambiguation existed, click **Rename array fields (N)** to choose which eligible entities to rename. The dialog lists names, NodeIds and the proposed new name, starts with nothing selected, and offers **Select all**. Only the selected entities' display names change; their entity IDs, NodeId mappings and any name already customized manually are left untouched.
+
+The panel groups these fields by array element only when explicitly selected: use the **By category / By array element** toggle next to the grid/list view switch (shown only when the endpoint has such fields) to switch from the default category grouping to grouping by array element instead. Either way, choosing a specific category tab or typing a search query always shows the matching entities as a flat list.
+
 ## Polling and subscriptions
 
 ### Enable subscriptions for selected entities
