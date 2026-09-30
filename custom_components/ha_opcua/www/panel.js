@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.6.0";
+const PANEL_VERSION = "1.7.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -73,6 +73,9 @@ const TEXT = {
     reclassifying: "Riclassificazione…",
     reclassified: "Sensori Boolean riclassificati.",
     groupedArrays: "Array raggruppati",
+    groupModeLabel: "Raggruppamento",
+    groupByCategory: "Per categoria",
+    groupByArray: "Per elemento array",
     renameArrayFields: "Rinomina campi array",
     renameArrayFieldsTitle: "Disambigua i campi degli array esistenti",
     renameArrayFieldsHelp:
@@ -281,6 +284,9 @@ const TEXT = {
     reclassifying: "Reclassifying…",
     reclassified: "Boolean sensors reclassified.",
     groupedArrays: "Grouped arrays",
+    groupModeLabel: "Grouping",
+    groupByCategory: "By category",
+    groupByArray: "By array element",
     renameArrayFields: "Rename array fields",
     renameArrayFieldsTitle: "Disambiguate existing array fields",
     renameArrayFieldsHelp:
@@ -532,11 +538,18 @@ class OpcuaNodePanel extends HTMLElement {
     this._selected = "";
     this._generation = 0;
     this._viewMode = "grid";
+    // Category grouping is the long-standing default; array-element
+    // grouping is an explicit opt-in the user can switch to, mirroring the
+    // grid/list preference below rather than silently replacing it.
+    this._groupMode = "category";
     this._subscriptionPending = new Set();
     this._subscriptionErrors = new Set();
     try {
       const stored = localStorage.getItem("ha-opcua-view-mode");
       if (stored === "grid" || stored === "list") this._viewMode = stored;
+      const storedGroup = localStorage.getItem("ha-opcua-group-mode");
+      if (storedGroup === "category" || storedGroup === "array")
+        this._groupMode = storedGroup;
     } catch {
       /* private browsing / blocked storage: keep the default */
     }
@@ -852,6 +865,34 @@ class OpcuaNodePanel extends HTMLElement {
       viewToggle.append(button);
     }
     navRow.append(viewToggle);
+    // Only worth offering when this endpoint actually has array-of-struct
+    // fields to group - otherwise it is a control with no visible effect.
+    if (endpoint.rows.some((r) => r.array_group)) {
+      const groupToggle = element("div", undefined, {
+        class: "viewToggle",
+        role: "group",
+        "aria-label": this._t("groupModeLabel"),
+      });
+      for (const mode of ["category", "array"]) {
+        const button = this._button(
+          mode === "category" ? "groupByCategory" : "groupByArray",
+          () => {
+            if (this._groupMode === mode) return;
+            this._groupMode = mode;
+            try {
+              localStorage.setItem("ha-opcua-group-mode", mode);
+            } catch {
+              /* private browsing / blocked storage: not persisted this time */
+            }
+            this._renderRows();
+          },
+          this._groupMode === mode ? "selected" : "",
+        );
+        button.setAttribute("aria-pressed", String(this._groupMode === mode));
+        groupToggle.append(button);
+      }
+      navRow.append(groupToggle);
+    }
     main.append(navRow);
     this._rows = element("section");
     main.append(this._rows);
@@ -1088,8 +1129,11 @@ class OpcuaNodePanel extends HTMLElement {
     );
     if (!rows.length) this._rows.append(emptyMessage(this._t("empty")));
     // Grouping by array only makes sense browsing everything at once - a
-    // platform filter or an active search wants its own flat, precise list.
-    const grouping = this._filter === "all" && !query;
+    // platform filter or an active search wants its own flat, precise list -
+    // and only when the user has explicitly opted into it over the default
+    // category grouping.
+    const grouping =
+      this._filter === "all" && !query && this._groupMode === "array";
     const groupedRows = grouping ? rows.filter((r) => r.array_group) : [];
     const ungroupedRows = grouping ? rows.filter((r) => !r.array_group) : rows;
     for (const group of GROUPS) {

@@ -223,6 +223,7 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 "always_available",
                 "update_mode",
                 "unit_of_measurement",
+                "display_name",
             )
         }
         if self._node["variant_type"] not in {"Float", "Double"}:

@@ -300,7 +300,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.6.0",
+    "Pannello 1.7.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -966,9 +966,20 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   });
   await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
 
-  // "All" groups the two astMeldungen[1] fields under one heading and
-  // astMeldungen[2] under another, independent of how many fields each
-  // struct element has.
+  // Category grouping is the default - even on "All", array fields stay
+  // scattered under their own platform headings until the user opts in.
+  assert.equal(await page.locator(".arrayGroup").count(), 0);
+  assert.equal(
+    await page.locator("article").filter({ hasText: "astMeldungen" }).count(),
+    3,
+  );
+
+  // Opting into array grouping via the toggle groups the two astMeldungen[1]
+  // fields under one heading and astMeldungen[2] under another, independent
+  // of how many fields each struct element has.
+  await page
+    .getByRole("button", { name: "Per elemento array", exact: true })
+    .click();
   const groups = page.locator(".arrayGroup");
   assert.equal(await groups.count(), 2);
   const group1Card = groups.filter({ hasText: "astMeldungen 1" });
@@ -978,7 +989,8 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
     "both fields of astMeldungen[1] appear under its own heading",
   );
 
-  // A platform filter wants its own flat, precise list instead.
+  // A platform filter wants its own flat, precise list instead, even while
+  // array grouping is selected.
   await page
     .getByRole("button", { name: "Sensori binari · 3", exact: true })
     .click();
@@ -988,6 +1000,17 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
     2,
   );
   await page.getByRole("button", { name: "Tutte · 7", exact: true }).click();
+  // Back on "All" with no filter, the array-grouping choice still applies.
+  assert.equal(await page.locator(".arrayGroup").count(), 2);
+
+  // Switching back to category grouping ungroups again.
+  await page
+    .getByRole("button", { name: "Per categoria", exact: true })
+    .click();
+  assert.equal(await page.locator(".arrayGroup").count(), 0);
+  await page
+    .getByRole("button", { name: "Per elemento array", exact: true })
+    .click();
 
   await page
     .getByRole("button", { name: "Rinomina campi array (3)", exact: true })
