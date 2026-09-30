@@ -138,6 +138,7 @@ async function pageFor(width = 1280, admin = true) {
       ],
       areas: [{ id: "workshop", name: "Officina" }],
       device_classes: ["door", "motion", "problem"],
+      units: ["%", "Hz", "bar", "kWh", "l/min", "°C"],
     };
     window.testHass = {
       language: "it",
@@ -1195,59 +1196,68 @@ test("REAL precision can be saved, cleared and reset on a non-REAL remap", async
   await page.close();
 });
 
-test("a unit of measurement can be saved, cleared and hidden for a non-numeric remap", async () => {
+test("a unit of measurement can be picked from a searchable list, set to a custom value, cleared and hidden for a non-numeric remap", async () => {
   const page = await pageFor();
   const card = page.locator("article").filter({ hasText: "Velocità linea" });
   const edit = () =>
     card.getByRole("button", { name: "Modifica", exact: true }).click();
   const dialog = page.locator("dialog[open]");
   const field = () => dialog.getByLabel("Unità di misura", { exact: true });
+  const filter = () => dialog.getByLabel("Filtra unità", { exact: true });
+  const custom = () =>
+    dialog.getByLabel("Unità personalizzata", { exact: true });
+  const lastUnit = () =>
+    page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+          .unit_of_measurement,
+    );
   const save = async () => {
     await dialog.getByRole("button", { name: "Salva", exact: true }).click();
     await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
   };
   await edit();
   assert.equal(await field().inputValue(), "");
-  await field().fill(" bar ");
+  assert.equal(await custom().isVisible(), false);
+  // The filter narrows the standard list; "Nessuna" and "Personalizzata…"
+  // always stay pinned so a search never hides those two choices.
+  await filter().fill("kwh");
+  assert.deepEqual(await field().locator("option").allTextContents(), [
+    "Nessuna",
+    "kWh",
+    "Personalizzata…",
+  ]);
+  await filter().fill("");
+  await field().selectOption("bar");
   await save();
-  assert.equal(
-    await page.evaluate(
-      () =>
-        window.calls.find((m) => m.type.endsWith("/update"))
-          .unit_of_measurement,
-    ),
-    "bar",
-  );
+  assert.equal(await lastUnit(), "bar");
   await edit();
   assert.equal(await field().inputValue(), "bar");
-  await field().fill("");
+  assert.equal(await custom().isVisible(), false);
+  await field().selectOption("__custom__");
+  assert.equal(await custom().isVisible(), true);
+  await custom().fill(" pieces/min ");
   await save();
-  assert.equal(
-    await page.evaluate(
-      () =>
-        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
-          .unit_of_measurement,
-    ),
-    null,
-  );
+  assert.equal(await lastUnit(), "pieces/min");
+  await edit();
+  assert.equal(await field().inputValue(), "__custom__");
+  assert.equal(await custom().inputValue(), "pieces/min");
+  await field().selectOption("");
+  assert.equal(await custom().isVisible(), false);
+  await save();
+  assert.equal(await lastUnit(), null);
   await edit();
   assert.equal(await field().inputValue(), "");
-  await field().fill("bar");
+  await field().selectOption("bar");
   await save();
   await edit();
   await dialog
     .getByLabel("NodeId associato", { exact: true })
     .selectOption("ns=4;i=4");
   assert.equal(await field().isVisible(), false);
+  assert.equal(await custom().isVisible(), false);
   await save();
-  assert.equal(
-    await page.evaluate(
-      () =>
-        window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
-          .unit_of_measurement,
-    ),
-    null,
-  );
+  assert.equal(await lastUnit(), null);
   await page.close();
 });
 
