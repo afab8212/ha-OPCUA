@@ -14,7 +14,7 @@
   "requirements": [
     "asyncua==2.0.1"
   ],
-  "version": "2.2.0",
+  "version": "2.3.0",
   "platforms": [
     "sensor",
     "binary_sensor",
