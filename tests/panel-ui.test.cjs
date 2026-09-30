@@ -300,7 +300,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.7.1",
+    "Pannello 1.7.2",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -966,6 +966,17 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   });
   await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
 
+  const categoryToggle = () =>
+    page.getByRole("button", { name: "Per categoria", exact: true });
+  const arrayToggle = () =>
+    page.getByRole("button", { name: "Per elemento array", exact: true });
+  const pressedState = async (locator) => ({
+    selected: ((await locator.getAttribute("class")) || "")
+      .split(" ")
+      .includes("selected"),
+    pressed: await locator.getAttribute("aria-pressed"),
+  });
+
   // Category grouping is the default - even on "All", array fields stay
   // scattered under their own platform headings until the user opts in.
   assert.equal(await page.locator(".arrayGroup").count(), 0);
@@ -973,13 +984,19 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
     await page.locator("article").filter({ hasText: "astMeldungen" }).count(),
     3,
   );
+  assert.deepEqual(await pressedState(categoryToggle()), {
+    selected: true,
+    pressed: "true",
+  });
+  assert.deepEqual(await pressedState(arrayToggle()), {
+    selected: false,
+    pressed: "false",
+  });
 
   // Opting into array grouping via the toggle groups the two astMeldungen[1]
   // fields under one heading and astMeldungen[2] under another, independent
   // of how many fields each struct element has.
-  await page
-    .getByRole("button", { name: "Per elemento array", exact: true })
-    .click();
+  await arrayToggle().click();
   const groups = page.locator(".arrayGroup");
   assert.equal(await groups.count(), 2);
   const group1Card = groups.filter({ hasText: "astMeldungen 1" });
@@ -988,6 +1005,15 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
     2,
     "both fields of astMeldungen[1] appear under its own heading",
   );
+  // The toggle itself must reflect the new mode, not just the rendered rows.
+  assert.deepEqual(await pressedState(arrayToggle()), {
+    selected: true,
+    pressed: "true",
+  });
+  assert.deepEqual(await pressedState(categoryToggle()), {
+    selected: false,
+    pressed: "false",
+  });
 
   // A platform filter wants its own flat, precise list instead, even while
   // array grouping is selected.
@@ -1003,14 +1029,19 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   // Back on "All" with no filter, the array-grouping choice still applies.
   assert.equal(await page.locator(".arrayGroup").count(), 2);
 
-  // Switching back to category grouping ungroups again.
-  await page
-    .getByRole("button", { name: "Per categoria", exact: true })
-    .click();
+  // Switching back to category grouping ungroups again and updates the
+  // toggle's selected styling and aria-pressed back the other way.
+  await categoryToggle().click();
   assert.equal(await page.locator(".arrayGroup").count(), 0);
-  await page
-    .getByRole("button", { name: "Per elemento array", exact: true })
-    .click();
+  assert.deepEqual(await pressedState(categoryToggle()), {
+    selected: true,
+    pressed: "true",
+  });
+  assert.deepEqual(await pressedState(arrayToggle()), {
+    selected: false,
+    pressed: "false",
+  });
+  await arrayToggle().click();
 
   await page
     .getByRole("button", { name: "Rinomina campi array (3)", exact: true })
