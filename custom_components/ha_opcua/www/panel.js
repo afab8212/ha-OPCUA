@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.7.0";
+const PANEL_VERSION = "1.8.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -48,6 +48,10 @@ const TEXT = {
     unitHelp:
       "Scegli un'unità standard di Home Assistant, «Nessuna» oppure «Personalizzata…» per digitarne una (es. pieces/min), mostrata accanto al valore.",
     filterUnits: "Cerca unità…",
+    moreInfo: "Dettagli",
+    noMatches: "Nessun risultato",
+    availabilityShort: "Mantieni l’ultimo valore quando il PLC è offline.",
+    invertShort: "Scambia acceso e spento in Home Assistant.",
     identitySection: "Identità",
     sourceSection: "Nodo OPC UA",
     valueSection: "Valore e visualizzazione",
@@ -255,6 +259,10 @@ const TEXT = {
     unitHelp:
       "Pick a standard Home Assistant unit, “None”, or “Custom…” to type one (e.g. pieces/min), shown next to the value.",
     filterUnits: "Search units…",
+    moreInfo: "Details",
+    noMatches: "No results",
+    availabilityShort: "Keep the last value while the PLC is offline.",
+    invertShort: "Swap on and off in Home Assistant.",
     identitySection: "Identity",
     sourceSection: "OPC UA node",
     valueSection: "Value and display",
@@ -529,7 +537,11 @@ dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:mi
 .pickArrow{font-size:12px;color:var(--secondary-text-color,#637487);text-align:right;max-width:180px;overflow-wrap:anywhere;flex-shrink:0}
 .arrayGroups{display:flex;flex-direction:column;gap:16px}.arrayGroup{border:1px solid var(--divider-color,#e2e7ef);border-radius:12px;padding:14px}.arrayGroupTitle{margin:0 0 10px;font-size:14px;font-weight:600;color:var(--secondary-text-color,#637487)}
 .entityForm{padding:0;gap:0;overflow:hidden;max-height:inherit;flex:0 1 auto}.editorBody{display:flex;flex-direction:column;gap:17px;padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1}.editorBody>*{flex-shrink:0}.entityForm footer{position:static;flex-shrink:0;flex-wrap:wrap;margin:0;padding:16px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color,#dce2ea)}.entityForm footer .error{flex-basis:100%;overflow-wrap:anywhere}.entityForm footer .error:empty{display:none}
-.entityEditor{width:min(820px,calc(100vw - 24px))}.editorHeading{padding:20px 24px 16px;border-bottom:1px solid var(--divider-color,#dce2ea);flex-shrink:0}.editorHeading .hint{margin-top:5px}.entityEditor .editorBody{gap:16px;background:var(--primary-background-color,#f5f7fa);padding:20px 24px}.editorSection{padding:18px;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#dce2ea);border-radius:12px;min-width:0}.editorSection h3{margin:0 0 16px;font-size:13px;font-weight:600;color:var(--primary-color,#008fac);letter-spacing:.02em}.editorFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.editorFieldGroup{min-width:0}.editorFieldGroup.wide{grid-column:1/-1}.editorFieldGroup .hint{margin:6px 0 0;font-size:12px;line-height:1.45}.entityEditor input,.entityEditor select{min-height:44px}.unitTrigger{width:100%;min-height:44px;text-align:left;display:flex;align-items:center;justify-content:space-between;font-weight:400}.unitTrigger::after{content:"⌄";margin-left:12px;color:var(--secondary-text-color,#637487)}.unitMenu{border:1px solid var(--primary-color,#008fac);border-radius:10px;padding:8px;margin-top:6px;background:var(--card-background-color,#fff)}.unitMenu input{width:100%;box-sizing:border-box}.unitOptions{max-height:190px;overflow:auto;margin-top:6px;overscroll-behavior:contain}.unitOptions [role=option]{padding:10px 12px;min-height:24px;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}.unitOptions [aria-selected=true]{font-weight:600;color:var(--primary-color,#008fac);background:color-mix(in srgb,var(--primary-color,#008fac) 10%,transparent)}.unitOptions .active,.unitOptions [role=option]:hover{background:var(--secondary-background-color,#eaf0f7);outline:1px solid var(--primary-color,#008fac);outline-offset:-1px}.unitTrigger:focus-visible,.unitMenu input:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:2px}
+.entityEditor .editorHeading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px}.editorHeadingText{min-width:0;flex:1}.editorHeadingText h2{font-size:19px}.editorState.card{padding:0;border:0;background:transparent;max-width:40%;flex-shrink:0}.editorState .entityState{margin:0;min-height:36px}.editorState .stateValue{font-size:18px;max-height:3em}.editorState .retainedValue{max-width:160px}.entityEditor .editorSection{padding:14px 16px}.entityEditor .editorSection h3{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px}.editorSection h3 svg{width:18px;height:18px;flex-shrink:0}.entityEditor .editorFields{gap:12px 16px}.editorHelp{margin-top:4px}.editorHelp summary{display:flex;align-items:center;gap:5px;width:fit-content;min-height:28px;cursor:pointer;font-size:12px;color:var(--secondary-text-color,#637487);list-style:none}.editorHelp summary::-webkit-details-marker{display:none}.editorHelp summary:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:2px;border-radius:4px}.infoDot{display:inline-flex;justify-content:center;align-items:center;width:14px;height:14px;border:1px solid currentColor;border-radius:50%;font-size:10px;font-weight:600}.editorHelp[open] summary{color:var(--primary-color,#008fac)}.editorHelp .hint{padding:8px 10px;border-left:2px solid var(--primary-color,#008fac);background:var(--secondary-background-color,#f1f5f9);border-radius:0 6px 6px 0}.editorSwitch{justify-content:space-between;flex-direction:row-reverse;gap:16px;min-height:44px;padding:8px 0;cursor:pointer}.editorSwitch .switchCopy{flex:1;font-weight:500;line-height:1.4}.switchCopy small{display:block;margin-top:3px;font-size:12px;font-weight:400;color:var(--secondary-text-color,#637487)}.entityEditor .editorSwitch input{appearance:none;-webkit-appearance:none;position:relative;width:44px;height:26px;min-width:44px;min-height:26px;flex:0 0 44px;border:1px solid var(--secondary-text-color,#637487);border-radius:20px;background:var(--secondary-text-color,#637487);margin:0;padding:0;cursor:pointer;transition:background 160ms,border-color 160ms}.editorSwitch input::before{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--card-background-color,#fff);transition:transform 160ms}.entityEditor .editorSwitch input:checked{background:var(--primary-color,#008fac);border-color:var(--primary-color,#008fac)}.editorSwitch input:checked::before{transform:translateX(18px)}.editorSwitch input:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:3px}.editorSwitch input:disabled{opacity:.45;cursor:default}.entityEditor input[name=precision]{max-width:120px}.nodePicker .unitTrigger{overflow-wrap:anywhere;white-space:normal;gap:8px}.unitTrigger::after{flex-shrink:0}
+@media(max-width:650px){.entityEditor .editorHeading{padding:12px 16px;gap:8px;flex-wrap:wrap}.editorState.card{max-width:100%}.editorState .entityState{padding:4px 8px;min-height:28px}.editorState .stateValue{font-size:15px}.editorState .valueIcon{display:none}.editorState .stateLabel{display:none}.entityEditor .editorSection{padding:12px}.entityEditor .editorFields{gap:10px}.editorHelp summary{min-height:32px}}
+@media(prefers-reduced-motion:reduce){.editorSwitch input,.editorSwitch input::before{transition:none}}
+
+.entityEditor{width:min(820px,calc(100vw - 24px))}.editorHeading{padding:20px 24px 16px;border-bottom:1px solid var(--divider-color,#dce2ea);flex-shrink:0}.editorHeading .hint{margin-top:5px}.entityEditor .editorBody{gap:16px;background:var(--primary-background-color,#f5f7fa);padding:20px 24px}.editorSection{padding:18px;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#dce2ea);border-radius:12px;min-width:0}.editorSection h3{margin:0 0 16px;font-size:13px;font-weight:600;color:var(--primary-color,#008fac);letter-spacing:.02em}.editorFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.editorFieldGroup{min-width:0}.editorFieldGroup.wide{grid-column:1/-1}.editorFieldGroup .hint{margin:6px 0 0;font-size:12px;line-height:1.45}.entityEditor input,.entityEditor select{min-height:44px}.unitTrigger{width:100%;min-height:44px;text-align:left;display:flex;align-items:center;justify-content:space-between;font-weight:400}.unitTrigger::after{content:"⌄";margin-left:12px;color:var(--secondary-text-color,#637487)}.unitMenu{border:1px solid var(--primary-color,#008fac);border-radius:10px;padding:8px;margin-top:6px;background:var(--card-background-color,#fff)}.unitMenu input{width:100%;box-sizing:border-box}.pickerOptions{max-height:190px;overflow:auto;margin-top:6px;overscroll-behavior:contain}.pickerOptions [role=option]{padding:10px 12px;min-height:24px;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}.pickerOptions [aria-selected=true]{font-weight:600;color:var(--primary-color,#008fac);background:color-mix(in srgb,var(--primary-color,#008fac) 10%,transparent)}.pickerOptions .active,.pickerOptions [role=option]:hover{background:var(--secondary-background-color,#eaf0f7);outline:1px solid var(--primary-color,#008fac);outline-offset:-1px}.unitTrigger:focus-visible,.unitMenu input:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:2px}
 @media(max-width:650px){.entityEditor{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:14px}.editorHeading{padding:16px}.entityEditor .editorBody{padding:12px;gap:12px}.editorSection{padding:14px}.editorFields{grid-template-columns:1fr;gap:14px}.entityEditor .editorHeading h2{font-size:18px}.editorSection h3{margin-bottom:14px}}
 
 @media(max-width:870px){.menu{display:inline-flex;align-items:center;justify-content:center}.grid.list .card{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(140px,.8fr);gap:12px}}
@@ -1767,6 +1779,159 @@ class OpcuaNodePanel extends HTMLElement {
     dialog.showModal();
     nodeId.focus();
   }
+  _searchPicker(unit, key, searchKey, pinned = []) {
+    const unitField = element("div", undefined, {
+      class: `field ${key === "unit" ? "unitPicker" : "nodePicker"}`,
+    });
+    const unitLabel = element("span", this._t(key), { id: `${key}-label` });
+    const unitButton = element("button", undefined, {
+      type: "button",
+      class: "unitTrigger",
+      "aria-label": this._t(key),
+      "aria-haspopup": "listbox",
+      "aria-expanded": "false",
+      "aria-controls": `${key}-options`,
+    });
+    const unitMenu = element("div", undefined, {
+      class: "unitMenu",
+      hidden: "",
+    });
+    const unitFilter = element("input", undefined, {
+      type: "search",
+      placeholder: this._t(searchKey),
+      "aria-label": this._t(searchKey),
+      role: "combobox",
+      "aria-expanded": "false",
+      "aria-controls": `${key}-options`,
+      "aria-autocomplete": "list",
+      autocomplete: "off",
+    });
+    const unitList = element("div", undefined, {
+      id: `${key}-options`,
+      role: "listbox",
+      tabindex: "-1",
+      "aria-labelledby": `${key}-label`,
+      class: key === "unit" ? "pickerOptions unitOptions" : "pickerOptions",
+    });
+    const empty = element("div", this._t("noMatches"), {
+      class: "hint",
+      role: "status",
+      hidden: "",
+    });
+    unitMenu.append(unitFilter, unitList, empty);
+    unit.hidden = true;
+    unitField.append(unitLabel, unitButton, unitMenu, unit);
+    let activeUnit = -1;
+    const closeUnits = (focus = false) => {
+      unitMenu.hidden = true;
+      unitButton.setAttribute("aria-expanded", "false");
+      unitFilter.setAttribute("aria-expanded", "false");
+      unitFilter.removeAttribute("aria-activedescendant");
+      if (focus) unitButton.focus();
+    };
+    const markUnit = (index) => {
+      const options = [...unitList.children];
+      activeUnit = options.length
+        ? Math.max(0, Math.min(index, options.length - 1))
+        : -1;
+      options.forEach((option, i) =>
+        option.classList.toggle("active", i === activeUnit),
+      );
+      if (options[activeUnit]) {
+        unitFilter.setAttribute(
+          "aria-activedescendant",
+          options[activeUnit].id,
+        );
+        options[activeUnit].scrollIntoView({ block: "nearest" });
+      }
+    };
+    const populateUnits = () => {
+      unitList.replaceChildren();
+      for (const option of unit.options) {
+        if (
+          !pinned.includes(option.value) &&
+          !option.textContent
+            .toLowerCase()
+            .includes(unitFilter.value.toLowerCase())
+        )
+          continue;
+        const item = element("div", option.textContent, {
+          role: "option",
+          id: `${key}-option-${unitList.children.length}`,
+          "aria-selected": String(option.value === unit.value),
+        });
+        item.addEventListener("mousedown", (event) => event.preventDefault());
+        item.addEventListener("click", () => {
+          unit.value = option.value;
+          unit.dispatchEvent(new Event("change"));
+          closeUnits(true);
+        });
+        unitList.append(item);
+      }
+      empty.hidden = unitList.children.length > 0;
+      activeUnit = -1;
+      unitFilter.removeAttribute("aria-activedescendant");
+    };
+    const openUnits = () => {
+      unitMenu.hidden = false;
+      unitButton.setAttribute("aria-expanded", "true");
+      unitFilter.setAttribute("aria-expanded", "true");
+      unitFilter.value = "";
+      populateUnits();
+      unitFilter.focus();
+    };
+    unitButton.addEventListener("click", () =>
+      unitMenu.hidden ? openUnits() : closeUnits(),
+    );
+    unitButton.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        openUnits();
+      }
+    });
+    unitFilter.addEventListener("input", populateUnits);
+    unitField.addEventListener("keydown", (event) => {
+      if (unitMenu.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closeUnits(true);
+      } else if (
+        event.target === unitFilter &&
+        ["ArrowDown", "ArrowUp", "Home", "End", "Enter"].includes(event.key)
+      ) {
+        event.preventDefault();
+        if (event.key === "Enter") {
+          if (activeUnit >= 0) unitList.children[activeUnit].click();
+        } else
+          markUnit(
+            event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? unitList.children.length - 1
+                : activeUnit + (event.key === "ArrowDown" ? 1 : -1),
+          );
+      }
+    });
+    unitField.addEventListener("focusout", (event) => {
+      if (!unitField.contains(event.relatedTarget)) closeUnits();
+    });
+    const refresh = () => {
+      unitButton.textContent =
+        unit.selectedOptions[0]?.textContent || this._t("noMatches");
+      unitButton.disabled = unit.disabled || !unit.options.length;
+      if (unitButton.disabled) closeUnits();
+    };
+    unit.addEventListener("change", refresh);
+    refresh();
+    return {
+      field: unitField,
+      button: unitButton,
+      filter: unitFilter,
+      close: closeUnits,
+      refresh,
+    };
+  }
   _edit(row, manual = null, endpoint = this._endpoint()) {
     row = { ...row };
     const revision = endpoint.revision;
@@ -1790,10 +1955,35 @@ class OpcuaNodePanel extends HTMLElement {
         class: "hint",
       }),
     );
+    const headingText = element("div", undefined, {
+      class: "editorHeadingText",
+    });
+    headingText.append(...heading.childNodes);
+    heading.append(headingText);
+    if (!manual) {
+      const preview = element("div", undefined, {
+        class: "card editorState",
+        "data-platform": row.platform,
+        "data-value-type": valueType(row),
+      });
+      preview.append(this._buildCard(row).querySelector(".entityState"));
+      heading.append(preview);
+    }
     form.prepend(heading);
     const section = (key) => {
       const section = element("section", undefined, { class: "editorSection" });
-      section.append(element("h3", this._t(key)));
+      const title = element("h3", this._t(key));
+      title.prepend(
+        valueIcon(
+          {
+            identitySection: "text",
+            sourceSection: "numeric",
+            valueSection: "datetime",
+            updatesSection: "on",
+          }[key],
+        ),
+      );
+      section.append(title);
       const grid = element("div", undefined, { class: "editorFields" });
       section.append(grid);
       body.append(section);
@@ -1823,11 +2013,6 @@ class OpcuaNodePanel extends HTMLElement {
     const availableNodes = manual ? [manual.node] : endpoint.nodes;
     const originalPlatform = row.platform;
     const category = element("select");
-    const nodeFilter = element("input", undefined, {
-      type: "search",
-      placeholder: this._t("filterNodes"),
-      "aria-label": this._t("filterNodes"),
-    });
     const nodes = element("select", undefined, {
       name: "node_id",
       required: "",
@@ -1859,13 +2044,8 @@ class OpcuaNodePanel extends HTMLElement {
     const populate = () => {
       const chosen = nodes.value || row.node_id;
       nodes.replaceChildren();
-      for (const node of availableNodes.filter(
-        (n) =>
-          compatible({ platform: category.value }, n) &&
-          (n.node_id === chosen ||
-            `${n.name} ${n.node_id}`
-              .toLowerCase()
-              .includes(nodeFilter.value.toLowerCase())),
+      for (const node of availableNodes.filter((n) =>
+        compatible({ platform: category.value }, n),
       ))
         nodes.append(
           element("option", `${node.name} · ${node.node_id}`, {
@@ -1879,10 +2059,13 @@ class OpcuaNodePanel extends HTMLElement {
     identitySection.append(this._field("category", category));
     const categoryHelp = element("p", "", { class: "hint" });
     identitySection.append(categoryHelp);
-    nodeFilter.addEventListener("input", populate);
-    if (!manual) sourceSection.append(this._field("filterNodes", nodeFilter));
     nodes.disabled = !!manual;
-    sourceSection.append(this._field("node", nodes));
+    const nodePicker = manual
+      ? null
+      : this._searchPicker(nodes, "node", "filterNodes");
+    sourceSection.append(
+      nodePicker ? nodePicker.field : this._field("node", nodes),
+    );
     if (!manual)
       sourceSection.append(
         element("p", this._t("nodeHelp"), { class: "hint" }),
@@ -1909,9 +2092,13 @@ class OpcuaNodePanel extends HTMLElement {
     const alwaysAvailable = element("input", undefined, {
       type: "checkbox",
       name: "always_available",
+      role: "switch",
+      "aria-label": this._t("alwaysAvailable"),
     });
     alwaysAvailable.checked = initial.always_available === true;
-    const availabilityToggle = element("label", undefined, { class: "toggle" });
+    const availabilityToggle = element("label", undefined, {
+      class: "toggle editorSwitch",
+    });
     availabilityToggle.append(
       alwaysAvailable,
       element("span", this._t("alwaysAvailable")),
@@ -1996,133 +2183,13 @@ class OpcuaNodePanel extends HTMLElement {
       : initial.unit_of_measurement
         ? UNIT_CUSTOM
         : "";
-    const unitField = element("div", undefined, { class: "field unitPicker" });
-    const unitLabel = element("span", this._t("unit"), { id: "unit-label" });
-    const unitButton = element("button", undefined, {
-      type: "button",
-      class: "unitTrigger",
-      "aria-label": this._t("unit"),
-      "aria-haspopup": "listbox",
-      "aria-expanded": "false",
-      "aria-controls": "unit-options",
-    });
-    const unitMenu = element("div", undefined, {
-      class: "unitMenu",
-      hidden: "",
-    });
-    const unitFilter = element("input", undefined, {
-      type: "search",
-      placeholder: this._t("filterUnits"),
-      "aria-label": this._t("filterUnits"),
-      role: "combobox",
-      "aria-expanded": "false",
-      "aria-controls": "unit-options",
-      "aria-autocomplete": "list",
-      autocomplete: "off",
-    });
-    const unitList = element("div", undefined, {
-      id: "unit-options",
-      role: "listbox",
-      tabindex: "-1",
-      "aria-labelledby": "unit-label",
-      class: "unitOptions",
-    });
-    unitMenu.append(unitFilter, unitList);
-    unitField.append(unitLabel, unitButton, unitMenu, unit);
+    const {
+      field: unitField,
+      button: unitButton,
+      filter: unitFilter,
+      close: closeUnits,
+    } = this._searchPicker(unit, "unit", "filterUnits", ["", UNIT_CUSTOM]);
     const unitHelp = element("p", this._t("unitHelp"), { class: "hint" });
-    let activeUnit = -1;
-    const closeUnits = (focus = false) => {
-      unitMenu.hidden = true;
-      unitButton.setAttribute("aria-expanded", "false");
-      unitFilter.setAttribute("aria-expanded", "false");
-      unitFilter.removeAttribute("aria-activedescendant");
-      if (focus) unitButton.focus();
-    };
-    const markUnit = (index) => {
-      const options = [...unitList.children];
-      activeUnit = Math.max(0, Math.min(index, options.length - 1));
-      options.forEach((option, i) =>
-        option.classList.toggle("active", i === activeUnit),
-      );
-      if (options[activeUnit]) {
-        unitFilter.setAttribute(
-          "aria-activedescendant",
-          options[activeUnit].id,
-        );
-        options[activeUnit].scrollIntoView({ block: "nearest" });
-      }
-    };
-    const populateUnits = () => {
-      unitList.replaceChildren();
-      for (const option of unit.options) {
-        if (
-          option.value &&
-          option.value !== UNIT_CUSTOM &&
-          !option.textContent
-            .toLowerCase()
-            .includes(unitFilter.value.toLowerCase())
-        )
-          continue;
-        const item = element("div", option.textContent, {
-          role: "option",
-          id: `unit-option-${unitList.children.length}`,
-          "aria-selected": String(option.value === unit.value),
-        });
-        item.addEventListener("mousedown", (event) => event.preventDefault());
-        item.addEventListener("click", () => {
-          unit.value = option.value;
-          unit.dispatchEvent(new Event("change"));
-          closeUnits(true);
-        });
-        unitList.append(item);
-      }
-      activeUnit = -1;
-      unitFilter.removeAttribute("aria-activedescendant");
-    };
-    const openUnits = () => {
-      unitMenu.hidden = false;
-      unitButton.setAttribute("aria-expanded", "true");
-      unitFilter.setAttribute("aria-expanded", "true");
-      unitFilter.value = "";
-      populateUnits();
-      unitFilter.focus();
-    };
-    unitButton.addEventListener("click", () =>
-      unitMenu.hidden ? openUnits() : closeUnits(),
-    );
-    unitButton.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        openUnits();
-      }
-    });
-    unitFilter.addEventListener("input", populateUnits);
-    unitField.addEventListener("keydown", (event) => {
-      if (unitMenu.hidden) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closeUnits(true);
-      } else if (
-        event.target === unitFilter &&
-        ["ArrowDown", "ArrowUp", "Home", "End", "Enter"].includes(event.key)
-      ) {
-        event.preventDefault();
-        if (event.key === "Enter") {
-          if (activeUnit >= 0) unitList.children[activeUnit].click();
-        } else
-          markUnit(
-            event.key === "Home"
-              ? 0
-              : event.key === "End"
-                ? unitList.children.length - 1
-                : activeUnit + (event.key === "ArrowDown" ? 1 : -1),
-          );
-      }
-    });
-    unitField.addEventListener("focusout", (event) => {
-      if (!unitField.contains(event.relatedTarget)) closeUnits();
-    });
     const unitCustom = element("input", undefined, {
       type: "text",
       name: "unit_of_measurement",
@@ -2162,18 +2229,23 @@ class OpcuaNodePanel extends HTMLElement {
       );
     deviceClass.value = row.device_class || "";
     const classField = this._field("deviceClass", deviceClass);
-    valueSection.append(classField);
+    valueSection.insertBefore(classField, unitCustomField);
     const invert = element("input", undefined, {
       type: "checkbox",
       name: "invert",
+      role: "switch",
+      "aria-label": this._t("invert"),
     });
     invert.checked = row.invert_state;
-    const toggle = element("label", undefined, { class: "toggle" });
+    const toggle = element("label", undefined, {
+      class: "toggle editorSwitch",
+    });
     toggle.append(invert, element("span", this._t("invert")));
     const invertHelp = element("p", this._t("invertHelp"), { class: "hint" });
     valueSection.append(toggle, invertHelp);
     const updateFields = () => {
       const platform = effective();
+      nodePicker?.refresh();
       const classes = classesFor(platform);
       const configuredClass = deviceClass.value;
       classField.hidden = classes.length === 0;
@@ -2227,6 +2299,7 @@ class OpcuaNodePanel extends HTMLElement {
       }
       limitsHelp.hidden = !["number", "text"].includes(platform);
       categoryHelp.hidden = !!manual || platform === originalPlatform;
+      for (const [details, help] of helpPairs) details.hidden = help.hidden;
       for (const wrap of body.querySelectorAll(".editorFieldGroup"))
         wrap.hidden = [...wrap.children].every((child) => child.hidden);
       for (const section of body.querySelectorAll(".editorSection"))
@@ -2237,6 +2310,17 @@ class OpcuaNodePanel extends HTMLElement {
         platform === "disabled" ? "excludeHelp" : "categoryHelp",
       );
     };
+    for (const [label, short] of [
+      [availabilityToggle, "availabilityShort"],
+      [toggle, "invertShort"],
+    ]) {
+      const copy = label.querySelector("span");
+      copy.classList.add("switchCopy");
+      copy.append(element("small", this._t(short)));
+    }
+    // Keep related fields adjacent: unit and class share a row on desktop.
+    valueSection.append(precisionField, precisionHelp);
+    const helpPairs = [];
     for (const grid of [
       identitySection,
       sourceSection,
@@ -2251,13 +2335,27 @@ class OpcuaNodePanel extends HTMLElement {
         const wrap = element("div", undefined, { class: "editorFieldGroup" });
         grid.insertBefore(wrap, child);
         wrap.append(child);
-        if (help) wrap.append(help);
+        if (help) {
+          const details = element("details", undefined, {
+            class: "editorHelp",
+          });
+          const summary = element("summary", this._t("moreInfo"));
+          summary.prepend(
+            element("span", "i", { class: "infoDot", "aria-hidden": "true" }),
+          );
+          summary.setAttribute(
+            "aria-label",
+            `${this._t("moreInfo")}: ${child.querySelector("span")?.textContent || this._t("valueSection")}`,
+          );
+          details.append(summary, help);
+          wrap.append(details);
+          helpPairs.push([details, help]);
+        }
         if (
-          child === unitField ||
+          child.contains(name) ||
           child.classList.contains("limits") ||
           child === availabilityToggle ||
           child === toggle ||
-          child.contains(nodeFilter) ||
           child.contains(nodes) ||
           child.contains(updateMode)
         )
@@ -2364,6 +2462,7 @@ class OpcuaNodePanel extends HTMLElement {
     });
     this.shadowRoot.append(dialog);
     dialog.showModal();
+    this._paintStates();
     name.focus();
   }
 }
