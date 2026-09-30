@@ -186,6 +186,37 @@ async def test_options_flow_preserves_unit_of_measurement(hass, entry):
     await c.async_shutdown()
 
 
+@pytest.mark.asyncio
+async def test_options_flow_preserves_unit_of_measurement_when_selecting_auto(
+    hass, entry
+):
+    """Choosing "Auto" saves the literal platform "auto", not the resolved
+    one - _save_node() must check unit support against the node's effective
+    platform, or a writable numeric node resolving to a compatible sensor
+    loses its unit for no reason other than the raw string not being
+    "number"/"sensor".
+    """
+    c, _, msg = await prepare(hass, entry)
+    c.hub.inspect_node = AsyncMock(return_value=REAL)
+    msg.update(
+        node_id=REAL["node_id"],
+        platform="number",
+        invert_state=False,
+        unit_of_measurement="bar",
+    )
+    await async_create_entity(hass, msg)
+    flow = AsyncUAOptionsFlow(entry)
+    flow.hass = hass
+    flow._node_id = REAL["node_id"]
+    flow._node = REAL
+    saved = await flow.async_step_node({"platform": "auto"})
+    assert (
+        saved["data"][CONF_NODE_SETTINGS][REAL["node_id"]]["unit_of_measurement"]
+        == "bar"
+    )
+    await c.async_shutdown()
+
+
 def test_standard_units_are_sourced_from_home_assistant_itself():
     """The panel's unit picker must never drift from HA's own definitions."""
     units = standard_units()

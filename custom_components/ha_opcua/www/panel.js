@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.5.0";
+const PANEL_VERSION = "1.5.1";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -1733,21 +1733,30 @@ class OpcuaNodePanel extends HTMLElement {
       placeholder: this._t("filterUnits"),
     });
     const unit = element("select", undefined, { name: "unit_choice" });
+    // Read once from the saved setting; every later call must instead trust
+    // the select's own current value - including an explicitly empty "None"
+    // - so re-filtering never resurrects the original unit from under it.
+    let chosenUnit = this._data.units.includes(initial.unit_of_measurement)
+      ? initial.unit_of_measurement
+      : initial.unit_of_measurement
+        ? UNIT_CUSTOM
+        : "";
     const populateUnits = () => {
-      const chosen = unit.value || initial.unit_of_measurement || "";
-      const isStandard = this._data.units.includes(chosen);
+      if (unit.options.length) chosenUnit = unit.value;
+      const isStandard = this._data.units.includes(chosenUnit);
       unit.replaceChildren(element("option", this._t("none"), { value: "" }));
       for (const value of this._data.units)
         if (
           !unitFilter.value ||
           value.toLowerCase().includes(unitFilter.value.toLowerCase()) ||
-          value === chosen
+          value === chosenUnit
         )
           unit.append(element("option", value, { value }));
       unit.append(
         element("option", this._t("unitCustom"), { value: UNIT_CUSTOM }),
       );
-      unit.value = chosen === "" ? "" : isStandard ? chosen : UNIT_CUSTOM;
+      unit.value =
+        chosenUnit === "" ? "" : isStandard ? chosenUnit : UNIT_CUSTOM;
     };
     populateUnits();
     unitFilter.addEventListener("input", populateUnits);

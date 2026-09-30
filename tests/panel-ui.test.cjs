@@ -283,7 +283,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.5.0",
+    "Pannello 1.5.1",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1101,6 +1101,24 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
   await field().selectOption("bar");
   await save();
   assert.equal(await lastUnit(), "bar");
+  await edit();
+  assert.equal(await field().inputValue(), "bar");
+  assert.equal(await custom().isVisible(), false);
+  // Regression: selecting "None" and then typing into the filter must keep
+  // the explicit empty choice, not resurrect the unit that was there before.
+  await field().selectOption("");
+  await filter().fill("kwh");
+  assert.equal(await field().inputValue(), "");
+  await filter().fill("");
+  await save();
+  assert.equal(await lastUnit(), null);
+
+  await edit();
+  assert.equal(await field().inputValue(), "");
+  await field().selectOption("bar");
+  await save();
+  assert.equal(await lastUnit(), "bar");
+
   await edit();
   assert.equal(await field().inputValue(), "bar");
   assert.equal(await custom().isVisible(), false);
