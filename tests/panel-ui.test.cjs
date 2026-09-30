@@ -1286,7 +1286,8 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
   const edit = () =>
     card.getByRole("button", { name: "Modifica", exact: true }).click();
   const dialog = page.locator("dialog[open]");
-  const field = () => dialog.getByLabel("Unità di misura", { exact: true });
+  const field = () =>
+    dialog.getByRole("button", { name: "Unità di misura", exact: true });
   const filter = () =>
     dialog.getByRole("combobox", { name: "Cerca unità…", exact: true });
   const selectUnit = async (value) => {
@@ -1406,7 +1407,10 @@ for (const width of [1280, 390]) {
       .click();
     const dialog = page.locator("dialog[open]");
     assert.equal(await dialog.locator(".editorSection:visible").count(), 4);
-    const trigger = dialog.getByLabel("Unità di misura", { exact: true });
+    const trigger = dialog.getByRole("button", {
+      name: "Unità di misura",
+      exact: true,
+    });
     const search = dialog.getByRole("combobox", {
       name: "Cerca unità…",
       exact: true,
