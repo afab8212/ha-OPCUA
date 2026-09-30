@@ -1293,6 +1293,7 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
   const selectUnit = async (value) => {
     await field().click();
     await dialog
+      .locator(".unitOptions")
       .getByRole("option", {
         name: value === "__custom__" ? "Personalizzata…" : value || "Nessuna",
         exact: true,
