@@ -305,7 +305,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.6.0",
+    "Pannello 1.7.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1287,7 +1287,17 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
     card.getByRole("button", { name: "Modifica", exact: true }).click();
   const dialog = page.locator("dialog[open]");
   const field = () => dialog.getByLabel("Unità di misura", { exact: true });
-  const filter = () => dialog.getByLabel("Filtra unità", { exact: true });
+  const filter = () =>
+    dialog.getByRole("combobox", { name: "Cerca unità…", exact: true });
+  const selectUnit = async (value) => {
+    await field().click();
+    await dialog
+      .getByRole("option", {
+        name: value === "__custom__" ? "Personalizzata…" : value || "Nessuna",
+        exact: true,
+      })
+      .click();
+  };
   const custom = () =>
     dialog.getByLabel("Unità personalizzata", { exact: true });
   const lastUnit = () =>
@@ -1301,56 +1311,79 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
     await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
   };
   await edit();
-  assert.equal(await field().inputValue(), "");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
   assert.equal(await custom().isVisible(), false);
   // The filter narrows the standard list; "Nessuna" and "Personalizzata…"
   // always stay pinned so a search never hides those two choices.
+  await field().click();
   await filter().fill("kwh");
-  assert.deepEqual(await field().locator("option").allTextContents(), [
+  assert.deepEqual(await dialog.getByRole("option").allTextContents(), [
     "Nessuna",
     "kWh",
     "Personalizzata…",
   ]);
-  await filter().fill("");
-  await field().selectOption("bar");
+  await filter().press("Escape");
+  await selectUnit("bar");
   await save();
   assert.equal(await lastUnit(), "bar");
   await edit();
-  assert.equal(await field().inputValue(), "bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "bar",
+  );
   assert.equal(await custom().isVisible(), false);
   // Regression: selecting "None" and then typing into the filter must keep
   // the explicit empty choice, not resurrect the unit that was there before.
-  await field().selectOption("");
+  await selectUnit("");
+  await field().click();
   await filter().fill("kwh");
-  assert.equal(await field().inputValue(), "");
-  await filter().fill("");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
+  await filter().press("Escape");
   await save();
   assert.equal(await lastUnit(), null);
 
   await edit();
-  assert.equal(await field().inputValue(), "");
-  await field().selectOption("bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
+  await selectUnit("bar");
   await save();
   assert.equal(await lastUnit(), "bar");
 
   await edit();
-  assert.equal(await field().inputValue(), "bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "bar",
+  );
   assert.equal(await custom().isVisible(), false);
-  await field().selectOption("__custom__");
+  await selectUnit("__custom__");
   assert.equal(await custom().isVisible(), true);
   await custom().fill(" pieces/min ");
   await save();
   assert.equal(await lastUnit(), "pieces/min");
   await edit();
-  assert.equal(await field().inputValue(), "__custom__");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "__custom__",
+  );
   assert.equal(await custom().inputValue(), "pieces/min");
-  await field().selectOption("");
+  await selectUnit("");
   assert.equal(await custom().isVisible(), false);
   await save();
   assert.equal(await lastUnit(), null);
   await edit();
-  assert.equal(await field().inputValue(), "");
-  await field().selectOption("bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
+  await selectUnit("bar");
   await save();
   await edit();
   await dialog
@@ -1362,6 +1395,55 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
   assert.equal(await lastUnit(), null);
   await page.close();
 });
+
+for (const width of [1280, 390]) {
+  test(`unit picker keyboard interaction and editor sections at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page
+      .locator("article")
+      .filter({ hasText: "Velocità linea" })
+      .getByRole("button", { name: "Modifica", exact: true })
+      .click();
+    const dialog = page.locator("dialog[open]");
+    assert.equal(await dialog.locator(".editorSection:visible").count(), 4);
+    const trigger = dialog.getByLabel("Unità di misura", { exact: true });
+    const search = dialog.getByRole("combobox", {
+      name: "Cerca unità…",
+      exact: true,
+    });
+    assert.equal(await search.isVisible(), false);
+    await trigger.focus();
+    await trigger.press("ArrowDown");
+    await search.fill("kwh");
+    await shot(page, `editor-unit-picker-${width}.png`);
+    await search.press("ArrowDown");
+    await search.press("ArrowDown");
+    await search.press("Enter");
+    assert.equal(await trigger.textContent(), "kWh");
+    assert.equal(await search.isVisible(), false);
+    assert.equal(await dialog.isVisible(), true);
+    await trigger.click();
+    await search.fill("no matching unit");
+    await search.press("Escape");
+    assert.equal(await dialog.isVisible(), true);
+    assert.equal(await trigger.textContent(), "kWh");
+    assert.equal(await trigger.getAttribute("aria-expanded"), "false");
+    await trigger.click();
+    await search.press("Tab");
+    assert.equal(await search.isVisible(), false);
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(
+      await page.evaluate(
+        () =>
+          window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+            .unit_of_measurement,
+      ),
+      "kWh",
+    );
+    await page.close();
+  });
+}
 
 test("always available is per entity, persists, clears and supports manual nodes", async () => {
   const page = await pageFor(390);
