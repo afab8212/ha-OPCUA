@@ -31,7 +31,9 @@ from .const import (
 )
 from .node_settings import (
     allowed_platforms,
+    available_device_classes,
     deadband_default,
+    effective_platform,
     number_defaults,
     supports_deadband,
     validate_settings,
@@ -227,7 +229,10 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
             common.pop("precision", None)
         if not supports_deadband(self._node, settings["platform"]):
             common.pop("deadband", None)
-        if settings["platform"] != "binary_sensor":
+        if common.get("device_class") not in available_device_classes(
+            self._node,
+            effective_platform(self._node, settings),
+        ):
             common.pop("device_class", None)
         merged = {**common, **settings}
         if merged == {"platform": "auto"}:

@@ -4,6 +4,9 @@ import math
 
 from asyncua import ua
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.components.number import NumberDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.components.switch import SwitchDeviceClass
 
 from .const import CONF_OFFLINE_NODES
 from .values import scalar_variant
@@ -21,6 +24,12 @@ INTEGER_TYPES = {
 NUMERIC_TYPES = INTEGER_TYPES | {"Float", "Double"}
 SCALAR_TYPES = NUMERIC_TYPES | {"String", "Boolean", "DateTime"}
 MAX_SAFE_INTEGER = 2**53 - 1
+DEVICE_CLASS_ENUMS = {
+    "binary_sensor": BinarySensorDeviceClass,
+    "number": NumberDeviceClass,
+    "sensor": SensorDeviceClass,
+    "switch": SwitchDeviceClass,
+}
 
 
 def allowed_platforms(node):
@@ -62,6 +71,16 @@ def deadband_default(node):
 def supports_deadband(node, platform):
     """Deadband applies to any numeric node exposed as a number or sensor."""
     return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
+
+
+def available_device_classes(node, platform):
+    """Return Home Assistant device classes supported by an entity domain."""
+    enum = DEVICE_CLASS_ENUMS.get(platform)
+    if enum is None:
+        return []
+    if platform == "sensor" and node["variant_type"] == "DateTime":
+        return [SensorDeviceClass.TIMESTAMP.value]
+    return sorted(item.value for item in enum)
 
 
 def validate_settings(node, settings):
@@ -127,9 +146,9 @@ def validate_settings(node, settings):
             raise ValueError("invalid_inversion")
         result["invert_state"] = settings["invert_state"]
     if settings.get("device_class") is not None:
-        if effective_platform(node, settings) != "binary_sensor" or settings[
-            "device_class"
-        ] not in {item.value for item in BinarySensorDeviceClass}:
+        if settings["device_class"] not in available_device_classes(
+            node, effective_platform(node, settings)
+        ):
             raise ValueError("invalid_device_class")
         result["device_class"] = settings["device_class"]
     if platform == "number":

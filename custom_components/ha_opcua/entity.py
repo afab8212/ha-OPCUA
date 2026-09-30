@@ -42,6 +42,9 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator], RestoreEntity):
         super().__init__(coordinator)
         self._attr_name = name
         self._attr_unique_id = entity_unique_id(entry_id, node_id)
+        self._settings = coordinator.node_settings.get(node_id, {})
+        if self._settings.get("device_class") is not None:
+            self._attr_device_class = self._settings["device_class"]
         self._attr_device_info = device_info(
             entry_id,
             (
@@ -51,7 +54,6 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator], RestoreEntity):
             ),
         )
         self._node_id = node_id
-        self._settings = coordinator.node_settings.get(node_id, {})
         node = coordinator.nodes[node_id]
         self._target_node_id = node.get("target_node_id", node_id)
         self._variant_type = node["variant_type"]

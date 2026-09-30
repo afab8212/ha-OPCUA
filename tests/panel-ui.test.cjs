@@ -137,7 +137,12 @@ async function pageFor(width = 1280, admin = true) {
         },
       ],
       areas: [{ id: "workshop", name: "Officina" }],
-      device_classes: ["door", "motion", "problem"],
+      device_classes: {
+        binary_sensor: ["door", "motion", "problem"],
+        number: ["power"],
+        sensor: ["temperature", "timestamp"],
+        switch: ["outlet", "switch"],
+      },
     };
     window.testHass = {
       language: "it",
@@ -369,6 +374,31 @@ test("editing saves correct fields and live hass updates preserve draft", async 
     device_class: "motion",
     invert_state: true,
   });
+  await page.close();
+});
+
+test("sensor device class is configurable and saved", async () => {
+  const page = await pageFor();
+  await page
+    .locator("article")
+    .filter({ hasText: "Velocità linea" })
+    .getByRole("button", { name: "Modifica" })
+    .click();
+  const dialog = page.locator("dialog");
+  const deviceClass = dialog.getByLabel("Classe dispositivo", { exact: true });
+  assert.equal(await deviceClass.isVisible(), true);
+  assert.deepEqual(
+    await deviceClass
+      .locator("option")
+      .evaluateAll((options) => options.map((option) => option.value)),
+    ["", "temperature", "timestamp"],
+  );
+  await deviceClass.selectOption("temperature");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  const saved = await page.evaluate(() =>
+    window.calls.find((message) => message.type.endsWith("/update")),
+  );
+  assert.equal(saved.device_class, "temperature");
   await page.close();
 });
 

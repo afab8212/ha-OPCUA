@@ -23,6 +23,9 @@ class AsyncuaSensor(OpcuaEntity, SensorEntity):
 
     @property
     def device_class(self):
+        configured = self._settings.get("device_class")
+        if configured is not None:
+            return configured
         if self.coordinator.nodes[self._node_id]["variant_type"] == "DateTime":
             return SensorDeviceClass.TIMESTAMP
         return None
