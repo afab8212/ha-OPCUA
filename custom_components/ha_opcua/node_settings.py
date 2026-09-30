@@ -145,6 +145,11 @@ def validate_settings(node, settings):
         if not isinstance(settings["node_id"], str) or not settings["node_id"]:
             raise ValueError("invalid_node_id")
         result["node_id"] = settings["node_id"]
+    if "display_name" in settings:
+        display_name = settings["display_name"]
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise ValueError("invalid_display_name")
+        result["display_name"] = display_name
     if "invert_state" in settings:
         if type(settings["invert_state"]) is not bool or (
             settings["invert_state"] and node["variant_type"] != "Boolean"

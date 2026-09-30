@@ -223,6 +223,7 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 "deadband",
                 "always_available",
                 "update_mode",
+                "display_name",
                 "unit_of_measurement",
             )
         }
