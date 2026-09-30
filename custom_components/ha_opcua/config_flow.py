@@ -32,6 +32,7 @@ from .const import (
 from .node_settings import (
     allowed_platforms,
     deadband_default,
+    effective_platform,
     number_defaults,
     supports_deadband,
     supports_unit,
@@ -232,7 +233,7 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
             common.pop("deadband", None)
         if settings["platform"] != "binary_sensor":
             common.pop("device_class", None)
-        if not supports_unit(self._node, settings["platform"]):
+        if not supports_unit(self._node, effective_platform(self._node, settings)):
             common.pop("unit_of_measurement", None)
         merged = {**common, **settings}
         if merged == {"platform": "auto"}:
