@@ -17,6 +17,19 @@ after(async () => {
   await browser?.close();
 });
 
+async function selectNode(dialog, id) {
+  await dialog
+    .getByRole("button", { name: "NodeId associato", exact: true })
+    .click();
+  await dialog
+    .getByRole("combobox", { name: "Cerca tra i nodi scoperti", exact: true })
+    .fill(id);
+  await dialog
+    .locator(".nodePicker [role=option]")
+    .filter({ hasText: id })
+    .click();
+}
+
 async function pageFor(width = 1280, admin = true) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   await page.setContent(
@@ -305,7 +318,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.6.0",
+    "Pannello 1.8.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -359,9 +372,7 @@ test("editing saves correct fields and live hass updates preserve draft", async 
   const dialog = page.locator("dialog");
   await dialog.getByLabel("Nome", { exact: true }).fill("Porta ingresso");
   await dialog.getByLabel("Area", { exact: true }).selectOption("workshop");
-  await dialog
-    .getByLabel("NodeId associato", { exact: true })
-    .selectOption("ns=4;i=1");
+  await selectNode(dialog, "ns=4;i=1");
   await dialog
     .getByLabel("Classe dispositivo", { exact: true })
     .selectOption("motion");
@@ -600,7 +611,9 @@ test("datetime manual creation, category filter and compatible remapping", async
     .getByLabel("Categoria", { exact: true })
     .selectOption("datetime");
   assert.equal(
-    await dialog.getByLabel("Inverti stato booleano").isVisible(),
+    await dialog
+      .getByRole("switch", { name: "Inverti stato booleano", exact: true })
+      .isVisible(),
     false,
   );
   assert.equal(
@@ -639,7 +652,7 @@ test("datetime manual creation, category filter and compatible remapping", async
   assert.equal(await page.locator("article").count(), 1);
   await page.getByRole("button", { name: "Modifica", exact: true }).click();
   const options = await dialog
-    .getByLabel("NodeId associato", { exact: true })
+    .locator("select[name=node_id]")
     .locator("option")
     .evaluateAll((nodes) => nodes.map((n) => n.value));
   assert.deepEqual(options, ["ns=4;i=50"]);
@@ -1265,9 +1278,7 @@ test("REAL precision can be saved, cleared and reset on a non-REAL remap", async
   await field().fill("3");
   await save();
   await edit();
-  await dialog
-    .getByLabel("NodeId associato", { exact: true })
-    .selectOption("ns=4;i=4");
+  await selectNode(dialog, "ns=4;i=4");
   assert.equal(await field().isVisible(), false);
   await save();
   assert.equal(
@@ -1286,8 +1297,20 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
   const edit = () =>
     card.getByRole("button", { name: "Modifica", exact: true }).click();
   const dialog = page.locator("dialog[open]");
-  const field = () => dialog.getByLabel("Unità di misura", { exact: true });
-  const filter = () => dialog.getByLabel("Filtra unità", { exact: true });
+  const field = () =>
+    dialog.getByRole("button", { name: "Unità di misura", exact: true });
+  const filter = () =>
+    dialog.getByRole("combobox", { name: "Cerca unità…", exact: true });
+  const selectUnit = async (value) => {
+    await field().click();
+    await dialog
+      .locator(".unitOptions")
+      .getByRole("option", {
+        name: value === "__custom__" ? "Personalizzata…" : value || "Nessuna",
+        exact: true,
+      })
+      .click();
+  };
   const custom = () =>
     dialog.getByLabel("Unità personalizzata", { exact: true });
   const lastUnit = () =>
@@ -1301,67 +1324,221 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
     await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
   };
   await edit();
-  assert.equal(await field().inputValue(), "");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
   assert.equal(await custom().isVisible(), false);
   // The filter narrows the standard list; "Nessuna" and "Personalizzata…"
   // always stay pinned so a search never hides those two choices.
+  await field().click();
   await filter().fill("kwh");
-  assert.deepEqual(await field().locator("option").allTextContents(), [
-    "Nessuna",
-    "kWh",
-    "Personalizzata…",
-  ]);
-  await filter().fill("");
-  await field().selectOption("bar");
+  assert.deepEqual(
+    await dialog.locator(".unitOptions").getByRole("option").allTextContents(),
+    ["Nessuna", "kWh", "Personalizzata…"],
+  );
+  await filter().press("Escape");
+  await selectUnit("bar");
   await save();
   assert.equal(await lastUnit(), "bar");
   await edit();
-  assert.equal(await field().inputValue(), "bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "bar",
+  );
   assert.equal(await custom().isVisible(), false);
   // Regression: selecting "None" and then typing into the filter must keep
   // the explicit empty choice, not resurrect the unit that was there before.
-  await field().selectOption("");
+  await selectUnit("");
+  await field().click();
   await filter().fill("kwh");
-  assert.equal(await field().inputValue(), "");
-  await filter().fill("");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
+  await filter().press("Escape");
   await save();
   assert.equal(await lastUnit(), null);
 
   await edit();
-  assert.equal(await field().inputValue(), "");
-  await field().selectOption("bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
+  await selectUnit("bar");
   await save();
   assert.equal(await lastUnit(), "bar");
 
   await edit();
-  assert.equal(await field().inputValue(), "bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "bar",
+  );
   assert.equal(await custom().isVisible(), false);
-  await field().selectOption("__custom__");
+  await selectUnit("__custom__");
   assert.equal(await custom().isVisible(), true);
   await custom().fill(" pieces/min ");
   await save();
   assert.equal(await lastUnit(), "pieces/min");
   await edit();
-  assert.equal(await field().inputValue(), "__custom__");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "__custom__",
+  );
   assert.equal(await custom().inputValue(), "pieces/min");
-  await field().selectOption("");
+  await selectUnit("");
   assert.equal(await custom().isVisible(), false);
   await save();
   assert.equal(await lastUnit(), null);
   await edit();
-  assert.equal(await field().inputValue(), "");
-  await field().selectOption("bar");
+  assert.equal(
+    await dialog.locator("select[name=unit_choice]").inputValue(),
+    "",
+  );
+  await selectUnit("bar");
   await save();
   await edit();
-  await dialog
-    .getByLabel("NodeId associato", { exact: true })
-    .selectOption("ns=4;i=4");
+  await selectNode(dialog, "ns=4;i=4");
   assert.equal(await field().isVisible(), false);
   assert.equal(await custom().isVisible(), false);
   await save();
   assert.equal(await lastUnit(), null);
   await page.close();
 });
+
+for (const width of [1280, 390]) {
+  test(`compact editor switches, node search and live header preserve draft at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page
+      .locator("article")
+      .filter({ hasText: "Marcia macchina" })
+      .getByRole("button", { name: "Modifica", exact: true })
+      .click();
+    const dialog = page.locator("dialog[open]");
+    const invert = dialog.getByRole("switch", {
+      name: "Inverti stato booleano",
+      exact: true,
+    });
+    const available = dialog.getByRole("switch", {
+      name: "Sempre disponibile",
+      exact: true,
+    });
+    await invert.focus();
+    await invert.press("Space");
+    await available.check();
+    assert.equal(await invert.isChecked(), true);
+    assert.equal(
+      await page.evaluate(
+        () => window.calls.filter((m) => m.type.endsWith("/update")).length,
+      ),
+      0,
+    );
+    await dialog.getByLabel("Nome", { exact: true }).fill("Bozza interruttore");
+    await page.evaluate(() => {
+      window.testHass.states = {
+        ...window.testHass.states,
+        "switch.marcia": { state: "on", attributes: {} },
+      };
+      document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+    });
+    assert.equal(
+      await dialog.locator(".editorState .stateValue").textContent(),
+      "Acceso",
+    );
+    assert.equal(
+      await dialog.getByLabel("Nome", { exact: true }).inputValue(),
+      "Bozza interruttore",
+    );
+    assert.equal(await invert.isChecked(), true);
+    const help = dialog.locator(".editorHelp:visible").last();
+    await help.locator("summary").click();
+    assert.equal(await help.getAttribute("open"), "");
+    await shot(page, `editor-switches-${width}.png`);
+    const search = dialog.getByRole("combobox", {
+      name: "Cerca tra i nodi scoperti",
+      exact: true,
+    });
+    assert.equal(await search.isVisible(), false);
+    await dialog
+      .getByRole("button", { name: "NodeId associato", exact: true })
+      .click();
+    await search.fill("missing-node");
+    await dialog
+      .locator(".nodePicker")
+      .getByText("Nessun risultato", { exact: true })
+      .waitFor();
+    await search.press("ArrowDown");
+    await search.press("Enter");
+    assert.equal(await dialog.isVisible(), true);
+    await search.fill("Consenso");
+    await search.press("ArrowDown");
+    await search.press("Enter");
+    assert.equal(
+      await dialog.locator("select[name=node_id]").inputValue(),
+      "ns=4;i=2",
+    );
+    await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+    assert.equal(
+      await page.evaluate(
+        () => window.calls.filter((m) => m.type.endsWith("/update")).length,
+      ),
+      0,
+    );
+    await page.close();
+  });
+}
+
+for (const width of [1280, 390]) {
+  test(`unit picker keyboard interaction and editor sections at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page
+      .locator("article")
+      .filter({ hasText: "Velocità linea" })
+      .getByRole("button", { name: "Modifica", exact: true })
+      .click();
+    const dialog = page.locator("dialog[open]");
+    assert.equal(await dialog.locator(".editorSection:visible").count(), 4);
+    const trigger = dialog.getByRole("button", {
+      name: "Unità di misura",
+      exact: true,
+    });
+    const search = dialog.getByRole("combobox", {
+      name: "Cerca unità…",
+      exact: true,
+    });
+    assert.equal(await search.isVisible(), false);
+    await trigger.focus();
+    await trigger.press("ArrowDown");
+    await search.fill("kwh");
+    await shot(page, `editor-unit-picker-${width}.png`);
+    await search.press("ArrowDown");
+    await search.press("ArrowDown");
+    await search.press("Enter");
+    assert.equal(await trigger.textContent(), "kWh");
+    assert.equal(await search.isVisible(), false);
+    assert.equal(await dialog.isVisible(), true);
+    await trigger.click();
+    await search.fill("no matching unit");
+    await search.press("Escape");
+    assert.equal(await dialog.isVisible(), true);
+    assert.equal(await trigger.textContent(), "kWh");
+    assert.equal(await trigger.getAttribute("aria-expanded"), "false");
+    await trigger.click();
+    await search.press("Tab");
+    assert.equal(await search.isVisible(), false);
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(
+      await page.evaluate(
+        () =>
+          window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+            .unit_of_measurement,
+      ),
+      "kWh",
+    );
+    await page.close();
+  });
+}
 
 test("always available is per entity, persists, clears and supports manual nodes", async () => {
   const page = await pageFor(390);
