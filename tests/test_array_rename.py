@@ -6,7 +6,7 @@ import pytest
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.ha_opcua import AsyncuaCoordinator, OpcuaHub, entity_unique_id
-from custom_components.ha_opcua.const import DOMAIN
+from custom_components.ha_opcua.const import CONF_NODE_SETTINGS, DOMAIN
 from custom_components.ha_opcua.panel import (
     async_rename_array_fields,
     endpoint_snapshot,
@@ -109,6 +109,39 @@ async def test_rename_sets_custom_name_and_leaves_others_untouched(hass, entry):
     assert registry.async_get(entity_1.entity_id).name == "astMeldungen 1 · xAktiv"
     # The unselected, equally-eligible field is untouched.
     assert registry.async_get(entity_2.entity_id).name is None
+
+    await c.async_shutdown()
+
+
+async def test_rename_persists_display_name_so_the_raw_duplicate_check_clears(
+    hass, entry
+):
+    """A renamed field must not just look right in the registry.
+
+    The unrelated legacy duplicate-name warning in _migrate_entity_ids()
+    counts each node's raw, undisambiguated name - it has no idea the
+    registry got a custom name. Only a persisted node_settings
+    display_name changes that raw name at the next discovery, so the
+    rename action must write both, not just the registry override.
+    """
+    c, entity_1, entity_2 = await prepare(hass, entry)
+    snapshot = endpoint_snapshot(hass, entry)
+
+    await async_rename_array_fields(
+        hass,
+        {
+            "entry_id": entry.entry_id,
+            "revision": snapshot["revision"],
+            "keys": [FIELD_1["node_id"]],
+        },
+    )
+
+    assert (
+        entry.options[CONF_NODE_SETTINGS][FIELD_1["node_id"]]["display_name"]
+        == "astMeldungen 1 · xAktiv"
+    )
+    # The unselected field's settings are untouched.
+    assert FIELD_2["node_id"] not in entry.options.get(CONF_NODE_SETTINGS, {})
 
     await c.async_shutdown()
 
