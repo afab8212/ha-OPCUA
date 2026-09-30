@@ -611,7 +611,9 @@ test("datetime manual creation, category filter and compatible remapping", async
     .getByLabel("Categoria", { exact: true })
     .selectOption("datetime");
   assert.equal(
-    await dialog.getByLabel("Inverti stato booleano").isVisible(),
+    await dialog
+      .getByRole("switch", { name: "Inverti stato booleano", exact: true })
+      .isVisible(),
     false,
   );
   assert.equal(

@@ -1879,6 +1879,7 @@ class OpcuaNodePanel extends HTMLElement {
       unitFilter.value = "";
       populateUnits();
       unitFilter.focus();
+      unitMenu.scrollIntoView({ block: "nearest" });
     };
     unitButton.addEventListener("click", () =>
       unitMenu.hidden ? openUnits() : closeUnits(),
@@ -2345,7 +2346,7 @@ class OpcuaNodePanel extends HTMLElement {
           );
           summary.setAttribute(
             "aria-label",
-            `${this._t("moreInfo")}: ${child.querySelector("span")?.textContent || this._t("valueSection")}`,
+            `${this._t("moreInfo")}: ${child.querySelector("span")?.firstChild?.textContent || this._t("valueSection")}`,
           );
           details.append(summary, help);
           wrap.append(details);
