@@ -45,3 +45,58 @@ def test_min_not_less_than_max_still_rejected():
 
     with pytest.raises(ValueError, match="invalid_number_limits"):
         validate_settings(INTEGER_NODE, settings)
+
+
+@pytest.mark.parametrize(
+    ("node", "settings", "device_class"),
+    [
+        (
+            {**INTEGER_NODE, "variant_type": "Boolean"},
+            {"platform": "binary_sensor", "device_class": "door"},
+            "door",
+        ),
+        (
+            {**INTEGER_NODE, "variant_type": "Double"},
+            {
+                "platform": "number",
+                "device_class": "power",
+                "min": 0,
+                "max": 100,
+                "step": 1,
+            },
+            "power",
+        ),
+        (
+            {**INTEGER_NODE, "variant_type": "Double"},
+            {"platform": "sensor", "device_class": "temperature"},
+            "temperature",
+        ),
+        (
+            {**INTEGER_NODE, "variant_type": "Boolean"},
+            {"platform": "switch", "device_class": "outlet"},
+            "outlet",
+        ),
+    ],
+)
+def test_device_class_is_validated_for_each_entity_domain(node, settings, device_class):
+    assert validate_settings(node, settings)["device_class"] == device_class
+
+
+def test_datetime_sensor_only_accepts_timestamp_device_class():
+    node = {**INTEGER_NODE, "variant_type": "DateTime", "writable": False}
+
+    assert (
+        validate_settings(node, {"platform": "sensor", "device_class": "timestamp"})[
+            "device_class"
+        ]
+        == "timestamp"
+    )
+    with pytest.raises(ValueError, match="invalid_device_class"):
+        validate_settings(node, {"platform": "sensor", "device_class": "power"})
+
+
+def test_device_class_from_another_domain_is_rejected():
+    node = {**INTEGER_NODE, "variant_type": "Double", "writable": False}
+
+    with pytest.raises(ValueError, match="invalid_device_class"):
+        validate_settings(node, {"platform": "sensor", "device_class": "door"})

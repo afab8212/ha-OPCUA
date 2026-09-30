@@ -20,6 +20,7 @@ from custom_components.ha_opcua import (
 from custom_components.ha_opcua.binary_sensor import AsyncuaBinarySensor
 from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
 from custom_components.ha_opcua.const import CONF_NODE_SETTINGS, DOMAIN
+from custom_components.ha_opcua.number import AsyncuaNumber
 from custom_components.ha_opcua.panel import (
     async_save_entity,
     async_setup_panel,
@@ -311,6 +312,30 @@ async def test_panel_number_limits_and_enabling_unregistered_excluded_node(hass,
         settings = entry.options[CONF_NODE_SETTINGS][msg["key"]]
         assert (settings["min"], settings["max"], settings["step"]) == (0, 200, 2)
     await c.async_shutdown()
+
+
+async def test_panel_number_device_class_and_unit_are_saved_and_applied(hass, entry):
+    c, _, msg = await prepare(hass, entry)
+    msg.update(
+        platform="number",
+        node_id="ns=2;i=3",
+        device_class="power",
+        unit_of_measurement="W",
+        invert_state=False,
+        limits={"min": 0, "max": 100, "step": 1},
+    )
+
+    result = await async_save_entity(hass, msg)
+
+    assert result["saved"]
+    assert entry.options[CONF_NODE_SETTINGS]["ns=2;i=1"]["device_class"] == "power"
+    restored = AsyncuaCoordinator(hass, "PLC", c.hub, config_entry=entry)
+    restored.set_nodes(NODES)
+    number = AsyncuaNumber(restored, "Speed", "ns=2;i=1", entry.entry_id)
+    assert number.device_class == "power"
+    assert number.native_unit_of_measurement == "W"
+    await c.async_shutdown()
+    await restored.async_shutdown()
 
 
 async def test_snapshot_resolves_renamed_subscription_switch(hass, entry):

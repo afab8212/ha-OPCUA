@@ -9,7 +9,6 @@ from pathlib import Path
 import voluptuous as vol
 from asyncua import ua
 from homeassistant.components import panel_custom, websocket_api
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import area_registry as ar
@@ -29,6 +28,7 @@ from .const import (
 from .device import async_register_device
 from .node_settings import (
     allowed_platforms,
+    available_device_classes,
     effective_platform,
     standard_units,
     update_offline_node,
@@ -301,7 +301,13 @@ def panel_snapshot(hass):
             {"id": area.id, "name": area.name}
             for area in ar.async_get(hass).async_list_areas()
         ],
-        "device_classes": sorted(item.value for item in BinarySensorDeviceClass),
+        "device_classes": {
+            platform: available_device_classes(
+                {"variant_type": "Float"},
+                platform,
+            )
+            for platform in ("binary_sensor", "number", "sensor", "switch")
+        },
         "units": standard_units(),
     }
 
