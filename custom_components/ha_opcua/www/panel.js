@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.7.2";
+const PANEL_VERSION = "1.7.3";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -1999,12 +1999,19 @@ class OpcuaNodePanel extends HTMLElement {
     body.append(unitFilterField, unitField, unitHelp, unitCustomField);
     const deviceClass = element("select", undefined, { name: "device_class" });
     deviceClass.append(element("option", this._t("none"), { value: "" }));
-    for (const cls of this._data.device_classes)
+    const classesFor = (platform) => {
+      const classes = this._data.device_classes[platform] || [];
+      return platform === "sensor" &&
+        selectedNode()?.variant_type === "DateTime"
+        ? classes.filter((cls) => cls === "timestamp")
+        : classes;
+    };
+    for (const cls of classesFor(effective()))
       deviceClass.append(
         element(
           "option",
           this._hass.localize?.(
-            `component.binary_sensor.entity_component.${cls}.name`,
+            `component.${effective()}.entity_component.${cls}.name`,
           ) || cls,
           { value: cls },
         ),
@@ -2023,7 +2030,25 @@ class OpcuaNodePanel extends HTMLElement {
     body.append(toggle, invertHelp);
     const updateFields = () => {
       const platform = effective();
-      classField.hidden = platform !== "binary_sensor";
+      const classes = classesFor(platform);
+      const configuredClass = deviceClass.value;
+      classField.hidden = classes.length === 0;
+      deviceClass.replaceChildren(
+        element("option", this._t("none"), { value: "" }),
+      );
+      for (const cls of classes)
+        deviceClass.append(
+          element(
+            "option",
+            this._hass.localize?.(
+              `component.${platform}.entity_component.${cls}.name`,
+            ) || cls,
+            { value: cls },
+          ),
+        );
+      deviceClass.value = classes.includes(configuredClass)
+        ? configuredClass
+        : "";
       precisionField.hidden = precisionHelp.hidden = ![
         "Float",
         "Double",
@@ -2141,8 +2166,7 @@ class OpcuaNodePanel extends HTMLElement {
           name: name.value,
           area_id: area.value || null,
           node_id: nodes.value,
-          device_class:
-            effective() === "binary_sensor" ? deviceClass.value || null : null,
+          device_class: !classField.hidden ? deviceClass.value || null : null,
           invert_state: !toggle.hidden && invert.checked,
         });
         this._notice = this._t(result.reload ? "reloading" : "saved");
