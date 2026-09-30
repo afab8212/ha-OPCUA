@@ -1321,11 +1321,10 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
   // always stay pinned so a search never hides those two choices.
   await field().click();
   await filter().fill("kwh");
-  assert.deepEqual(await dialog.getByRole("option").allTextContents(), [
-    "Nessuna",
-    "kWh",
-    "Personalizzata…",
-  ]);
+  assert.deepEqual(
+    await dialog.locator(".unitOptions").getByRole("option").allTextContents(),
+    ["Nessuna", "kWh", "Personalizzata…"],
+  );
   await filter().press("Escape");
   await selectUnit("bar");
   await save();

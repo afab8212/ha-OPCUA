@@ -2023,6 +2023,7 @@ class OpcuaNodePanel extends HTMLElement {
     const unitList = element("div", undefined, {
       id: "unit-options",
       role: "listbox",
+      tabindex: "-1",
       "aria-labelledby": "unit-label",
       class: "unitOptions",
     });
