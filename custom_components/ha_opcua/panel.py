@@ -29,6 +29,7 @@ from .device import async_register_device
 from .node_settings import (
     allowed_platforms,
     effective_platform,
+    standard_units,
     update_offline_node,
     validate_settings,
 )
@@ -50,6 +51,7 @@ SNAPSHOT_SETTINGS = (
     "precision",
     "always_available",
     "update_mode",
+    "unit_of_measurement",
 )
 
 PANEL_PATH = "opcua-nodes"
@@ -256,6 +258,7 @@ def panel_snapshot(hass):
             for area in ar.async_get(hass).async_list_areas()
         ],
         "device_classes": sorted(item.value for item in BinarySensorDeviceClass),
+        "units": standard_units(),
     }
 
 
@@ -385,7 +388,13 @@ def _entity_settings(node, msg, saved=None):
     }
     if "platform" in msg:
         proposed["platform"] = msg["platform"]
-    for field in ("precision", "deadband", "always_available", "update_mode"):
+    for field in (
+        "precision",
+        "deadband",
+        "always_available",
+        "update_mode",
+        "unit_of_measurement",
+    ):
         if field in msg:
             proposed[field] = msg[field]
     limits = msg.get("limits", {})
@@ -826,6 +835,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
         vol.Optional("update_mode"): vol.In(("polling", "subscription")),
+        vol.Optional("unit_of_measurement"): vol.Any(str, None),
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("device_class"): vol.Any(str, None),
@@ -862,6 +872,7 @@ async def ws_snapshot(hass, connection, msg):
         vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
         vol.Optional("update_mode"): vol.In(("polling", "subscription")),
+        vol.Optional("unit_of_measurement"): vol.Any(str, None),
         vol.Required("name"): str,
         vol.Required("area_id"): vol.Any(str, None),
         vol.Required("node_id"): str,
