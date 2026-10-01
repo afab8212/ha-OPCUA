@@ -1001,6 +1001,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 elif saved:
                     self.node_settings[node_id] = settings
                     self._pending_node_settings[node_id] = settings
+        self._reconcile_legacy_array_display_names()
         seen_ids = set(candidates)
         # persist=False here means this pass is fundamentally not eligible to
         # ever become the discovery baseline (see the cache-only seed call in
@@ -1012,6 +1013,45 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         if persist:
             self._last_discovery_snapshot = (seen_ids, full_discovery)
             self._persist_discovery_state(seen_ids, full_discovery=full_discovery)
+
+    def _reconcile_legacy_array_display_names(self):
+        """Backfill display_name for array fields renamed before it existed.
+
+        A field renamed through the array-rename panel action before it
+        learned to also persist display_name (or renamed by hand to that
+        same text) only ever updated the entity registry: node_settings
+        never recorded it, so the raw name this method's caller feeds to
+        the unrelated duplicate-name check in _migrate_entity_ids still
+        collides, and the warning can keep firing on every upgrade even
+        though the entity already shows the right name. Only a registry
+        name that matches the generated name exactly is backfilled here -
+        anything else is a deliberate user choice and is left alone, the
+        same guard _is_unrenamed_array_field uses in the panel.
+        """
+        if not self.hass or not self.config_entry:
+            return
+        registry = er.async_get(self.hass)
+        entry_id = self.config_entry.entry_id
+        for node_id, node in self.nodes.items():
+            settings = self.node_settings.get(node_id, {})
+            if settings.get("display_name"):
+                continue
+            parsed = parse_array_element(node_id)
+            if parsed is None:
+                continue
+            entity_id = registry.async_get_entity_id(
+                self._platforms[node_id], DOMAIN, entity_unique_id(entry_id, node_id)
+            )
+            registered = registry.async_get(entity_id) if entity_id else None
+            if registered is None or registered.name is None:
+                continue
+            expected = array_element_name(node_id, parsed["field"])
+            if registered.name != expected:
+                continue
+            node["name"] = expected
+            updated = {**settings, "display_name": expected}
+            self.node_settings[node_id] = updated
+            self._pending_node_settings[node_id] = updated
 
     def flush_pending_discovery_state(self) -> None:
         """Persist a classification made before entities_ready, right now.
