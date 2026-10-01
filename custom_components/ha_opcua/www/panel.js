@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.8.1";
+const PANEL_VERSION = "1.9.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -34,9 +34,22 @@ const TEXT = {
     updateModeHelp:
       "Le notifiche richiedono anche lo switch Auto-Subscription dell’endpoint acceso. Il polling continua in entrambe le modalità. Spegnere lo switch non cancella questa scelta.",
     invalid_update_mode: "Modalità aggiornamento non valida.",
+    conversion: "Conversione numerica",
+    conversionNone: "Nessuna (valore PLC)",
+    multiplier: "Moltiplicatore",
+    linear_scale: "Scala lineare",
+    factor: "Fattore",
+    plc_min: "Valore PLC iniziale",
+    plc_max: "Valore PLC finale",
+    ha_min: "Valore HA iniziale",
+    ha_max: "Valore HA finale",
+    conversionHelp:
+      "La conversione si applica in lettura e, al contrario, in scrittura. Limiti e passo sono in unità HA; il deadband resta in unità PLC. Le scritture su interi arrotondano al più vicino (a parità, al pari). La scala non limita i valori agli estremi.",
+    invalid_conversion:
+      "Inserisci valori finiti: fattore diverso da zero ed estremi distinti per ogni scala.",
     precision: "Decimali",
     precisionHelp:
-      "REAL/LREAL: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
+      "REAL/LREAL e valori convertiti: da 0 a 10 decimali. Lascia vuoto per non arrotondare. Si applica al valore in Home Assistant, inclusi storico e automazioni; non modifica le scritture al PLC.",
     invalid_precision:
       "Inserisci un numero intero da 0 a 10 per un nodo REAL/LREAL.",
     invalid_deadband:
@@ -246,10 +259,24 @@ const TEXT = {
     updateModeHelp:
       "Notifications also require the endpoint’s Auto-Subscription switch to be on. Polling continues in both modes. Turning the switch off preserves this choice.",
     invalid_update_mode: "Invalid update mode.",
+    conversion: "Numeric conversion",
+    conversionNone: "None (PLC value)",
+    multiplier: "Multiplier",
+    linear_scale: "Linear scale",
+    factor: "Factor",
+    plc_min: "PLC start value",
+    plc_max: "PLC end value",
+    ha_min: "HA start value",
+    ha_max: "HA end value",
+    conversionHelp:
+      "Reads are converted and writes use the inverse. Limits and step use HA units; deadband uses PLC units. Integer writes round to nearest (ties to even). The scale does not clamp values to its endpoints.",
+    invalid_conversion:
+      "Enter finite values: a nonzero factor and distinct endpoints for each scale.",
     precision: "Decimal places",
     precisionHelp:
-      "REAL/LREAL: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
-    invalid_precision: "Enter an integer from 0 to 10 for a REAL/LREAL node.",
+      "REAL/LREAL and converted values: 0 to 10 decimal places. Leave empty for no rounding. Applies to the Home Assistant value, including history and automations; PLC writes are unchanged.",
+    invalid_precision:
+      "Enter an integer from 0 to 10 for a REAL/LREAL or converted numeric node.",
     invalid_deadband:
       "Use a finite deadband of 0 or more (an integer for integer node types).",
     deadband: "Deadband",
@@ -955,7 +982,13 @@ class OpcuaNodePanel extends HTMLElement {
         ) || row.device_class;
       add("device_class", `${this._t("classBadge")}: ${name}`);
     }
-    if (floating && settings.precision != null)
+    if (settings.conversion)
+      add(
+        "conversion",
+        this._t(settings.conversion.type),
+        this._t("conversionHelp"),
+      );
+    if ((floating || settings.conversion) && settings.precision != null)
       add(
         "precision",
         `${this._t("precision")}: ${settings.precision}`,
@@ -2143,6 +2176,37 @@ class OpcuaNodePanel extends HTMLElement {
     }
     const limitsHelp = element("p", this._t("limitsHelp"), { class: "hint" });
     valueSection.append(limitsHelp);
+    const conversion = element("select", undefined, { name: "conversion" });
+    for (const kind of ["none", "multiplier", "linear_scale"])
+      conversion.append(
+        element("option", this._t(kind === "none" ? "conversionNone" : kind), {
+          value: kind,
+        }),
+      );
+    conversion.value = initial.conversion?.type || "none";
+    const conversionField = this._field("conversion", conversion);
+    const conversionHelp = element("p", this._t("conversionHelp"), {
+      class: "hint",
+    });
+    const conversionInputs = {};
+    const conversionGroup = element("div", undefined, { class: "limits" });
+    for (const [key, fallback] of Object.entries({
+      factor: 1,
+      plc_min: 0,
+      plc_max: 100,
+      ha_min: 0,
+      ha_max: 100,
+    })) {
+      const input = element("input", undefined, {
+        type: "number",
+        step: "any",
+        name: key,
+      });
+      input.value = initial.conversion?.[key] ?? fallback;
+      conversionInputs[key] = input;
+      conversionGroup.append(this._field(key, input));
+    }
+    valueSection.append(conversionField, conversionHelp, conversionGroup);
     const precision = element("input", undefined, {
       type: "number",
       name: "precision",
@@ -2266,10 +2330,26 @@ class OpcuaNodePanel extends HTMLElement {
       deviceClass.value = classes.includes(configuredClass)
         ? configuredClass
         : "";
-      precisionField.hidden = precisionHelp.hidden = ![
-        "Float",
-        "Double",
-      ].includes(selectedNode()?.variant_type);
+      conversionField.hidden = conversionHelp.hidden = !NUMERIC.has(
+        selectedNode()?.variant_type,
+      );
+      conversion.disabled = conversionField.hidden;
+      conversionGroup.hidden =
+        conversion.disabled || conversion.value === "none";
+      for (const [key, input] of Object.entries(conversionInputs)) {
+        const visible =
+          !conversionGroup.hidden &&
+          (conversion.value === "multiplier"
+            ? key === "factor"
+            : key !== "factor");
+        input.parentElement.hidden = !visible;
+        input.disabled = !visible;
+        input.required = visible;
+      }
+      precisionField.hidden = precisionHelp.hidden = !(
+        ["Float", "Double"].includes(selectedNode()?.variant_type) ||
+        (!conversion.disabled && conversion.value !== "none")
+      );
       precision.disabled = precisionField.hidden;
       // Any numeric node shown as number or sensor: a read-only float has
       // exactly the same push-noise problem as a writable one.
@@ -2319,6 +2399,7 @@ class OpcuaNodePanel extends HTMLElement {
       copy.classList.add("switchCopy");
       copy.append(element("small", this._t(short)));
     }
+    conversion.addEventListener("change", updateFields);
     // Keep related fields adjacent: unit and class share a row on desktop.
     valueSection.append(precisionField, precisionHelp);
     const helpPairs = [];
@@ -2405,6 +2486,21 @@ class OpcuaNodePanel extends HTMLElement {
           ...(manual ? {} : { key: row.key }),
           platform: category.value,
           update_mode: updateMode.value,
+          ...(!conversion.disabled || initial.conversion
+            ? {
+                conversion:
+                  conversion.disabled || conversion.value === "none"
+                    ? null
+                    : {
+                        type: conversion.value,
+                        ...Object.fromEntries(
+                          Object.entries(conversionInputs)
+                            .filter(([, input]) => !input.disabled)
+                            .map(([key, input]) => [key, Number(input.value)]),
+                        ),
+                      },
+              }
+            : {}),
           ...(alwaysAvailable.checked || initial.always_available !== undefined
             ? { always_available: alwaysAvailable.checked }
             : {}),

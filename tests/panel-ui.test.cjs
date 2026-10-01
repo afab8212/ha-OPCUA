@@ -274,6 +274,9 @@ async function pageFor(width = 1280, admin = true) {
             ...(Object.hasOwn(msg, "always_available")
               ? { always_available: msg.always_available }
               : {}),
+            ...(Object.hasOwn(msg, "conversion")
+              ? { conversion: msg.conversion }
+              : {}),
             ...(Object.hasOwn(msg, "precision")
               ? { precision: msg.precision }
               : {}),
@@ -318,7 +321,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.8.1",
+    "Pannello 1.9.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -2290,6 +2293,75 @@ for (const width of [1280, 390]) {
       await document.querySelector("opcua-node-panel")._load();
     });
     assert.equal(await page.locator(".customizations").count(), 0);
+    await page.close();
+  });
+}
+
+for (const width of [1280, 390]) {
+  test(`numeric conversions persist, switch mode and clear at ${width}px`, async () => {
+    const page = await pageFor(width);
+    const card = page.locator("article").filter({ hasText: "Velocità linea" });
+    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    let dialog = page.locator("dialog[open]");
+    const selector = () =>
+      dialog.getByLabel("Conversione numerica", { exact: true });
+    await selector().selectOption("multiplier");
+    await dialog.getByLabel("Fattore", { exact: true }).fill("0.1");
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await page.evaluate(
+        () =>
+          window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+            .conversion,
+      ),
+      { type: "multiplier", factor: 0.1 },
+    );
+    await card
+      .locator('[data-setting="conversion"]')
+      .getByText("Moltiplicatore", { exact: true })
+      .waitFor();
+    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    dialog = page.locator("dialog[open]");
+    assert.equal(await selector().inputValue(), "multiplier");
+    assert.equal(
+      await dialog.getByLabel("Fattore", { exact: true }).inputValue(),
+      "0.1",
+    );
+    await selector().selectOption("linear_scale");
+    await dialog.getByLabel("Valore PLC finale", { exact: true }).fill("27648");
+    await dialog.getByLabel("Valore HA iniziale", { exact: true }).fill("-50");
+    await dialog.getByLabel("Valore HA finale", { exact: true }).fill("150");
+    await shot(page, `conversion-${width}.png`);
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await page.evaluate(
+        () =>
+          window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+            .conversion,
+      ),
+      {
+        type: "linear_scale",
+        plc_min: 0,
+        plc_max: 27648,
+        ha_min: -50,
+        ha_max: 150,
+      },
+    );
+    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    dialog = page.locator("dialog[open]");
+    await selector().selectOption("none");
+    await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+    await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+    assert.equal(
+      await page.evaluate(
+        () =>
+          window.calls.filter((m) => m.type.endsWith("/update")).at(-1)
+            .conversion,
+      ),
+      null,
+    );
     await page.close();
   });
 }

@@ -221,6 +221,7 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 "invert_state",
                 "device_class",
                 "precision",
+                "conversion",
                 "deadband",
                 "always_available",
                 "update_mode",
@@ -228,7 +229,9 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 "unit_of_measurement",
             )
         }
-        if self._node["variant_type"] not in {"Float", "Double"}:
+        if self._node["variant_type"] not in {"Float", "Double"} and not common.get(
+            "conversion"
+        ):
             common.pop("precision", None)
         if not supports_deadband(self._node, settings["platform"]):
             common.pop("deadband", None)
@@ -292,7 +295,12 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             try:
                 settings = validate_settings(
-                    self._node, {**user_input, "platform": platform}
+                    self._node,
+                    {
+                        "conversion": self._current_settings().get("conversion"),
+                        **user_input,
+                        "platform": platform,
+                    },
                 )
             except ValueError as err:
                 errors["base"] = str(err)

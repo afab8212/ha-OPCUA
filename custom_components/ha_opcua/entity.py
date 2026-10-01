@@ -11,6 +11,7 @@ from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AsyncuaCoordinator, entity_unique_id
+from .conversion import convert
 from .device import device_info
 from .values import datetime_value, scalar_variant
 
@@ -144,11 +145,18 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator], RestoreEntity):
             value = self._last_value if self._has_last_value else None
         if isinstance(value, bool) and self._settings.get("invert_state", False):
             return not value
+        if value is not None and self._settings.get("conversion"):
+            try:
+                value = convert(value, self._settings["conversion"])
+            except ValueError:
+                return None
         precision = self._settings.get("precision")
         if (
             precision is not None
-            and self.coordinator.nodes[self._node_id]["variant_type"]
-            in {"Float", "Double"}
+            and (
+                self._variant_type in {"Float", "Double"}
+                or self._settings.get("conversion")
+            )
             and isinstance(value, (int, float))
             and not isinstance(value, bool)
             and math.isfinite(value)
