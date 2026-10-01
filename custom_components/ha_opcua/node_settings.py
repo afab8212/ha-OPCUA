@@ -11,6 +11,7 @@ from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.components.switch import SwitchDeviceClass
 
 from .const import CONF_OFFLINE_NODES
+from .conversion import convert, validate_conversion
 from .values import scalar_variant
 
 INTEGER_TYPES = {
@@ -122,12 +123,17 @@ def validate_settings(node, settings):
         if type(settings["always_available"]) is not bool:
             raise ValueError("invalid_availability")
         result["always_available"] = settings["always_available"]
+    conversion = validate_conversion(settings.get("conversion"))
+    if conversion is not None:
+        if node["variant_type"] not in NUMERIC_TYPES:
+            raise ValueError("invalid_conversion")
+        result["conversion"] = conversion
     precision = settings.get("precision")
     if precision is not None:
         if (
             type(precision) is not int
             or not 0 <= precision <= 10
-            or node["variant_type"] not in {"Float", "Double"}
+            or (node["variant_type"] not in {"Float", "Double"} and not conversion)
         ):
             raise ValueError("invalid_precision")
         result["precision"] = precision
@@ -212,7 +218,7 @@ def validate_settings(node, settings):
         ):
             raise ValueError("invalid_number_limits")
         kind = node["variant_type"]
-        if kind in INTEGER_TYPES:
+        if kind in INTEGER_TYPES and not conversion:
             if not all(value.is_integer() for value in limits.values()):
                 raise ValueError("integer_limits_required")
             limits = {key: int(value) for key, value in limits.items()}
@@ -220,7 +226,12 @@ def validate_settings(node, settings):
                 raise ValueError("unsafe_integer_limits")
         try:
             for key in ("min", "max"):
-                scalar_variant(limits[key], ua.VariantType[kind])
+                raw = convert(
+                    limits[key], conversion, inverse=True, integer=kind in INTEGER_TYPES
+                )
+                if kind in INTEGER_TYPES and abs(raw) > MAX_SAFE_INTEGER:
+                    raise ValueError("unsafe_integer_limits")
+                scalar_variant(raw, ua.VariantType[kind])
         except ValueError as err:
             raise ValueError("limits_outside_type") from err
         result.update(limits)

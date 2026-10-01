@@ -2,12 +2,15 @@
 
 import math
 
+from asyncua import ua
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
+from .conversion import convert
 from .entity import OpcuaEntity, async_setup_node_entities
 from .node_settings import INTEGER_TYPES, MAX_SAFE_INTEGER
+from .values import scalar_variant
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -56,8 +59,23 @@ class AsyncuaNumber(OpcuaEntity, NumberEntity):
             raise HomeAssistantError("A finite numeric value is required")
         if not self.native_min_value <= value <= self.native_max_value:
             raise HomeAssistantError("Value is outside the configured limits")
+        try:
+            value = convert(
+                value,
+                self._settings.get("conversion"),
+                inverse=True,
+                integer=self._integer,
+            )
+        except ValueError as err:
+            raise HomeAssistantError("Invalid converted value") from err
         if self._integer:
             if isinstance(value, float) and not value.is_integer():
                 raise HomeAssistantError("This OPC UA node requires an integer")
             value = int(value)
+        try:
+            if self._integer and abs(value) > MAX_SAFE_INTEGER:
+                raise ValueError("Integer exceeds safe precision")
+            scalar_variant(value, ua.VariantType[self._variant_type])
+        except ValueError as err:
+            raise HomeAssistantError(str(err)) from err
         await self._async_write_value(value)

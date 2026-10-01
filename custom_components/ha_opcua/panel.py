@@ -50,6 +50,7 @@ SNAPSHOT_SETTINGS = (
     "min_length",
     "max_length",
     "precision",
+    "conversion",
     "always_available",
     "update_mode",
     "unit_of_measurement",
@@ -440,6 +441,7 @@ def _entity_settings(node, msg, saved=None):
         proposed["platform"] = msg["platform"]
     for field in (
         "precision",
+        "conversion",
         "deadband",
         "always_available",
         "update_mode",
@@ -941,6 +943,7 @@ async def ws_inspect(hass, connection, msg):
         vol.Required("node_id"): str,
         vol.Required("platform"): str,
         vol.Optional("limits"): dict,
+        vol.Optional("conversion"): vol.Any(dict, None),
         vol.Optional("precision"): vol.Any(int, None),
         vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,
@@ -978,6 +981,7 @@ async def ws_snapshot(hass, connection, msg):
         vol.Required("key"): str,
         vol.Optional("platform"): str,
         vol.Optional("limits"): dict,
+        vol.Optional("conversion"): vol.Any(dict, None),
         vol.Optional("precision"): vol.Any(int, None),
         vol.Optional("deadband"): vol.Any(int, float, None),
         vol.Optional("always_available"): bool,

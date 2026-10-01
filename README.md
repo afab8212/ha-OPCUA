@@ -256,11 +256,25 @@ Open the **OPC UA Connect** sidebar panel, select an endpoint and click **Edit**
 
 Choices are keyed by **NodeId**, so nodes with identical names can be configured independently. Write controls are offered only when both AccessLevel and UserAccessLevel permit writes. If a saved choice becomes incompatible after a PLC type or permission change, the entity is skipped and a warning is logged; use the panel to fix the choice. Missing nodes retain their saved choices for when they return. Discovery runs at setup/reload.
 
-Numeric limits must fit the OPC UA type. Integer nodes require integer limits and step; their editable range is restricted to ±9007199254740991 to avoid rounding in the browser. A larger 64-bit value is shown as unknown in a `number` entity. Float values retain the precision of their PLC type. The step controls the interface increment; writes must satisfy the range and PLC type, but need not be a multiple of the step.
+Without a conversion, numeric limits must fit the OPC UA type. Integer nodes require integer limits and step; their editable range is restricted to ±9007199254740991 to avoid rounding in the browser. A larger 64-bit value is shown as unknown in a `number` entity. Float values retain the precision of their PLC type. The step controls the interface increment; writes must satisfy the range and PLC type, but need not be a multiple of the step.
 
 Text limits must satisfy `0 ≤ minimum ≤ maximum ≤ 255`. Set the maximum to the capacity configured in your PLC (for example, 80 for STRING[80]); the integration does not discover this capacity. Spaces, brackets and empty strings are preserved. Longer current text values are shown as unknown because Home Assistant entity states are limited to 255 characters. Server restrictions still apply to every write. Successful writes request a fresh read; values are not assumed to have changed before readback.
 
 Changing a node from `sensor` to `number`, for example, creates an entity in the new domain. The previous registry entry is retained and is no longer provided. Update automations/dashboard references before deleting it. Selecting Excluded has the same effect on the previous entity. Selecting Automatic restores the original mapping. Existing mappings are unchanged on upgrade until you choose a different type.
+
+## Numeric conversions
+
+In the entity editor, select **Numeric conversion** for a numeric sensor or number:
+
+- **None** (default): keep the raw PLC value.
+- **Multiplier**: `HA = PLC × factor`. For example, factor `0.1` displays `253` as `25.3`; writing `23.5` to a number writes `235` to the PLC.
+- **Linear scale**: map two PLC endpoints to two Home Assistant endpoints. For example, PLC `0…27648` maps to HA `-50…150 °C`. Descending scales are supported. Values outside the endpoints are extrapolated, not clamped.
+
+Number minimum, maximum and step are expressed in **HA units** when conversion is enabled, including fractional limits for integer PLC nodes. Writes use the inverse conversion, then validate the PLC type and safe integer range. Integer writes round to the nearest integer, with exact ties rounded to even; the readback can therefore differ slightly from the requested value. Float/Double writes retain their native precision. The factor must be finite and nonzero; each scale must have two distinct finite endpoints.
+
+**Decimal places** rounds the converted state, including converted integer nodes; it does not round number commands. Units remain display metadata and must be selected separately. Subscription **Deadband** remains in **raw PLC units**. Polling, subscription updates and retained offline states use the same conversion, while restore data stores the raw value to avoid applying it twice. Removing a conversion returns to raw units: adjust number limits and step accordingly before saving.
+
+These conversions apply to entity states and native number commands. The low-level raw write service continues to accept PLC values. Expressions and configurable clamping are not included in this first implementation.
 
 ## Orphan entity repairs
 
