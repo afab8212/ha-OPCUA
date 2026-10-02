@@ -241,7 +241,7 @@ Connection controls are also available when the PLC is offline at startup. Node 
 
 ## Per-node entity configuration (1.1.0)
 
-Open the **OPC UA Connect** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and update mode and, for `number` or `text`, set its limits in the same form. Numeric entities in subscription mode also offer a deadband setting. Save to reload the endpoint. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → OPC UA Connect → Configure**. English and Italian translations are included.
+Open the **OPC UA Connect** sidebar panel, select an endpoint and click **Edit** on a node. Choose its category and update mode and, for `number` or `text`, set its limits in the same form. Numeric entities in subscription mode also offer a deadband setting. Save to apply the changes. Both discovered and manual nodes use the same backend validation. Connection settings remain under **Settings → Devices & services → OPC UA Connect → Configure**. English and Italian translations are included.
 
 | Choice | Compatible nodes | Behavior |
 | --- | --- | --- |
@@ -261,6 +261,21 @@ Without a conversion, numeric limits must fit the OPC UA type. Integer nodes req
 Text limits must satisfy `0 ≤ minimum ≤ maximum ≤ 255`. Set the maximum to the capacity configured in your PLC (for example, 80 for STRING[80]); the integration does not discover this capacity. Spaces, brackets and empty strings are preserved. Longer current text values are shown as unknown because Home Assistant entity states are limited to 255 characters. Server restrictions still apply to every write. Successful writes request a fresh read; values are not assumed to have changed before readback.
 
 Changing a node from `sensor` to `number`, for example, creates an entity in the new domain. The previous registry entry is retained and is no longer provided. Update automations/dashboard references before deleting it. Selecting Excluded has the same effect on the previous entity. Selecting Automatic restores the original mapping. Existing mappings are unchanged on upgrade until you choose a different type.
+
+## Live entity customization
+
+Editing **Always available**, boolean inversion, decimal places, numeric conversions,
+number/text limits, device class or units updates the existing entities immediately.
+The endpoint session and subscriptions stay connected; other entities keep updating.
+The saved settings continue to apply after a restart.
+
+Always available can also be changed with the connection disabled when the node's
+verified metadata is already loaded or cached. Enabling it saves that metadata for
+future offline startup. It does not discover unknown nodes or invent missing values.
+
+Changes to entity category, associated NodeId, endpoint connection settings,
+subscription update mode or deadband still reload the endpoint in this iteration.
+The panel reports a reload only when one is actually required.
 
 ## Numeric conversions
 

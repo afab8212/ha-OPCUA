@@ -199,19 +199,20 @@ async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None
         if key not in (CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED)
     }
     if options != coordinator.reload_options:
-        await hass.config_entries.async_reload(entry.entry_id)
-    else:
-        await coordinator.async_set_connection_enabled(
-            entry.options.get(CONF_CONNECTION_ENABLED, True), persist=False
-        )
-        # Preserve the initial choice in entry.data unless options override it.
-        # Older entries without this setting retain polling-only behavior.
-        await coordinator.async_set_subscription_enabled(
-            {**entry.data, **entry.options}.get(
-                CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
-            ),
-            persist=False,
-        )
+        if not coordinator.apply_entity_options(options):
+            await hass.config_entries.async_reload(entry.entry_id)
+            return
+    await coordinator.async_set_connection_enabled(
+        entry.options.get(CONF_CONNECTION_ENABLED, True), persist=False
+    )
+    # Preserve the initial choice in entry.data unless options override it.
+    # Older entries without this setting retain polling-only behavior.
+    await coordinator.async_set_subscription_enabled(
+        {**entry.data, **entry.options}.get(
+            CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
+        ),
+        persist=False,
+    )
 
 
 def entity_unique_id(entry_id: str, node_id: str) -> str:
@@ -889,6 +890,82 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             else:
                 await self._hub.pause()
                 self.async_set_updated_data({})
+
+    def live_entity_options(self, options):
+        """Validate an in-place edit without mutating any running entity."""
+        ignored = {CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED}
+        options = {k: v for k, v in options.items() if k not in ignored}
+        editable = {CONF_NODE_SETTINGS, CONF_OFFLINE_NODES}
+        if {k: v for k, v in options.items() if k not in editable} != {
+            k: v for k, v in self.reload_options.items() if k not in editable
+        }:
+            return None
+        before = self.reload_options.get(CONF_NODE_SETTINGS, {})
+        after = options.get(CONF_NODE_SETTINGS, {})
+        live_fields = {
+            "always_available",
+            "invert_state",
+            "precision",
+            "conversion",
+            "min",
+            "max",
+            "step",
+            "min_length",
+            "max_length",
+            "device_class",
+            "unit_of_measurement",
+            "display_name",
+        }
+        normalized = {}
+        for key in before.keys() | after.keys():
+            old, new = before.get(key, {}), after.get(key, {})
+            if old == new:
+                continue
+            node = self.nodes.get(key)
+            if node is None or self._platforms.get(key) in (None, "disabled"):
+                return None
+            # Explicitly saving existing routing/default fields is harmless.
+            try:
+                settings = validate_settings(node, new)
+            except ValueError:
+                return None
+            if effective_platform(node, settings) != self._platforms[key]:
+                return None
+            current = self.node_settings.get(key, {})
+            for field in (current.keys() | settings.keys()) - live_fields:
+                default = (
+                    key
+                    if field == "node_id"
+                    else "polling" if field == "update_mode" else None
+                )
+                if field == "platform":
+                    continue
+                if current.get(field, default) != settings.get(field, default):
+                    return None
+            normalized[key] = settings
+        return normalized
+
+    def apply_entity_options(self, options):
+        """Publish validated presentation/availability settings without reconnecting."""
+        normalized = self.live_entity_options(options)
+        if normalized is None:
+            return False
+        self.node_settings.update(normalized)
+        self.offline_nodes = {
+            key: node
+            for key, node in options.get(CONF_OFFLINE_NODES, {}).items()
+            if self.node_settings.get(key, {}).get("always_available", False)
+        }
+        self.reload_options = {
+            key: value
+            for key, value in options.items()
+            if key not in (CONF_CONNECTION_ENABLED, CONF_SUBSCRIPTION_ENABLED)
+        }
+        for key, settings in normalized.items():
+            if settings.get("display_name"):
+                self.nodes[key]["name"] = settings["display_name"]
+        self.async_update_listeners()
+        return True
 
     def set_nodes(self, nodes, *, persist=True, full_discovery=False):
         self._discovery_pending = False
