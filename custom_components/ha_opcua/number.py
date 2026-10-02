@@ -28,9 +28,18 @@ class AsyncuaNumber(OpcuaEntity, NumberEntity):
     def __init__(self, coordinator, name, node_id, entry_id):
         super().__init__(coordinator, name, node_id, entry_id)
         self._integer = coordinator.nodes[node_id]["variant_type"] in INTEGER_TYPES
-        self._attr_native_min_value = self._settings["min"]
-        self._attr_native_max_value = self._settings["max"]
-        self._attr_native_step = self._settings["step"]
+
+    @property
+    def native_min_value(self):
+        return self._settings["min"]
+
+    @property
+    def native_max_value(self):
+        return self._settings["max"]
+
+    @property
+    def native_step(self):
+        return self._settings["step"]
 
     @property
     def native_unit_of_measurement(self):

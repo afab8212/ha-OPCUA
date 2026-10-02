@@ -19,10 +19,13 @@ class AsyncuaText(OpcuaEntity, TextEntity):
 
     _attr_mode = TextMode.TEXT
 
-    def __init__(self, coordinator, name, node_id, entry_id):
-        super().__init__(coordinator, name, node_id, entry_id)
-        self._attr_native_min = self._settings["min_length"]
-        self._attr_native_max = self._settings["max_length"]
+    @property
+    def native_min(self):
+        return self._settings["min_length"]
+
+    @property
+    def native_max(self):
+        return self._settings["max_length"]
 
     @property
     def native_value(self):

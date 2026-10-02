@@ -418,8 +418,11 @@ async def async_save_entity(hass, msg):
         options = deepcopy(dict(entry.options))
         options.setdefault(CONF_NODE_SETTINGS, {})[msg["key"]] = settings
         update_offline_node(options, msg["key"], target, settings)
-        reload_needed = options != dict(entry.options)
-        if reload_needed:
+        changed = options != dict(entry.options)
+        reload_needed = changed and c.live_entity_options(options) is None
+        if changed:
+            if not reload_needed:
+                c.apply_entity_options(options)
             hass.config_entries.async_update_entry(entry, options=options)
         async_sync_orphan_repairs(hass, entry)
         return {
