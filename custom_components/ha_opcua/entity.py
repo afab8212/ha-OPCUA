@@ -100,6 +100,11 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator], RestoreEntity):
 
     @callback
     def _handle_coordinator_update(self):
+        self._settings = self.coordinator.node_settings.get(self._node_id, {})
+        self._attr_device_class = self._settings.get("device_class")
+        self._attr_name = self._settings.get(
+            "display_name", self.coordinator.nodes[self._node_id]["name"]
+        )
         self._capture_value()
         super()._handle_coordinator_update()
 

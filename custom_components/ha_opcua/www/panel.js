@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.9.0";
+const PANEL_VERSION = "1.9.1";
 const TEXT = {
   it: {
     version: "Integrazione",
