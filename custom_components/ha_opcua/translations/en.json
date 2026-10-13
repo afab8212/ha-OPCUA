@@ -10,7 +10,8 @@
           "password": "Password",
           "scan_interval": "Polling interval (seconds)",
           "hub_root": "Root NodeId",
-          "subscription_enabled": "Auto-Subscription (instant updates)"
+          "subscription_enabled": "Auto-Subscription (instant updates)",
+          "name_with_path": "Include PLC path in entity names"
         }
       }
     },
@@ -34,11 +35,13 @@
           "password": "Password",
           "scan_interval": "Polling interval (seconds)",
           "hub_root": "Root NodeId",
-          "subscription_enabled": "Auto-Subscription (instant updates)"
+          "subscription_enabled": "Auto-Subscription (instant updates)",
+          "name_with_path": "Include PLC path in entity names"
         },
         "data_description": {
           "scan_interval": "Values are always re-read on this interval, whether or not Auto-Subscription below is enabled.",
-          "subscription_enabled": "When on, changed values are pushed the instant the PLC reports them, on top of the regular polling interval. Turn off to use polling only."
+          "subscription_enabled": "When on, changed values are pushed the instant the PLC reports them, on top of the regular polling interval. Turn off to use polling only.",
+          "name_with_path": "When on, new entities are named with their full path below the root NodeId (e.g. \"SP · xError\"), and the panel's rename action offers that name for existing ones. Existing names never change on their own."
         }
       },
       "nodes": {
