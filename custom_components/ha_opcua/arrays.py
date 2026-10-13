@@ -11,6 +11,8 @@ struct.
 
 import re
 
+from .const import CONF_NAME_WITH_PATH
+
 _ARRAY_ELEMENT_RE = re.compile(
     r"^(?P<prefix>.*\.(?P<array>[^.\[\]]+)\[(?P<index>\d+)\])\.(?P<field>[^.\[\]]+)$"
 )
@@ -75,3 +77,66 @@ def disambiguated_name(node_id, *, collides):
     if collides:
         return struct_field_name(node_id)
     return None
+
+
+_INDEXED_SEGMENT_RE = re.compile(r"^(?P<name>.+)\[(?P<index>\d+)\]$")
+
+
+def name_with_path_enabled(entry):
+    """Whether this connection names entities by their full path below the root."""
+    if entry is None:
+        return False
+    return bool({**entry.data, **entry.options}.get(CONF_NAME_WITH_PATH, False))
+
+
+def _relative_segments(node_id, root_node_id):
+    """Path segments of a symbolic NodeId below the discovery root, or None."""
+    if not isinstance(root_node_id, str) or not _STRING_NODE_ID_RE.match(node_id):
+        return None
+    prefix = f"{root_node_id.strip()}."
+    if not node_id.startswith(prefix):
+        return None
+    segments = [part.strip('"') for part in node_id[len(prefix) :].split(".")]
+    return segments if all(segments) else None
+
+
+def _segment_label(segment):
+    match = _INDEXED_SEGMENT_RE.match(segment)
+    return f"{match['name']} {match['index']}" if match else segment
+
+
+def path_name(node_id, root_node_id):
+    """A node's full path below the root as a display name, or None.
+
+    Only a node nested at least one level below the root has a path to show.
+    """
+    segments = _relative_segments(node_id, root_node_id)
+    if segments is None or len(segments) < 2:
+        return None
+    return " · ".join(_segment_label(segment) for segment in segments)
+
+
+def path_group(node_id, root_node_id):
+    """The parent path below the root as a group key and label, or None."""
+    segments = _relative_segments(node_id, root_node_id)
+    if segments is None or len(segments) < 2:
+        return None
+    parent = segments[:-1]
+    return {
+        "key": ".".join(parent),
+        "label": " › ".join(_segment_label(segment) for segment in parent),
+    }
+
+
+def display_name_for(node_id, *, collides, root_node_id=None, with_path=False):
+    """The default display name that tells a node apart, or None when none applies.
+
+    With path naming on, every node nested below the root gets its full
+    path. Otherwise only array elements (by index) and fields whose name
+    collides (by parent struct) are disambiguated.
+    """
+    if with_path:
+        name = path_name(node_id, root_node_id)
+        if name is not None:
+            return name
+    return disambiguated_name(node_id, collides=collides)

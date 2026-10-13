@@ -16,7 +16,12 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_integration
 
-from .arrays import disambiguated_name, parse_array_element
+from .arrays import (
+    display_name_for,
+    name_with_path_enabled,
+    parse_array_element,
+    path_group,
+)
 from .connection import connection_attributes
 from .const import (
     CONF_HUB_ID,
@@ -143,6 +148,8 @@ def endpoint_snapshot(hass, entry):
     manual = entry.options.get(CONF_MANUAL_NODES, {})
     nodes = {**manual, **(c.nodes if c else {})}
     name_counts = Counter(node["name"] for node in nodes.values())
+    with_path = name_with_path_enabled(entry)
+    root_node_id = c.hub.root_node_id if c else None
     for key, node in nodes.items():
         settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
         platform = effective_platform(node, settings)
@@ -171,9 +178,13 @@ def endpoint_snapshot(hass, entry):
         )
         custom_name = registered.name if registered else None
         parsed_array = parse_array_element(node_id)
-        proposed_name = disambiguated_name(
-            node_id, collides=name_counts[node["name"]] > 1
+        proposed_name = display_name_for(
+            node_id,
+            collides=name_counts[node["name"]] > 1,
+            root_node_id=root_node_id,
+            with_path=with_path,
         )
+        group = path_group(node_id, root_node_id)
         renamable = _is_unrenamed_duplicate_field(proposed_name, name, custom_name)
         if renamable:
             renamable_fields += 1
@@ -195,6 +206,8 @@ def endpoint_snapshot(hass, entry):
                 "array_field": parsed_array["field"] if parsed_array else None,
                 "array_index": parsed_array["index"] if parsed_array else None,
                 "proposed_name": proposed_name,
+                "path_group": group["key"] if group else None,
+                "path_label": group["label"] if group else None,
                 "renamable": renamable,
                 "variant_type": node["variant_type"],
                 "device_class": (
@@ -253,6 +266,8 @@ def endpoint_snapshot(hass, entry):
                 "array_field": None,
                 "array_index": None,
                 "proposed_name": None,
+                "path_group": None,
+                "path_label": None,
                 "renamable": False,
             }
         )

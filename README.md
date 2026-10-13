@@ -158,7 +158,11 @@ The same collision happens when a field name repeats across several struct insta
 
 For nodes discovered before this disambiguation existed, click **Rename duplicate fields (N)** to choose which eligible entities to rename (array fields and fields with a repeated name). The dialog lists names, NodeIds and the proposed new name, starts with nothing selected, and offers **Select all**. Only the selected entities' display names change; their entity IDs, NodeId mappings and any name already customized manually are left untouched.
 
-The panel groups these fields by array element only when explicitly selected: use the **By category / By array element** toggle next to the grid/list view switch (shown only when the endpoint has such fields) to switch from the default category grouping to grouping by array element instead. Either way, choosing a specific category tab or typing a search query always shows the matching entities as a flat list.
+The panel groups fields only when explicitly selected: use the **By category / By array element / By group** toggle next to the grid/list view switch (each choice is shown only when the endpoint has something to group that way) to switch from the default category grouping. **By array element** groups the fields of one array-of-struct element; **By group** groups every field by its parent path below the root NodeId (for example a GVL such as `SP`, or a struct instance such as `PARAM › Pump_North`). Either way, choosing a specific category tab or typing a search query always shows the matching entities as a flat list.
+
+#### Naming entities with their full path
+
+Turn on **Include the PLC path in entity names** in the connection options (default off) to name entities after the full symbolic path below the root NodeId, separated by " · ": `SP.xError` becomes "SP · xError" and `PARAM.Pump_North.xEnable` becomes "PARAM · Pump_North · xEnable" (array indexes read as before, e.g. "PlantRelay · astAlarms 3 · xActive"). Entity IDs follow the name, so the group becomes part of the ID. Like the other smart defaults this only applies to brand-new nodes; for existing entities the **Rename duplicate fields** dialog offers the path name, and a custom name is never overridden. A node directly under the root, outside it, or with a numeric NodeId has no path to show and keeps its plain name. Turning the option off again never renames anything.
 
 ## Polling and subscriptions
 

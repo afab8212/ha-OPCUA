@@ -3,8 +3,11 @@
 from custom_components.ha_opcua.arrays import (
     array_element_name,
     disambiguated_name,
+    display_name_for,
     parse_array_element,
     parse_struct_field,
+    path_group,
+    path_name,
     struct_field_name,
 )
 
@@ -90,3 +93,62 @@ def test_array_elements_are_always_disambiguated_by_their_index():
     expected = "Alarms 3 · xActive"
     assert disambiguated_name(node_id, collides=False) == expected
     assert disambiguated_name(node_id, collides=True) == expected
+
+
+ROOT = "ns=4;s=|var|PLC.Application"
+
+
+def test_path_name_joins_every_segment_below_the_root():
+    assert path_name(f"{ROOT}.SP.xError", ROOT) == "SP · xError"
+    assert (
+        path_name(f"{ROOT}.PARAM.Pump_North.xEnable", ROOT)
+        == "PARAM · Pump_North · xEnable"
+    )
+    # An array index stays readable the same way array element names are.
+    assert (
+        path_name(f"{ROOT}.PlantRelay.astAlarms[3].xActive", ROOT)
+        == "PlantRelay · astAlarms 3 · xActive"
+    )
+    # Quoted segments lose their quotes, and a stray space in the root is fine.
+    assert path_name('ns=3;s="DB1"."Pump"."xRun"', 'ns=3;s="DB1"') == "Pump · xRun"
+    assert path_name('ns=3;s=Root."DB1"."xRun"', " ns=3;s=Root ") == "DB1 · xRun"
+
+
+def test_path_name_needs_a_symbolic_path_nested_below_the_root():
+    # Directly under the root there is no group to show.
+    assert path_name(f"{ROOT}.Speed", ROOT) is None
+    # Outside the root, numeric NodeIds and a missing root have no path.
+    assert path_name("ns=4;s=|var|OTHER.Application.SP.xError", ROOT) is None
+    assert path_name("ns=2;i=4", ROOT) is None
+    assert path_name(f"{ROOT}.SP.xError", None) is None
+    assert path_name(f"{ROOT}.SP.xError", "ns=2;i=1") is None
+
+
+def test_path_group_is_the_parent_path_below_the_root():
+    assert path_group(f"{ROOT}.SP.xError", ROOT) == {"key": "SP", "label": "SP"}
+    assert path_group(f"{ROOT}.PARAM.Pump_North.xEnable", ROOT) == {
+        "key": "PARAM.Pump_North",
+        "label": "PARAM › Pump_North",
+    }
+    assert path_group(f"{ROOT}.astAlarms[3].xActive", ROOT) == {
+        "key": "astAlarms[3]",
+        "label": "astAlarms 3",
+    }
+    assert path_group(f"{ROOT}.Speed", ROOT) is None
+    assert path_group("ns=2;i=4", ROOT) is None
+
+
+def test_display_name_for_prefers_the_path_only_when_enabled():
+    node_id = f"{ROOT}.SP.xError"
+    assert display_name_for(node_id, collides=False, root_node_id=ROOT) is None
+    assert (
+        display_name_for(node_id, collides=False, root_node_id=ROOT, with_path=True)
+        == "SP · xError"
+    )
+    # Without a path to show, the collision-based names still apply.
+    assert (
+        display_name_for(node_id, collides=True, root_node_id=None, with_path=True)
+        == "SP · xError"
+    )
+    array_id = f"{ROOT}.astAlarms[3].xActive"
+    assert display_name_for(array_id, collides=False) == "astAlarms 3 · xActive"

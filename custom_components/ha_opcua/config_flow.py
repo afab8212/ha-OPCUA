@@ -24,6 +24,7 @@ from .const import (
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
     CONF_KNOWN_NODE_IDS,
+    CONF_NAME_WITH_PATH,
     CONF_NODE_SETTINGS,
     CONF_SUBSCRIPTION_ENABLED,
     DEFAULT_SUBSCRIPTION_ENABLED,
@@ -71,6 +72,7 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_SUBSCRIPTION_ENABLED: user_input.get(
                         CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
                     ),
+                    CONF_NAME_WITH_PATH: user_input.get(CONF_NAME_WITH_PATH, False),
                 },
                 # An empty (not absent) baseline marks this endpoint as having
                 # already completed its "zero known nodes" starting point, so
@@ -93,6 +95,7 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_SUBSCRIPTION_ENABLED, default=DEFAULT_SUBSCRIPTION_ENABLED
                 ): bool,
+                vol.Optional(CONF_NAME_WITH_PATH, default=False): bool,
             }
         )
 
@@ -165,6 +168,10 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                         default=current.get(
                             CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
                         ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_NAME_WITH_PATH,
+                        default=current.get(CONF_NAME_WITH_PATH, False),
                     ): bool,
                 }
             ),

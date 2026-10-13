@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.9.2";
+const PANEL_VERSION = "1.9.3";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -97,6 +97,8 @@ const TEXT = {
     groupModeLabel: "Raggruppamento",
     groupByCategory: "Per categoria",
     groupByArray: "Per elemento array",
+    groupByPath: "Per gruppo (GVL / struct)",
+    groupedPaths: "Gruppi",
     renameFields: "Rinomina campi duplicati",
     renameFieldsTitle: "Disambigua i campi con nomi ripetuti",
     renameFieldsHelp:
@@ -330,6 +332,8 @@ const TEXT = {
     groupModeLabel: "Grouping",
     groupByCategory: "By category",
     groupByArray: "By array element",
+    groupByPath: "By group (GVL / struct)",
+    groupedPaths: "Groups",
     renameFields: "Rename duplicate fields",
     renameFieldsTitle: "Disambiguate fields with repeated names",
     renameFieldsHelp:
@@ -446,6 +450,20 @@ const TEXT = {
     limits_outside_type:
       "Configured numeric limits exceed the selected node’s range.",
     info: "Configure categories and limits with Edit. Connection settings remain in the integration options.",
+  },
+};
+const GROUPINGS = {
+  array: {
+    key: "array_group",
+    label: "array_label",
+    sort: "array_field",
+    summary: "groupedArrays",
+  },
+  path: {
+    key: "path_group",
+    label: "path_label",
+    sort: "name",
+    summary: "groupedPaths",
   },
 };
 const GROUPS = [
@@ -598,7 +616,7 @@ class OpcuaNodePanel extends HTMLElement {
       const stored = localStorage.getItem("ha-opcua-view-mode");
       if (stored === "grid" || stored === "list") this._viewMode = stored;
       const storedGroup = localStorage.getItem("ha-opcua-group-mode");
-      if (storedGroup === "category" || storedGroup === "array")
+      if (storedGroup === "category" || storedGroup in GROUPINGS)
         this._groupMode = storedGroup;
     } catch {
       /* private browsing / blocked storage: keep the default */
@@ -915,19 +933,27 @@ class OpcuaNodePanel extends HTMLElement {
       viewToggle.append(button);
     }
     navRow.append(viewToggle);
-    // Only worth offering when this endpoint actually has array-of-struct
-    // fields to group - otherwise it is a control with no visible effect.
-    if (endpoint.rows.some((r) => r.array_group)) {
+    // Only worth offering when this endpoint actually has something to
+    // group by - otherwise it is a control with no visible effect.
+    const groupModes = ["category"];
+    if (endpoint.rows.some((r) => r.array_group)) groupModes.push("array");
+    if (endpoint.rows.some((r) => r.path_group)) groupModes.push("path");
+    if (groupModes.length > 1) {
+      const activeMode = this._activeGroupMode(endpoint);
       const groupToggle = element("div", undefined, {
         class: "viewToggle",
         role: "group",
         "aria-label": this._t("groupModeLabel"),
       });
-      for (const mode of ["category", "array"]) {
+      for (const mode of groupModes) {
         const button = this._button(
-          mode === "category" ? "groupByCategory" : "groupByArray",
+          {
+            category: "groupByCategory",
+            array: "groupByArray",
+            path: "groupByPath",
+          }[mode],
           () => {
-            if (this._groupMode === mode) return;
+            if (activeMode === mode) return;
             this._groupMode = mode;
             try {
               localStorage.setItem("ha-opcua-group-mode", mode);
@@ -936,9 +962,9 @@ class OpcuaNodePanel extends HTMLElement {
             }
             this._render();
           },
-          this._groupMode === mode ? "selected" : "",
+          activeMode === mode ? "selected" : "",
         );
-        button.setAttribute("aria-pressed", String(this._groupMode === mode));
+        button.setAttribute("aria-pressed", String(activeMode === mode));
         groupToggle.append(button);
       }
       navRow.append(groupToggle);
@@ -1125,19 +1151,28 @@ class OpcuaNodePanel extends HTMLElement {
     if (customizations) card.append(customizations);
     return card;
   }
-  _renderArrayGroups(rows) {
-    // Every field of one PLC array-of-struct element (e.g.
-    // "astMeldungen[10]") shares a group key - shown together under one
-    // heading instead of scattered across the sensor/binary_sensor/...
-    // sections above, regardless of how many fields the struct has or
-    // how large the array is.
+  _activeGroupMode(endpoint) {
+    // A stored preference only applies to an endpoint that has something
+    // to group that way; any other endpoint keeps the category default.
+    const grouping = GROUPINGS[this._groupMode];
+    return grouping && endpoint.rows.some((r) => r[grouping.key])
+      ? this._groupMode
+      : "category";
+  }
+  _renderGroups(rows, grouping) {
+    // Every field sharing a group key - one PLC array-of-struct element
+    // (e.g. "astAlarms[10]") or one parent path (e.g. a GVL or struct
+    // instance) - is shown together under one heading instead of
+    // scattered across the sensor/binary_sensor/... sections above,
+    // regardless of how many fields the group has or how many groups
+    // there are.
     const byGroup = new Map();
     for (const row of rows) {
-      if (!byGroup.has(row.array_group)) byGroup.set(row.array_group, []);
-      byGroup.get(row.array_group).push(row);
+      if (!byGroup.has(row[grouping.key])) byGroup.set(row[grouping.key], []);
+      byGroup.get(row[grouping.key]).push(row);
     }
     const groups = [...byGroup.values()].sort((a, b) =>
-      a[0].array_label.localeCompare(b[0].array_label, undefined, {
+      a[0][grouping.label].localeCompare(b[0][grouping.label], undefined, {
         numeric: true,
       }),
     );
@@ -1147,14 +1182,14 @@ class OpcuaNodePanel extends HTMLElement {
       "data-platform": "grouped",
     });
     details.append(
-      element("summary", `${this._t("groupedArrays")} · ${groups.length}`),
+      element("summary", `${this._t(grouping.summary)} · ${groups.length}`),
     );
     const container = element("div", undefined, { class: "arrayGroups" });
     for (const fields of groups) {
-      fields.sort((a, b) => (a.array_field > b.array_field ? 1 : -1));
+      fields.sort((a, b) => (a[grouping.sort] > b[grouping.sort] ? 1 : -1));
       const section = element("div", undefined, { class: "arrayGroup" });
       section.append(
-        element("h3", fields[0].array_label, { class: "arrayGroupTitle" }),
+        element("h3", fields[0][grouping.label], { class: "arrayGroupTitle" }),
       );
       const grid = element("div", undefined, {
         class: this._viewMode === "list" ? "grid list" : "grid",
@@ -1184,14 +1219,19 @@ class OpcuaNodePanel extends HTMLElement {
         `${r.name} ${r.node_id} ${r.entity_id}`.toLowerCase().includes(query),
     );
     if (!rows.length) this._rows.append(emptyMessage(this._t("empty")));
-    // Grouping by array only makes sense browsing everything at once - a
-    // platform filter or an active search wants its own flat, precise list -
-    // and only when the user has explicitly opted into it over the default
-    // category grouping.
+    // Grouping by array element or by path only makes sense browsing
+    // everything at once - a platform filter or an active search wants its
+    // own flat, precise list - and only when the user has explicitly opted
+    // into it over the default category grouping.
+    const mode = this._activeGroupMode(endpoint);
     const grouping =
-      this._filter === "all" && !query && this._groupMode === "array";
-    const groupedRows = grouping ? rows.filter((r) => r.array_group) : [];
-    const ungroupedRows = grouping ? rows.filter((r) => !r.array_group) : rows;
+      this._filter === "all" && !query && mode !== "category"
+        ? GROUPINGS[mode]
+        : null;
+    const groupedRows = grouping ? rows.filter((r) => r[grouping.key]) : [];
+    const ungroupedRows = grouping
+      ? rows.filter((r) => !r[grouping.key])
+      : rows;
     for (const group of GROUPS) {
       const items = ungroupedRows.filter((r) => r.platform === group);
       if (!items.length) continue;
@@ -1208,7 +1248,7 @@ class OpcuaNodePanel extends HTMLElement {
       details.append(grid);
       this._rows.append(details);
     }
-    if (groupedRows.length) this._renderArrayGroups(groupedRows);
+    if (groupedRows.length) this._renderGroups(groupedRows, grouping);
     this._paintStates();
   }
   async _setEndpointSubscription(endpoint, enabled) {

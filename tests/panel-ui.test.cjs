@@ -321,7 +321,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.9.2",
+    "Pannello 1.9.3",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1116,6 +1116,100 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   );
   assert.deepEqual(call.keys, ["arr1x"]);
   await page.close();
+});
+
+test("fields can be grouped by their PLC path as a third explicit choice", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    const row = (key, platform, group, label, name) => ({
+      key,
+      node_id: `ns=4;s=PLC.Application.${group}.${name}`,
+      name: `${label} · ${name}`,
+      entity_id: `${platform}.${key}`,
+      platform,
+      variant_type: platform === "binary_sensor" ? "Boolean" : "Double",
+      reclassifiable: false,
+      path_group: group,
+      path_label: label,
+    });
+    endpoint.rows.push(
+      row("pathsp1", "binary_sensor", "SP", "SP", "xError"),
+      row("pathsp2", "binary_sensor", "SP", "SP", "xWarning"),
+      row(
+        "pathpr1",
+        "sensor",
+        "PARAM.Pump_North",
+        "PARAM › Pump_North",
+        "rGain",
+      ),
+    );
+    window.testHass.states = {
+      ...window.testHass.states,
+      "binary_sensor.pathsp1": { state: "off", attributes: {} },
+      "binary_sensor.pathsp2": { state: "on", attributes: {} },
+      "sensor.pathpr1": { state: "1.5", attributes: {} },
+    };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+
+  const categoryToggle = () =>
+    page.getByRole("button", { name: "Per categoria", exact: true });
+  const pathToggle = () =>
+    page.getByRole("button", {
+      name: "Per gruppo (GVL / struct)",
+      exact: true,
+    });
+  const pressed = async (locator) => await locator.getAttribute("aria-pressed");
+
+  // Only offered when something can be grouped by path; no array fields
+  // here, so there is no array choice at all.
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Per elemento array", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(await page.locator(".arrayGroup").count(), 0);
+  assert.equal(await pressed(categoryToggle()), "true");
+  assert.equal(await pressed(pathToggle()), "false");
+
+  await pathToggle().click();
+  const groups = page.locator(".arrayGroup");
+  assert.equal(await groups.count(), 2);
+  assert.equal(
+    await groups
+      .filter({
+        has: page.locator(".arrayGroupTitle", { hasText: /^SP$/ }),
+      })
+      .locator("article")
+      .count(),
+    2,
+    "both SP fields appear under the SP heading",
+  );
+  assert.equal(
+    await page
+      .locator(".arrayGroupTitle", { hasText: "PARAM › Pump_North" })
+      .count(),
+    1,
+  );
+  assert.equal(
+    await page.locator("summary", { hasText: "Gruppi · 2" }).count(),
+    1,
+  );
+  assert.equal(await pressed(pathToggle()), "true");
+  assert.equal(await pressed(categoryToggle()), "false");
+
+  // A platform filter wants its own flat list even while path grouping is on.
+  await page.getByRole("button", { name: /^Sensori binari · \d+$/ }).click();
+  assert.equal(await page.locator(".arrayGroup").count(), 0);
+  await page.getByRole("button", { name: /^Tutte · \d+$/ }).click();
+  assert.equal(await page.locator(".arrayGroup").count(), 2);
+
+  await categoryToggle().click();
+  assert.equal(await page.locator(".arrayGroup").count(), 0);
+  assert.equal(await pressed(categoryToggle()), "true");
 });
 
 test("edit number limits, preserve draft, exclude and re-enable from the panel", async () => {
