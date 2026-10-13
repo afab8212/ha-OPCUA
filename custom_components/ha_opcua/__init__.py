@@ -20,7 +20,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .arrays import array_element_name, parse_array_element
+from .arrays import array_element_name, disambiguated_name, parse_array_element
 from .const import (
     CONF_CONNECTION_ENABLED,
     CONF_HUB_ID,
@@ -989,6 +989,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             if self._known_node_ids_initialized
             else set()
         )
+        name_counts = Counter(node["name"] for node in candidates.values())
         self.nodes = {}
         self._platforms = {}
         for node_id, original in candidates.items():
@@ -1044,11 +1045,17 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 # the entity's first creation instead of needing a rename
                 # after the fact. Persisted like the defaults above so it
                 # stays stable once the node is no longer "new".
-                if parse_array_element(node_id) is not None:
-                    saved = {
-                        **saved,
-                        "display_name": array_element_name(node_id, node["name"]),
-                    }
+                #
+                # The same collision happens for any other symbolic field
+                # whose name another node shares, e.g. an "xEnable" in several
+                # struct instances ("...Pump_North.xEnable" and
+                # "...Pump_South.xEnable"): its parent struct instance
+                # tells them apart. A name that is unique stays untouched.
+                disambiguated = disambiguated_name(
+                    node_id, collides=name_counts[original["name"]] > 1
+                )
+                if disambiguated is not None:
+                    saved = {**saved, "display_name": disambiguated}
             # A persisted display name (from this node's own "new" pass,
             # possibly in an earlier run) always wins over the raw field
             # name - but only ever a name this feature computed and saved

@@ -84,7 +84,7 @@ async def test_only_unrenamed_array_fields_are_candidates(hass, entry):
     c, entity_1, _ = await prepare(hass, entry)
     snapshot = endpoint_snapshot(hass, entry)
 
-    assert snapshot["renamable_array_fields"] == 2
+    assert snapshot["renamable_fields"] == 2
     by_key = {row["key"]: row for row in snapshot["rows"]}
     assert by_key[FIELD_1["node_id"]]["renamable"] is True
     assert by_key[FIELD_1["node_id"]]["array_group"] == f"{PREFIX}[1]"

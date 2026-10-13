@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.9.1";
+const PANEL_VERSION = "1.9.2";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -97,10 +97,10 @@ const TEXT = {
     groupModeLabel: "Raggruppamento",
     groupByCategory: "Per categoria",
     groupByArray: "Per elemento array",
-    renameArrayFields: "Rinomina campi array",
-    renameArrayFieldsTitle: "Disambigua i campi degli array esistenti",
-    renameArrayFieldsHelp:
-      "Ogni campo di un array di struct del PLC (es. “astMeldungen[10].xAktiv”) condivide lo stesso nome con ogni altro elemento: rinominare i campi selezionati qui sotto aggiunge l'indice dell'array al nome, così da poterli distinguere. Vengono modificati solo i nomi delle entità selezionate; un nome già personalizzato manualmente non viene mai sovrascritto.",
+    renameFields: "Rinomina campi duplicati",
+    renameFieldsTitle: "Disambigua i campi con nomi ripetuti",
+    renameFieldsHelp:
+      "Più campi del PLC condividono lo stesso nome: ogni campo di un elemento di array di struct (es. “Alarms[10].xActive”) si ripete in tutti gli elementi, e un campo come “xEnable” si ripete in più istanze di struct (es. “...Pompa_HK_Nord.xEnable” e “...Pompa_HK_Sud.xEnable”). Rinominare i campi selezionati qui sotto aggiunge al nome l'indice dell'array o la struct padre, così da poterli distinguere. Vengono modificati solo i nomi delle entità selezionate; un nome già personalizzato manualmente non viene mai sovrascritto.",
     renameConfirm: "Rinomina selezionati",
     renaming: "Ridenominazione…",
     renamed: "Campi rinominati.",
@@ -330,10 +330,10 @@ const TEXT = {
     groupModeLabel: "Grouping",
     groupByCategory: "By category",
     groupByArray: "By array element",
-    renameArrayFields: "Rename array fields",
-    renameArrayFieldsTitle: "Disambiguate existing array fields",
-    renameArrayFieldsHelp:
-      'Every field of one PLC array-of-struct element (e.g. "astMeldungen[10].xAktiv") shares the same name with every other element - renaming the ones selected below adds the array index to the name so they can be told apart. Only the selected entities\' names are changed; a name already customized manually is never overridden.',
+    renameFields: "Rename duplicate fields",
+    renameFieldsTitle: "Disambiguate fields with repeated names",
+    renameFieldsHelp:
+      'Several PLC fields share the same name: every field of an array-of-struct element (e.g. "Alarms[10].xActive") repeats across the elements, and a field like "xEnable" repeats across struct instances (e.g. "...Pump_HK_North.xEnable" and "...Pump_HK_South.xEnable"). Renaming the ones selected below adds the array index or the parent struct to the name so they can be told apart. Only the selected entities\' names are changed; a name already customized manually is never overridden.',
     renameConfirm: "Rename selected",
     renaming: "Renaming…",
     renamed: "Fields renamed.",
@@ -858,12 +858,12 @@ class OpcuaNodePanel extends HTMLElement {
     // A field inside a PLC array-of-struct element discovered before this
     // disambiguation existed keeps its raw, colliding name forever unless
     // opted in explicitly here.
-    if (endpoint.renamable_array_fields) {
+    if (endpoint.renamable_fields) {
       const renameCandidates = endpoint.rows.filter((row) => row.renamable);
-      const rename = this._button("renameArrayFields", () =>
-        this._renameArrayFields(renameCandidates),
+      const rename = this._button("renameFields", () =>
+        this._renameFields(renameCandidates),
       );
-      rename.textContent = `${this._t("renameArrayFields")} (${renameCandidates.length})`;
+      rename.textContent = `${this._t("renameFields")} (${renameCandidates.length})`;
       endpointActions.append(rename);
     }
     endpointPanel.append(meta);
@@ -1400,7 +1400,7 @@ class OpcuaNodePanel extends HTMLElement {
     this.shadowRoot.append(dialog);
     dialog.showModal();
   }
-  _renameArrayFields(candidates) {
+  _renameFields(candidates) {
     const endpoint = this._endpoint();
     const dialog = element("dialog");
     this._dialog = dialog;
@@ -1458,8 +1458,8 @@ class OpcuaNodePanel extends HTMLElement {
       updateConfirm();
     });
     form.append(
-      element("h2", this._t("renameArrayFieldsTitle")),
-      element("p", this._t("renameArrayFieldsHelp")),
+      element("h2", this._t("renameFieldsTitle")),
+      element("p", this._t("renameFieldsHelp")),
       selectAllLabel,
       list,
       error,
