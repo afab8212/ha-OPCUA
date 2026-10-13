@@ -80,6 +80,7 @@ def disambiguated_name(node_id, *, collides):
 
 
 _INDEXED_SEGMENT_RE = re.compile(r"^(?P<name>.+)\[(?P<index>\d+)\]$")
+_KIND_TAG_RE = re.compile(r"^\|[^|]*\|")
 
 
 def name_with_path_enabled(entry):
@@ -157,7 +158,12 @@ def _symbolic_segments(node_id):
     if match is None:
         return None
     segments = [part.strip('"') for part in match["path"].split(".")]
-    return segments if len(segments) >= 2 and all(segments) else None
+    if not (len(segments) >= 2 and all(segments)):
+        return None
+    # A leading "|var|" or "|vprop|" only says what kind of entry this is
+    # (a variable or a property of one), not where it lives.
+    segments[0] = _KIND_TAG_RE.sub("", segments[0]) or segments[0]
+    return segments
 
 
 def _shared_prefix(group):

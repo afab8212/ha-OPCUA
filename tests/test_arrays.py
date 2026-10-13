@@ -231,7 +231,7 @@ def test_relative_paths_keep_a_single_group_next_to_a_sibling_group():
 
 
 def test_relative_paths_ignore_a_few_stray_variables_in_a_large_installation():
-    other = "ns=4;s=|prop|PLC.Application"
+    other = "ns=4;s=|var|OTHER.Application"
     browse = {}
     for index in range(150):
         group = "A" if index % 2 else "B"
@@ -247,11 +247,22 @@ def test_relative_paths_ignore_a_few_stray_variables_in_a_large_installation():
 
 
 def test_relative_paths_are_exact_for_a_small_installation():
-    other = "ns=4;s=|prop|PLC.Application"
+    other = "ns=4;s=|var|OTHER.Application"
     browse = {f"{DEVICE}.A.x{index}": [] for index in range(10)}
     browse[f"{other}.Info.sVersion"] = []
     result = relative_paths(browse)
     # With so few variables a deviating one counts: nothing is shared, so the
     # full symbol path is kept for everyone rather than guessing.
-    assert result[f"{DEVICE}.A.x1"] == ["|var|PLC", "Application", "A", "x1"]
+    assert result[f"{DEVICE}.A.x1"] == ["PLC", "Application", "A", "x1"]
     assert len(result) == 11
+
+
+def test_a_property_of_a_variable_shares_the_prefix_of_its_variables():
+    variable = "ns=4;s=|var|PLC.Application.PARAM.Pump_North.aValues[0]"
+    prop = "ns=4;s=|vprop|PLC.Application.PARAM.Pump_North.aValues.Dimensions"
+    other = "ns=4;s=|var|PLC.Application.SP.xError"
+    result = relative_paths({variable: [], prop: [], other: []})
+    # The kind tag does not make the property a stray: it keeps its group.
+    assert result[variable] == ["PARAM", "Pump_North", "aValues[0]"]
+    assert result[prop] == ["PARAM", "Pump_North", "aValues", "Dimensions"]
+    assert result[other] == ["SP", "xError"]
