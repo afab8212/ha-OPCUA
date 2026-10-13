@@ -160,25 +160,48 @@ def _symbolic_segments(node_id):
     return segments if len(segments) >= 2 and all(segments) else None
 
 
-def _common_prefix(paths):
+def _shared_prefix(group):
+    """The leading path nearly every variable shares, and who follows it.
+
+    A few stray variables must not stop the shared device and application
+    from being recognized (a PLC can expose a handful of properties under
+    another prefix), so up to 1% of the variables may deviate. Below 100
+    variables nobody may, which keeps a small installation exact.
+    """
+    tolerance = len(group) // 100
+    members = dict(group)
     prefix = []
-    for parts in zip(*paths):
-        if any(part != parts[0] for part in parts):
+    while True:
+        depth = len(prefix)
+        counts = {}
+        for segments in members.values():
+            if len(segments) - 1 > depth:
+                counts[segments[depth]] = counts.get(segments[depth], 0) + 1
+        if not counts:
             break
-        prefix.append(parts[0])
-    return prefix
+        value, count = max(counts.items(), key=lambda item: item[1])
+        if len(group) - count > tolerance:
+            break
+        prefix.append(value)
+        members = {
+            node_id: segments
+            for node_id, segments in members.items()
+            if len(segments) - 1 > depth and segments[depth] == value
+        }
+    return prefix, members
 
 
 def relative_paths(browse_paths):
-    """Each variable's path below the deepest node that holds all of them.
+    """Each variable's path below the deepest node that holds nearly all of them.
 
     A PLC's symbol path (e.g. Application.GVL.variable) is what people
     know, so a string NodeId is read as that path; only a numeric NodeId
     falls back to the browse names recorded while discovering, which can
     include organizing folders the symbols do not have. The leading
-    nodes every variable shares (the device, an application) say nothing
+    nodes the variables share (the device, an application) say nothing
     about where one variable lives, so they are dropped. What remains of
-    a variable's path always keeps its own name last.
+    a variable's path always keeps its own name last. A variable outside
+    that shared prefix gets no path and keeps its plain name.
     """
     symbolic = {}
     browsed = {}
@@ -192,7 +215,7 @@ def relative_paths(browse_paths):
     for group in (symbolic, browsed):
         if not group:
             continue
-        shared = len(_common_prefix([segments[:-1] for segments in group.values()]))
-        for node_id, segments in group.items():
-            result[node_id] = segments[shared:]
+        prefix, members = _shared_prefix(group)
+        for node_id, segments in members.items():
+            result[node_id] = segments[len(prefix) :]
     return result

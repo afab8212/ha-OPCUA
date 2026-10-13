@@ -228,3 +228,30 @@ def test_relative_paths_keep_a_single_group_next_to_a_sibling_group():
     only = {k: v for k, v in browse.items() if ".SP." in k}
     assert relative_paths(only)[f"{DEVICE}.SP.xError"] == ["xError"]
     assert relative_paths({}) == {}
+
+
+def test_relative_paths_ignore_a_few_stray_variables_in_a_large_installation():
+    other = "ns=4;s=|prop|PLC.Application"
+    browse = {}
+    for index in range(150):
+        group = "A" if index % 2 else "B"
+        browse[f"{DEVICE}.{group}.x{index}"] = []
+    stray = f"{other}.Info.sVersion"
+    browse[stray] = []
+    result = relative_paths(browse)
+    # The shared device/application prefix is still recognized ...
+    assert result[f"{DEVICE}.A.x1"] == ["A", "x1"]
+    assert result[f"{DEVICE}.B.x0"] == ["B", "x0"]
+    # ... and the variable outside it gets no path, so it keeps its name.
+    assert stray not in result
+
+
+def test_relative_paths_are_exact_for_a_small_installation():
+    other = "ns=4;s=|prop|PLC.Application"
+    browse = {f"{DEVICE}.A.x{index}": [] for index in range(10)}
+    browse[f"{other}.Info.sVersion"] = []
+    result = relative_paths(browse)
+    # With so few variables a deviating one counts: nothing is shared, so the
+    # full symbol path is kept for everyone rather than guessing.
+    assert result[f"{DEVICE}.A.x1"] == ["|var|PLC", "Application", "A", "x1"]
+    assert len(result) == 11
