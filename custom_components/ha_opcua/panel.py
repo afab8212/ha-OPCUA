@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+from collections import Counter
 from copy import deepcopy
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_integration
 
-from .arrays import array_element_name, parse_array_element
+from .arrays import disambiguated_name, parse_array_element
 from .connection import connection_attributes
 from .const import (
     CONF_HUB_ID,
@@ -111,17 +112,17 @@ def _is_auto_readonly_boolean(node, settings):
     )
 
 
-def _is_unrenamed_array_field(node_id, name, custom_name, parsed_array):
-    """A field of a PLC array-of-struct element still showing its raw, colliding name.
+def _is_unrenamed_duplicate_field(proposed_name, name, custom_name):
+    """A field still showing its raw, colliding name instead of its proposed one.
 
     Never matches a row with a custom name already set - a past rename,
     even to the same words, is a deliberate choice and is never
     overridden, the same guard the Boolean reclassify action uses for an
     explicit platform choice.
     """
-    if custom_name is not None or parsed_array is None:
+    if custom_name is not None or proposed_name is None:
         return False
-    return array_element_name(node_id, parsed_array["field"]) != name
+    return proposed_name != name
 
 
 def _panel_nodes(coordinator):
@@ -138,9 +139,10 @@ def endpoint_snapshot(hass, entry):
     available_nodes = _panel_nodes(c) if c else {}
     rows = []
     reclassifiable_booleans = 0
-    renamable_array_fields = 0
+    renamable_fields = 0
     manual = entry.options.get(CONF_MANUAL_NODES, {})
     nodes = {**manual, **(c.nodes if c else {})}
+    name_counts = Counter(node["name"] for node in nodes.values())
     for key, node in nodes.items():
         settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
         platform = effective_platform(node, settings)
@@ -169,9 +171,12 @@ def endpoint_snapshot(hass, entry):
         )
         custom_name = registered.name if registered else None
         parsed_array = parse_array_element(node_id)
-        renamable = _is_unrenamed_array_field(node_id, name, custom_name, parsed_array)
+        proposed_name = disambiguated_name(
+            node_id, collides=name_counts[node["name"]] > 1
+        )
+        renamable = _is_unrenamed_duplicate_field(proposed_name, name, custom_name)
         if renamable:
-            renamable_array_fields += 1
+            renamable_fields += 1
         rows.append(
             {
                 "key": key,
@@ -189,11 +194,7 @@ def endpoint_snapshot(hass, entry):
                 ),
                 "array_field": parsed_array["field"] if parsed_array else None,
                 "array_index": parsed_array["index"] if parsed_array else None,
-                "proposed_name": (
-                    array_element_name(node_id, parsed_array["field"])
-                    if parsed_array
-                    else None
-                ),
+                "proposed_name": proposed_name,
                 "renamable": renamable,
                 "variant_type": node["variant_type"],
                 "device_class": (
@@ -280,7 +281,7 @@ def endpoint_snapshot(hass, entry):
         "revision": revision,
         "rows": rows,
         "reclassifiable_booleans": reclassifiable_booleans,
-        "renamable_array_fields": renamable_array_fields,
+        "renamable_fields": renamable_fields,
         "nodes": list(available_nodes.values()),
         "subscription_entity": registry.async_get_entity_id(
             "switch", DOMAIN, f"{entry.entry_id}:subscription_enabled"
@@ -769,7 +770,11 @@ async def async_reclassify_boolean_sensors(hass, msg):
 
 
 async def async_rename_array_fields(hass, msg):
-    """Explicitly disambiguate selected PLC array-of-struct fields by index.
+    """Explicitly disambiguate selected PLC fields with a repeated name.
+
+    Covers array-of-struct fields (by index) and fields whose name repeats
+    across struct instances (by their parent struct); see the snapshot's
+    proposed_name.
 
     A field inside one element of a PLC array-of-struct (e.g.
     "astMeldungen[10].xAktiv") shares its raw name with every other
