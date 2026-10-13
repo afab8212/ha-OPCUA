@@ -187,3 +187,40 @@ async def test_connection_form_offers_and_saves_the_switch(hass, entry):
     again = await flow.async_step_connection()
     keys = {str(key): key for key in again["data_schema"].schema}
     assert keys[CONF_NAME_WITH_PATH].default() is True
+
+
+async def test_a_numeric_root_uses_the_paths_recorded_by_discovery(hass, entry):
+    enable(hass, entry)
+    hub = OpcuaHub("PLC", "opc.tcp://localhost:4840", "ns=4;i=5000")
+    hub.get_values = AsyncMock(return_value={})
+    numeric = [
+        {**node("SP.xError", variant="Boolean"), "node_id": "ns=4;i=2001"},
+        {**node("PARAM.Pump_North.xEnable"), "node_id": "ns=4;i=2002"},
+        {**node("Speed"), "node_id": "ns=4;i=2003"},
+        {**node("Manual.xFlag"), "node_id": "ns=4;i=2004"},
+    ]
+    hub.node_paths = {
+        "ns=4;i=2001": ["SP", "xError"],
+        "ns=4;i=2002": ["PARAM", "Pump_North", "xEnable"],
+        "ns=4;i=2003": ["Speed"],
+    }
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    c.known_node_ids = set()
+    c._known_node_ids_initialized = True
+    c.set_nodes(numeric)
+    hass.data[DOMAIN] = {"PLC": c}
+
+    assert c.nodes["ns=4;i=2001"]["name"] == "SP · xError"
+    assert c.nodes["ns=4;i=2002"]["name"] == "PARAM · Pump_North · xEnable"
+    # No group below the root, and no recorded path at all (e.g. a manually
+    # added node) - both keep their plain name.
+    assert c.nodes["ns=4;i=2003"]["name"] == "Speed"
+    assert c.nodes["ns=4;i=2004"]["name"] == "xFlag"
+
+    rows = {r["key"]: r for r in endpoint_snapshot(hass, entry)["rows"]}
+    assert rows["ns=4;i=2001"]["path_group"] == "SP"
+    assert rows["ns=4;i=2002"]["path_label"] == "PARAM › Pump_North"
+    assert rows["ns=4;i=2003"]["path_group"] is None
+    assert rows["ns=4;i=2004"]["path_group"] is None
+
+    await c.async_shutdown()

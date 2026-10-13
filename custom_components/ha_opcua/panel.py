@@ -150,6 +150,8 @@ def endpoint_snapshot(hass, entry):
     name_counts = Counter(node["name"] for node in nodes.values())
     with_path = name_with_path_enabled(entry)
     root_node_id = c.hub.root_node_id if c else None
+    paths = getattr(c.hub, "node_paths", None) if c else None
+    paths = paths if isinstance(paths, dict) else {}
     for key, node in nodes.items():
         settings = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
         platform = effective_platform(node, settings)
@@ -183,8 +185,9 @@ def endpoint_snapshot(hass, entry):
             collides=name_counts[node["name"]] > 1,
             root_node_id=root_node_id,
             with_path=with_path,
+            path=paths.get(node_id),
         )
-        group = path_group(node_id, root_node_id)
+        group = path_group(node_id, root_node_id, paths.get(node_id))
         renamable = _is_unrenamed_duplicate_field(proposed_name, name, custom_name)
         if renamable:
             renamable_fields += 1

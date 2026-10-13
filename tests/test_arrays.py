@@ -152,3 +152,28 @@ def test_display_name_for_prefers_the_path_only_when_enabled():
     )
     array_id = f"{ROOT}.astAlarms[3].xActive"
     assert display_name_for(array_id, collides=False) == "astAlarms 3 · xActive"
+
+
+def test_a_recorded_browse_path_works_for_a_numeric_root():
+    node_id = "ns=4;i=2001"
+    path = ["PARAM", "Pump_North", "xEnable"]
+    assert path_name(node_id, "ns=4;i=5000", path) == "PARAM · Pump_North · xEnable"
+    assert path_group(node_id, "ns=4;i=5000", path) == {
+        "key": "PARAM.Pump_North",
+        "label": "PARAM › Pump_North",
+    }
+    assert (
+        display_name_for(
+            node_id,
+            collides=False,
+            root_node_id="ns=4;i=5000",
+            with_path=True,
+            path=path,
+        )
+        == "PARAM · Pump_North · xEnable"
+    )
+    # A variable directly below the root has no group to show.
+    assert path_name(node_id, "ns=4;i=5000", ["Speed"]) is None
+    assert path_group(node_id, "ns=4;i=5000", ["Speed"]) is None
+    # Without a recorded path, a numeric root cannot be resolved.
+    assert path_name(node_id, "ns=4;i=5000", None) is None

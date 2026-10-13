@@ -288,6 +288,9 @@ class OpcuaHub:
         self._password = password
         self.root_node_id = root_node_id
         self.discovery_complete = False
+        # Browse names from the root down to each discovered variable, by
+        # NodeId; the exact path works for any NodeId scheme, e.g. a numeric root.
+        self.node_paths: dict[str, list[str]] = {}
         self.client = None
         self._connected = False
         self._closed = False
@@ -440,19 +443,23 @@ class OpcuaHub:
     async def discover_nodes(self) -> list[dict[str, Any]]:
         """Discover each NodeId once and cache its entity classification."""
         discovered = []
+        paths = {}
         visited = set()
         self.discovery_complete = True
 
-        async def visit(node):
+        async def visit(node, parent_path):
             node_id = node.nodeid.to_string()
             if node_id in visited:
                 return
             visited.add(node_id)
             node_class = await node.read_node_class()
             name = (await node.read_browse_name()).Name
+            path = [] if parent_path is None else [*parent_path, name]
             if node_class == ua.NodeClass.Variable:
                 try:
-                    discovered.append(await self._read_node_metadata(node, name))
+                    metadata = await self._read_node_metadata(node, name)
+                    discovered.append(metadata)
+                    paths[metadata["node_id"]] = path
                 except ValueError:
                     _LOGGER.debug("Skipping unsupported value on node %s", node_id)
                 except ua.UaStatusCodeError as err:
@@ -482,7 +489,7 @@ class OpcuaHub:
             ):
                 for child in await node.get_children():
                     try:
-                        await visit(child)
+                        await visit(child, path)
                     except ua.UaStatusCodeError as err:
                         if _connection_error(err):
                             raise
@@ -492,7 +499,8 @@ class OpcuaHub:
                         )
 
         async with self._session() as client:
-            await visit(client.get_node(self.root_node_id))
+            await visit(client.get_node(self.root_node_id), None)
+        self.node_paths = paths
         return discovered
 
     async def get_values(self, node_ids) -> dict[str, Any]:
@@ -1068,6 +1076,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                     collides=name_counts[original["name"]] > 1,
                     root_node_id=root_node_id,
                     with_path=with_path,
+                    path=self._discovered_path(target_id),
                 )
                 if generated is not None:
                     saved = {**saved, "display_name": generated}
@@ -1113,6 +1122,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             self._last_discovery_snapshot = (seen_ids, full_discovery)
             self._persist_discovery_state(seen_ids, full_discovery=full_discovery)
 
+    def _discovered_path(self, node_id):
+        """The browse path below the root recorded for a node, if discovered."""
+        paths = getattr(self._hub, "node_paths", None)
+        return paths.get(node_id) if isinstance(paths, dict) else None
+
     def _reconcile_legacy_array_display_names(self):
         """Backfill display_name for array fields renamed before it existed.
 
@@ -1151,6 +1165,9 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                     collides=False,
                     root_node_id=getattr(self._hub, "root_node_id", None),
                     with_path=name_with_path_enabled(self.config_entry),
+                    path=self._discovered_path(
+                        self.node_settings.get(node_id, {}).get("node_id", node_id)
+                    ),
                 ),
             }
             if registered.name not in expected:

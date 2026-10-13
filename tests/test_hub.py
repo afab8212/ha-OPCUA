@@ -214,3 +214,36 @@ async def test_permanent_close_rejects_queued_writes():
     node.write_value.assert_awaited_once()
     client.disconnect.assert_awaited_once()
     assert not await hub.connect()
+
+
+async def test_discovery_records_each_variables_browse_path_below_the_root(
+    unused_tcp_port,
+):
+    server = Server()
+    await server.init()
+    server.set_endpoint(f"opc.tcp://127.0.0.1:{unused_tcp_port}/")
+    server.set_security_policy([ua.SecurityPolicyType.NoSecurity])
+    namespace = await server.register_namespace("urn:opcua-discovery:paths")
+    root = await server.nodes.objects.add_object(namespace, "Application")
+    group = await root.add_object(namespace, "SP")
+    struct = await group.add_object(namespace, "Pump_North")
+    nested = await struct.add_variable(namespace, "xEnable", True)
+    flat = await group.add_variable(namespace, "xError", False)
+    top = await root.add_variable(
+        namespace, "Speed", ua.Variant(0, ua.VariantType.Int16)
+    )
+    # The root is addressed by a numeric NodeId: only the discovery walk
+    # knows the names between it and each variable.
+    assert root.nodeid.to_string().startswith("ns=2;i=")
+    hub = OpcuaHub("test", server.endpoint.geturl(), root.nodeid.to_string())
+    async with server:
+        try:
+            assert await hub.connect()
+            await hub.discover_nodes()
+            assert hub.node_paths == {
+                nested.nodeid.to_string(): ["SP", "Pump_North", "xEnable"],
+                flat.nodeid.to_string(): ["SP", "xError"],
+                top.nodeid.to_string(): ["Speed"],
+            }
+        finally:
+            await hub.disconnect(permanent=True)

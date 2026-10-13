@@ -89,8 +89,15 @@ def name_with_path_enabled(entry):
     return bool({**entry.data, **entry.options}.get(CONF_NAME_WITH_PATH, False))
 
 
-def _relative_segments(node_id, root_node_id):
-    """Path segments of a symbolic NodeId below the discovery root, or None."""
+def _relative_segments(node_id, root_node_id, path=None):
+    """Path segments of a node below the discovery root, or None.
+
+    The browse path recorded during discovery is exact for any NodeId
+    scheme, including a numeric root. Without one (a manually added or
+    offline node), a symbolic NodeId is read relative to a symbolic root.
+    """
+    if path:
+        return list(path) if all(path) else None
     if not isinstance(root_node_id, str) or not _STRING_NODE_ID_RE.match(node_id):
         return None
     prefix = f"{root_node_id.strip()}."
@@ -105,20 +112,20 @@ def _segment_label(segment):
     return f"{match['name']} {match['index']}" if match else segment
 
 
-def path_name(node_id, root_node_id):
+def path_name(node_id, root_node_id, path=None):
     """A node's full path below the root as a display name, or None.
 
     Only a node nested at least one level below the root has a path to show.
     """
-    segments = _relative_segments(node_id, root_node_id)
+    segments = _relative_segments(node_id, root_node_id, path)
     if segments is None or len(segments) < 2:
         return None
     return " · ".join(_segment_label(segment) for segment in segments)
 
 
-def path_group(node_id, root_node_id):
+def path_group(node_id, root_node_id, path=None):
     """The parent path below the root as a group key and label, or None."""
-    segments = _relative_segments(node_id, root_node_id)
+    segments = _relative_segments(node_id, root_node_id, path)
     if segments is None or len(segments) < 2:
         return None
     parent = segments[:-1]
@@ -128,7 +135,9 @@ def path_group(node_id, root_node_id):
     }
 
 
-def display_name_for(node_id, *, collides, root_node_id=None, with_path=False):
+def display_name_for(
+    node_id, *, collides, root_node_id=None, with_path=False, path=None
+):
     """The default display name that tells a node apart, or None when none applies.
 
     With path naming on, every node nested below the root gets its full
@@ -136,7 +145,7 @@ def display_name_for(node_id, *, collides, root_node_id=None, with_path=False):
     collides (by parent struct) are disambiguated.
     """
     if with_path:
-        name = path_name(node_id, root_node_id)
+        name = path_name(node_id, root_node_id, path)
         if name is not None:
             return name
     return disambiguated_name(node_id, collides=collides)
