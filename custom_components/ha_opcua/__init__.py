@@ -25,6 +25,7 @@ from .arrays import (
     display_name_for,
     name_with_path_enabled,
     parse_array_element,
+    relative_paths,
 )
 from .const import (
     CONF_CONNECTION_ENABLED,
@@ -288,8 +289,8 @@ class OpcuaHub:
         self._password = password
         self.root_node_id = root_node_id
         self.discovery_complete = False
-        # Browse names from the root down to each discovered variable, by
-        # NodeId; the exact path works for any NodeId scheme, e.g. a numeric root.
+        # Each discovered variable's path below the deepest node that holds
+        # all of them, by NodeId (see relative_paths).
         self.node_paths: dict[str, list[str]] = {}
         self.client = None
         self._connected = False
@@ -500,7 +501,7 @@ class OpcuaHub:
 
         async with self._session() as client:
             await visit(client.get_node(self.root_node_id), None)
-        self.node_paths = paths
+        self.node_paths = relative_paths(paths)
         return discovered
 
     async def get_values(self, node_ids) -> dict[str, Any]:

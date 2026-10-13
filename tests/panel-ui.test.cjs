@@ -236,6 +236,13 @@ async function pageFor(width = 1280, admin = true) {
           endpoint.revision = "reclassified";
           return { reclassified };
         }
+        if (msg.type.endsWith("/name_with_path")) {
+          const endpoint = window.fixture.endpoints.find(
+            (e) => e.entry_id === msg.entry_id,
+          );
+          endpoint.name_with_path = msg.enabled;
+          return { name_with_path: msg.enabled };
+        }
         if (msg.type.endsWith("/rename_array_fields")) {
           if (window.failRename) throw { code: window.failRename };
           const endpoint = window.fixture.endpoints.find(
@@ -321,7 +328,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.9.3",
+    "Pannello 1.9.4",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1118,6 +1125,93 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   await page.close();
 });
 
+test("view and grouping choices sit together as icons with a calm, delayed hint", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    endpoint.rows.push({
+      key: "tipsp1",
+      node_id: "ns=4;s=PLC.Application.SP.xError",
+      name: "SP · xError",
+      entity_id: "binary_sensor.tipsp1",
+      platform: "binary_sensor",
+      variant_type: "Boolean",
+      reclassifiable: false,
+      path_group: "SP",
+      path_label: "SP",
+    });
+    window.testHass.states = {
+      ...window.testHass.states,
+      "binary_sensor.tipsp1": { state: "off", attributes: {} },
+    };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+
+  // Both toggles share one container, and the grouping choices are icons only.
+  const tools = page.locator(".navTools");
+  assert.equal(await tools.locator(".viewToggle").count(), 2);
+  const pathButton = page.getByRole("button", {
+    name: "Per gruppo (GVL / struct)",
+    exact: true,
+  });
+  assert.equal((await pathButton.textContent()).trim(), "");
+  assert.equal(await pathButton.locator("svg").count(), 1);
+
+  const hint = (locator) =>
+    locator.evaluate((node) => {
+      const style = getComputedStyle(node, "::after");
+      return { text: style.content, opacity: style.opacity };
+    });
+  // Moving over the button does not flash the hint right away ...
+  await pathButton.hover();
+  assert.equal((await hint(pathButton)).opacity, "0");
+  // ... it only appears when the pointer stays, with a short text ...
+  await page.waitForTimeout(1200);
+  const shown = await hint(pathButton);
+  assert.equal(shown.opacity, "1");
+  assert.ok(shown.text.includes("PLC"));
+  await shot(page, "toolbar-hint.png");
+  // ... and leaves again as soon as the pointer does.
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(400);
+  assert.equal((await hint(pathButton)).opacity, "0");
+});
+
+test("path naming is switched on and off from the endpoint panel", async () => {
+  const page = await pageFor(1280);
+  const toggle = () => page.locator("[data-name-path-toggle]");
+  assert.equal(await toggle().count(), 1);
+  assert.equal(await toggle().isChecked(), false);
+  assert.equal(await page.locator("#name-path-help").count(), 1);
+  const saves = () =>
+    page.evaluate(() =>
+      window.calls.filter((m) => m.type.endsWith("/name_with_path")),
+    );
+  await toggle().click();
+  await page.waitForFunction(() =>
+    window.calls.some((m) => m.type.endsWith("/name_with_path")),
+  );
+  const [first] = await saves();
+  assert.equal(first.type, "ha_opcua/endpoint/name_with_path");
+  assert.equal(first.enabled, true);
+  assert.ok(first.entry_id);
+  // The panel reloads its data afterwards and shows the saved state.
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("opcua-node-panel")
+        .shadowRoot.querySelector("[data-name-path-toggle]")?.checked,
+  );
+  await toggle().click();
+  await page.waitForFunction(
+    () =>
+      window.calls.filter((m) => m.type.endsWith("/name_with_path")).length ===
+      2,
+  );
+  assert.equal((await saves())[1].enabled, false);
+});
+
 test("fields can be grouped by their PLC path as a third explicit choice", async () => {
   const page = await pageFor(1280);
   await page.evaluate(() => {
@@ -1181,7 +1275,7 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
   assert.equal(
     await groups
       .filter({
-        has: page.locator(".arrayGroupTitle", { hasText: /^SP$/ }),
+        has: page.locator(".arrayGroupTitle", { hasText: /^SP · 2$/ }),
       })
       .locator("article")
       .count(),
@@ -1194,18 +1288,32 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
       .count(),
     1,
   );
-  assert.equal(
-    await page.locator("summary", { hasText: "Gruppi · 2" }).count(),
-    1,
-  );
+  // Every group folds on its own: closing one leaves the other open.
+  await groups.first().locator("summary").click();
+  assert.equal(await groups.first().getAttribute("open"), null);
+  assert.equal(await page.locator(".arrayGroup[open]").count(), 1);
+  await groups.first().locator("summary").click();
+  assert.equal(await page.locator(".arrayGroup[open]").count(), 2);
   assert.equal(await pressed(pathToggle()), "true");
   assert.equal(await pressed(categoryToggle()), "false");
 
-  // A platform filter wants its own flat list even while path grouping is on.
+  // Path grouping is kept while narrowing down: a platform filter groups
+  // only what it still shows, and a search does too.
   await page.getByRole("button", { name: /^Sensori binari · \d+$/ }).click();
-  assert.equal(await page.locator(".arrayGroup").count(), 0);
+  assert.equal(await page.locator(".arrayGroup").count(), 1);
+  assert.equal(await page.locator(".arrayGroup article").count(), 2);
+  await page.getByRole("button", { name: /^Sensori · \d+$/ }).click();
+  assert.equal(await page.locator(".arrayGroup").count(), 1);
   await page.getByRole("button", { name: /^Tutte · \d+$/ }).click();
   assert.equal(await page.locator(".arrayGroup").count(), 2);
+  await page
+    .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
+    .fill("xWarning");
+  assert.equal(await page.locator(".arrayGroup").count(), 1);
+  assert.equal(await page.locator(".arrayGroup article").count(), 1);
+  await page
+    .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
+    .fill("");
 
   await categoryToggle().click();
   assert.equal(await page.locator(".arrayGroup").count(), 0);

@@ -14,6 +14,7 @@ from custom_components.ha_opcua.const import (
 )
 from custom_components.ha_opcua.panel import (
     async_rename_array_fields,
+    async_set_name_with_path,
     endpoint_snapshot,
 )
 
@@ -222,5 +223,31 @@ async def test_a_numeric_root_uses_the_paths_recorded_by_discovery(hass, entry):
     assert rows["ns=4;i=2002"]["path_label"] == "PARAM › Pump_North"
     assert rows["ns=4;i=2003"]["path_group"] is None
     assert rows["ns=4;i=2004"]["path_group"] is None
+
+    await c.async_shutdown()
+
+
+async def test_panel_switch_saves_the_option_without_reloading_the_endpoint(
+    hass, entry
+):
+    c = coordinator(hass, entry, known=True)
+    assert endpoint_snapshot(hass, entry)["name_with_path"] is False
+
+    result = await async_set_name_with_path(
+        hass, {"entry_id": entry.entry_id, "enabled": True}
+    )
+
+    assert result == {"name_with_path": True}
+    assert entry.options[CONF_NAME_WITH_PATH] is True
+    assert endpoint_snapshot(hass, entry)["name_with_path"] is True
+    # The coordinator already reflects the saved options, so the options
+    # listener has nothing to reload for this change.
+    assert c.reload_options[CONF_NAME_WITH_PATH] is True
+
+    await async_set_name_with_path(hass, {"entry_id": entry.entry_id, "enabled": False})
+    assert endpoint_snapshot(hass, entry)["name_with_path"] is False
+
+    with pytest.raises(ValueError, match="endpoint_not_found"):
+        await async_set_name_with_path(hass, {"entry_id": "missing", "enabled": True})
 
     await c.async_shutdown()

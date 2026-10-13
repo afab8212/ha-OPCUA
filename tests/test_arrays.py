@@ -8,6 +8,7 @@ from custom_components.ha_opcua.arrays import (
     parse_struct_field,
     path_group,
     path_name,
+    relative_paths,
     struct_field_name,
 )
 
@@ -177,3 +178,53 @@ def test_a_recorded_browse_path_works_for_a_numeric_root():
     assert path_group(node_id, "ns=4;i=5000", ["Speed"]) is None
     # Without a recorded path, a numeric root cannot be resolved.
     assert path_name(node_id, "ns=4;i=5000", None) is None
+
+
+DEVICE = "ns=4;s=|var|PLC.Application"
+
+
+def test_relative_paths_drop_the_nodes_every_variable_shares():
+    browse = {
+        f"{DEVICE}.A_IN.rTemp": ["Application", "Folder", "A_IN", "rTemp"],
+        f"{DEVICE}.PARAM.Pump_North.xEnable": [
+            "Application",
+            "Folder",
+            "PARAM",
+            "Pump_North",
+            "xEnable",
+        ],
+        f"{DEVICE}.PRG.rLocal": ["Application", "PRG", "rLocal"],
+    }
+    # The symbol path is what people know: organizing browse folders such as
+    # "Folder" are not part of it, and the shared device/application are
+    # dropped because they say nothing about where a variable lives.
+    assert relative_paths(browse) == {
+        f"{DEVICE}.A_IN.rTemp": ["A_IN", "rTemp"],
+        f"{DEVICE}.PARAM.Pump_North.xEnable": ["PARAM", "Pump_North", "xEnable"],
+        f"{DEVICE}.PRG.rLocal": ["PRG", "rLocal"],
+    }
+
+
+def test_relative_paths_for_numeric_node_ids_use_the_browse_names():
+    browse = {
+        "ns=4;i=2": ["Root", "Group_A", "xOne"],
+        "ns=4;i=3": ["Root", "Group_B", "Sub", "xTwo"],
+    }
+    assert relative_paths(browse) == {
+        "ns=4;i=2": ["Group_A", "xOne"],
+        "ns=4;i=3": ["Group_B", "Sub", "xTwo"],
+    }
+
+
+def test_relative_paths_keep_a_single_group_next_to_a_sibling_group():
+    browse = {
+        f"{DEVICE}.SP.xError": ["SP", "xError"],
+        f"{DEVICE}.SP.xWarning": ["SP", "xWarning"],
+        f"{DEVICE}.FLAG.xOn": ["FLAG", "xOn"],
+    }
+    assert relative_paths(browse)[f"{DEVICE}.SP.xError"] == ["SP", "xError"]
+    # With only one group at all, that group is the shared node and its
+    # variables have nothing left to be grouped by.
+    only = {k: v for k, v in browse.items() if ".SP." in k}
+    assert relative_paths(only)[f"{DEVICE}.SP.xError"] == ["xError"]
+    assert relative_paths({}) == {}

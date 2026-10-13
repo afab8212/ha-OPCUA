@@ -26,6 +26,7 @@ from .connection import connection_attributes
 from .const import (
     CONF_HUB_ID,
     CONF_MANUAL_NODES,
+    CONF_NAME_WITH_PATH,
     CONF_NODE_SETTINGS,
     CONF_OFFLINE_NODES,
     CONF_SUBSCRIPTION_ENABLED,
@@ -97,6 +98,7 @@ async def async_setup_panel(hass):
     websocket_api.async_register_command(hass, ws_remove_orphans)
     websocket_api.async_register_command(hass, ws_reclassify_boolean_sensors)
     websocket_api.async_register_command(hass, ws_rename_array_fields)
+    websocket_api.async_register_command(hass, ws_set_name_with_path)
     hass.data[PANEL_DATA] = {"locks": {}, "version": version}
 
 
@@ -300,6 +302,7 @@ def endpoint_snapshot(hass, entry):
         "rows": rows,
         "reclassifiable_booleans": reclassifiable_booleans,
         "renamable_fields": renamable_fields,
+        "name_with_path": with_path,
         "nodes": list(available_nodes.values()),
         "subscription_entity": registry.async_get_entity_id(
             "switch", DOMAIN, f"{entry.entry_id}:subscription_enabled"
@@ -641,6 +644,30 @@ async def async_rediscover(hass, msg):
     return {"rediscovered": True}
 
 
+async def async_set_name_with_path(hass, msg):
+    """Turn a connection's path naming on or off from the panel.
+
+    The setting is only read when a node is discovered and when the panel
+    builds its rename proposals, so nothing has to reload. Syncing the
+    coordinator's reload_options first makes the options listener see no
+    difference, like the other live changes made here.
+    """
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        options = deepcopy(dict(entry.options))
+        options[CONF_NAME_WITH_PATH] = msg["enabled"]
+        c = _coordinator(hass, entry)
+        if c is not None:
+            c.reload_options = _reload_options(options)
+        hass.config_entries.async_update_entry(entry, options=options)
+        return {"name_with_path": msg["enabled"]}
+
+
 async def async_remove_orphan_entity(hass, msg):
     """Delete one orphaned entity (node gone / stale domain) from the panel.
 
@@ -876,6 +903,24 @@ async def ws_remove(hass, connection, msg):
 async def ws_rediscover(hass, connection, msg):
     try:
         result = await async_rediscover(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/endpoint/name_with_path",
+        vol.Required("entry_id"): str,
+        vol.Required("enabled"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_set_name_with_path(hass, connection, msg):
+    try:
+        result = await async_set_name_with_path(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
     else:

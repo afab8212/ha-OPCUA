@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.9.3";
+const PANEL_VERSION = "1.9.4";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -21,6 +21,9 @@ const TEXT = {
     alwaysAvailableHelp:
       "Mantiene l’ultimo valore noto quando il PLC è scollegato o la connessione è disabilitata. Senza un valore salvato lo stato è sconosciuto. Le scritture richiedono la connessione e una lettura aggiornata.",
     invalid_availability: "Impostazione di disponibilità non valida.",
+    endpointNamePath: "Percorso PLC nei nomi",
+    endpointNamePathHelp:
+      "Le nuove entità prendono il percorso completo nel nome (es. “SP · xError”). Per quelle esistenti usa «Rinomina campi duplicati».",
     endpointSubscription: "Auto-Subscription endpoint",
     endpointSubscriptionHelp:
       "Abilita le subscription per le entità selezionate di questo endpoint. Il polling rimane attivo.",
@@ -93,12 +96,13 @@ const TEXT = {
     reclassifyConvert: "Converti selezionati",
     reclassifying: "Riclassificazione…",
     reclassified: "Sensori Boolean riclassificati.",
-    groupedArrays: "Array raggruppati",
     groupModeLabel: "Raggruppamento",
     groupByCategory: "Per categoria",
     groupByArray: "Per elemento array",
     groupByPath: "Per gruppo (GVL / struct)",
-    groupedPaths: "Gruppi",
+    groupTipCategory: "Sezioni per tipo: sensori, interruttori, numeri…",
+    groupTipArray: "Campi raggruppati per elemento array",
+    groupTipPath: "Campi raggruppati per percorso PLC (GVL / struct)",
     renameFields: "Rinomina campi duplicati",
     renameFieldsTitle: "Disambigua i campi con nomi ripetuti",
     renameFieldsHelp:
@@ -248,6 +252,9 @@ const TEXT = {
     alwaysAvailableHelp:
       "Keeps the last known value when the PLC is disconnected or the connection is disabled. Without a saved value the state is unknown. Writes require a connection and a fresh reading.",
     invalid_availability: "Invalid availability setting.",
+    endpointNamePath: "Include PLC path in names",
+    endpointNamePathHelp:
+      "New entities are named with their full path (e.g. “SP · xError”). For existing ones use Rename duplicate fields.",
     endpointSubscription: "Endpoint Auto-Subscription",
     endpointSubscriptionHelp:
       "Enable subscriptions for the selected entities on this endpoint. Polling remains active.",
@@ -328,12 +335,13 @@ const TEXT = {
     reclassifyConvert: "Convert selected",
     reclassifying: "Reclassifying…",
     reclassified: "Boolean sensors reclassified.",
-    groupedArrays: "Grouped arrays",
     groupModeLabel: "Grouping",
     groupByCategory: "By category",
     groupByArray: "By array element",
     groupByPath: "By group (GVL / struct)",
-    groupedPaths: "Groups",
+    groupTipCategory: "Sections by type: sensors, switches, numbers…",
+    groupTipArray: "Fields grouped by array element",
+    groupTipPath: "Fields grouped by PLC path (GVL / struct)",
     renameFields: "Rename duplicate fields",
     renameFieldsTitle: "Disambiguate fields with repeated names",
     renameFieldsHelp:
@@ -457,13 +465,11 @@ const GROUPINGS = {
     key: "array_group",
     label: "array_label",
     sort: "array_field",
-    summary: "groupedArrays",
   },
   path: {
     key: "path_group",
     label: "path_label",
     sort: "name",
-    summary: "groupedPaths",
   },
 };
 const GROUPS = [
@@ -521,6 +527,10 @@ const VALUE_ICONS = {
   pending: "M5 3h14M5 21h14M7 3v4l10 10v4M17 3v4L7 17v4",
   disabled: "M9 5v14M15 5v14",
   empty: "M5 6h14v12H5zM9 12h6",
+  groupCategory:
+    "M7 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM14 4h6v6h-6ZM7 14l3.5 6h-7ZM17 14l3 3-3 3-3-3Z",
+  groupArray: "M8 4H5v16h3M16 4h3v16h-3M12 8v.01M12 12v.01M12 16v.01",
+  groupPath: "M4 4h6v5H4ZM7 9v9M7 13h5M7 18h5M12 11h8v4h-8ZM12 16h8v4h-8Z",
 };
 function valueIcon(name) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -571,16 +581,16 @@ const CSS = `
 *{box-sizing:border-box}button,input,select{font:inherit}button{cursor:pointer;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:10px 15px;background:var(--card-background-color,#fff);color:inherit;min-height:42px;transition:background var(--speed),border-color var(--speed)}button:hover{border-color:var(--primary-color,#009ac0);background:color-mix(in srgb,var(--primary-color,#009ac0) 5%,var(--card-background-color,#fff))}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--primary-color,#009ac0);outline-offset:3px}.primary,.primary:hover{background:var(--primary-color,#008fac);border-color:transparent;color:var(--text-primary-color,#fff)}
 header{display:flex;flex-shrink:0;gap:16px;align-items:center;padding:18px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:22px;line-height:1.3;margin:0;font-weight:650}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1;min-width:0}.headerText>p{margin-top:5px}.titleRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.version{white-space:nowrap}.menu{display:none;border:0;background:none;font-size:22px;padding:4px 10px}.content{flex:1;min-height:0;width:100%;max-width:1480px;margin:0 auto;padding:24px 28px 48px;overflow:auto}
 .endpointPanel{background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#dce2ea);border-radius:16px;padding:20px;margin-bottom:22px}.toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:end;margin-bottom:16px}.field{display:flex;flex-direction:column;gap:7px;min-width:0}.field>span{font-weight:600;font-size:13px}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:16px;align-items:center;flex-wrap:wrap;min-width:0;color:var(--secondary-text-color,#637487)}.endpointIdentity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1 1 220px;min-width:0}.endpointAddress{font:12px ui-monospace,monospace;overflow-wrap:anywhere;line-height:1.6}.endpointActions{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;border-radius:7px;padding:4px 8px;background:color-mix(in srgb,var(--secondary-text-color,#637487) 9%,transparent);color:var(--secondary-text-color,#637487)}[data-connection]{border-radius:20px;white-space:nowrap;padding:5px 10px}[data-connection]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}
-.navRow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--divider-color,#e0e6ee)}nav{display:flex;gap:7px;flex-wrap:wrap;max-width:100%}nav button{border:1px solid transparent;background:transparent;padding:8px 12px;min-height:38px;color:var(--secondary-text-color,#637487)}nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 10%,var(--card-background-color,#fff));border-color:color-mix(in srgb,var(--primary-color,#008fac) 28%,transparent);color:var(--primary-text-color,#243346);font-weight:600}.viewToggle{display:flex;gap:3px;padding:3px;border:1px solid var(--divider-color,#dce2ea);border-radius:11px;background:var(--card-background-color,#fff)}.viewToggle button{border:0;background:none;border-radius:7px;padding:8px 11px;min-height:34px;font-size:16px;line-height:1;color:var(--secondary-text-color,#637487)}.viewToggle .selected,.viewToggle .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 12%,transparent);color:var(--primary-color,#008fac)}
+.navRow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--divider-color,#e0e6ee)}nav{display:flex;gap:7px;flex-wrap:wrap;max-width:100%}nav button{border:1px solid transparent;background:transparent;padding:8px 12px;min-height:38px;color:var(--secondary-text-color,#637487)}nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 10%,var(--card-background-color,#fff));border-color:color-mix(in srgb,var(--primary-color,#008fac) 28%,transparent);color:var(--primary-text-color,#243346);font-weight:600}.navTools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.viewToggle button{position:relative}.viewToggle svg{display:block;width:18px;height:18px}[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);right:0;z-index:20;width:max-content;max-width:210px;padding:5px 9px;border-radius:7px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:12px;font-weight:400;line-height:1.35;text-align:left;white-space:normal;opacity:0;pointer-events:none;transition:opacity .12s ease}@media(hover:hover){[data-tip]:hover::after{opacity:1;transition-delay:.8s}}[data-tip]:focus-visible::after{opacity:1;transition-delay:.3s}.viewToggle{display:flex;gap:3px;padding:3px;border:1px solid var(--divider-color,#dce2ea);border-radius:11px;background:var(--card-background-color,#fff)}.viewToggle button{border:0;background:none;border-radius:7px;padding:8px 11px;min-height:34px;font-size:16px;line-height:1;color:var(--secondary-text-color,#637487)}.viewToggle .selected,.viewToggle .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 12%,transparent);color:var(--primary-color,#008fac)}
 .group{margin-bottom:22px}.group>summary{cursor:pointer;font-size:15px;font-weight:600;padding:8px 2px 12px;display:flex;align-items:center;gap:9px;list-style:none}.group>summary::-webkit-details-marker{display:none}.group>summary::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent,var(--secondary-text-color,#637487));flex-shrink:0}.group>summary::after{content:"";margin-left:auto;margin-right:5px;width:7px;height:7px;border-right:2px solid var(--secondary-text-color,#8a97a8);border-bottom:2px solid var(--secondary-text-color,#8a97a8);transform:rotate(45deg);transition:transform var(--speed) ease}.group:not([open])>summary::after{transform:rotate(-45deg)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}.card{display:flex;flex-direction:column;position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:12px;padding:16px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.cardTop{display:flex;align-items:start;gap:8px;flex-wrap:wrap;min-width:0}.cardTitle{flex:1;min-width:0}.card h3{font-size:15px;line-height:1.45;font-weight:600;margin:0 0 5px;overflow-wrap:anywhere}.cardTop .badge{font-size:11px;padding:3px 7px}.manualTag,.orphanTag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}.manualTag{color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent)}.address{font:11px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}.entityState{flex:1;margin-top:18px;min-width:0}.stateLabel{display:block;font-size:11px;color:var(--secondary-text-color,#637487);margin-bottom:4px}.stateValue{display:block;font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:15px;font-weight:400;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:7px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.cardBottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid var(--divider-color,#e2e7ef)}.actions button{padding:7px 12px;min-height:36px}.meta{color:var(--secondary-text-color,#637487);font-size:12px;overflow-wrap:anywhere}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
 .grid.list{grid-template-columns:1fr;gap:7px}.grid.list .card{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(180px,.8fr);align-items:center;gap:20px;padding:13px 16px}.grid.list .cardTop{align-items:center}.grid.list .entityState{margin:0}.grid.list .stateValue{font-size:17px;max-height:6em}.grid.list .cardBottom{flex-direction:column;align-items:flex-end;justify-content:center;gap:6px;margin:0;padding:0;border:0}.grid.list .cardBottom .meta{text-align:right}
 [data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
-.endpointSubscription{display:flex;flex:1 1 100%;gap:8px 20px;flex-wrap:wrap;align-items:center;min-width:0;padding-top:14px;border-top:1px solid var(--divider-color,#e2e7ef)}.endpointSubscription .hint{flex:1 1 270px;font-size:12px;margin:0}.endpointSubscription #subscription-status,.endpointSubscription .error{flex-basis:100%}.endpointSubscription .toggle{font-weight:600;color:var(--primary-text-color,#243346);padding:4px 0;min-height:36px}.endpointSubscription input[role="switch"]{appearance:none;position:relative;width:42px;min-width:42px;height:24px;padding:0;border:0;border-radius:12px;background:var(--disabled-color,#8695a5);cursor:pointer}.endpointSubscription input[role="switch"]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.endpointSubscription input[role="switch"]:checked{background:var(--primary-color,#008fac)}.endpointSubscription input[role="switch"]:checked::after{left:21px}.endpointSubscription input[role="switch"]:disabled{opacity:.5;cursor:default}
+.endpointSubscription{display:flex;flex:1 1 100%;gap:8px 20px;flex-wrap:wrap;align-items:center;min-width:0;padding-top:14px;border-top:1px solid var(--divider-color,#e2e7ef)}.endpointSubscription .hint{flex:1 1 270px;font-size:12px;margin:0}.endpointSubscription #subscription-status,.endpointSubscription .error{flex-basis:100%}.endpointSubscription .toggle{font-weight:600;color:var(--primary-text-color,#243346);padding:4px 0;min-height:36px}.endpointSubscription input[role="switch"]{appearance:none;position:relative;width:42px;min-width:42px;height:24px;padding:0;border:0;border-radius:12px;background:var(--disabled-color,#8695a5);cursor:pointer}.endpointSubscription input[role="switch"]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.endpointSubscription input[role="switch"]:checked{background:var(--primary-color,#008fac)}.endpointSubscription input[role="switch"]:checked::after{left:21px}.endpointSubscription input[role="switch"]:disabled{opacity:.5;cursor:default}.endpointSubscription+.endpointSubscription{border-top:0;padding-top:0}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease;overflow:hidden}dialog[open]{opacity:1;transform:none;display:flex;flex-direction:column}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px;overflow-y:auto;flex:1;min-height:0}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:-24px;margin:6px -24px -24px;padding:14px 24px 24px;background:var(--card-background-color,#fff)}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}.orphanTag{color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 15%,transparent)}.card.orphan{border-left-color:var(--error-color,#be3131);border-style:dashed}.card.orphan .cardTitle h3{color:var(--secondary-text-color,#637487)}
 .pickList{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:6px}.pickItem{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:7px;cursor:pointer}.pickItem:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 6%,transparent)}.pickItem input{width:18px;height:18px;min-width:18px;flex-shrink:0;accent-color:var(--primary-color,#008fac)}.pickInfo{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.pickName{font-weight:600;overflow-wrap:anywhere}.pickNodeId{font:11px ui-monospace,monospace;color:var(--secondary-text-color,#637487);overflow-wrap:anywhere}.pickState{font-size:12px;font-weight:600;color:var(--secondary-text-color,#637487);white-space:nowrap;flex-shrink:0}
 .pickArrow{font-size:12px;color:var(--secondary-text-color,#637487);text-align:right;max-width:180px;overflow-wrap:anywhere;flex-shrink:0}
-.arrayGroups{display:flex;flex-direction:column;gap:16px}.arrayGroup{border:1px solid var(--divider-color,#e2e7ef);border-radius:12px;padding:14px}.arrayGroupTitle{margin:0 0 10px;font-size:14px;font-weight:600;color:var(--secondary-text-color,#637487)}
+.group.arrayGroup>summary.arrayGroupTitle{font-size:14px;color:var(--secondary-text-color,#637487)}
 .entityForm{padding:0;gap:0;overflow:hidden;max-height:inherit;flex:0 1 auto}.editorBody{display:flex;flex-direction:column;gap:17px;padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1}.editorBody>*{flex-shrink:0}.entityForm footer{position:static;flex-shrink:0;flex-wrap:wrap;margin:0;padding:16px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color,#dce2ea)}.entityForm footer .error{flex-basis:100%;overflow-wrap:anywhere}.entityForm footer .error:empty{display:none}
 .entityEditor .editorHeading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px}.editorHeadingText{min-width:0;flex:1}.editorHeadingText h2{font-size:19px}.editorState.card{padding:0;border:0;background:transparent;max-width:40%;flex-shrink:0}.editorState .entityState{margin:0;min-height:36px}.editorState .stateValue{font-size:18px;max-height:3em}.editorState .retainedValue{max-width:160px}.entityEditor .editorSection{padding:14px 16px}.entityEditor .editorSection h3{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px}.editorSection h3 svg{width:18px;height:18px;flex-shrink:0}.entityEditor .editorFields{gap:12px 16px}.editorHelp{margin-top:4px}.editorHelp summary{display:flex;align-items:center;gap:5px;width:fit-content;min-height:28px;cursor:pointer;font-size:12px;color:var(--secondary-text-color,#637487);list-style:none}.editorHelp summary::-webkit-details-marker{display:none}.editorHelp summary:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:2px;border-radius:4px}.infoDot{display:inline-flex;justify-content:center;align-items:center;width:14px;height:14px;border:1px solid currentColor;border-radius:50%;font-size:10px;font-weight:600}.editorHelp[open] summary{color:var(--primary-color,#008fac)}.editorHelp .hint{padding:8px 10px;border-left:2px solid var(--primary-color,#008fac);background:var(--secondary-background-color,#f1f5f9);border-radius:0 6px 6px 0}.editorSwitch{justify-content:space-between;flex-direction:row-reverse;gap:16px;min-height:44px;padding:8px 0;cursor:pointer}.editorSwitch .switchCopy{flex:1;font-weight:500;line-height:1.4}.switchCopy small{display:block;margin-top:3px;font-size:12px;font-weight:400;color:var(--secondary-text-color,#637487)}.entityEditor .editorSwitch input{appearance:none;-webkit-appearance:none;position:relative;width:44px;height:26px;min-width:44px;min-height:26px;flex:0 0 44px;border:1px solid var(--secondary-text-color,#637487);border-radius:20px;background:var(--secondary-text-color,#637487);margin:0;padding:0;cursor:pointer;transition:background 160ms,border-color 160ms}.editorSwitch input::before{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--card-background-color,#fff);transition:transform 160ms}.entityEditor .editorSwitch input:checked{background:var(--primary-color,#008fac);border-color:var(--primary-color,#008fac)}.editorSwitch input:checked::before{transform:translateX(18px)}.editorSwitch input:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:3px}.editorSwitch input:disabled{opacity:.45;cursor:default}.entityEditor input[name=precision]{max-width:120px}.nodePicker .unitTrigger{overflow-wrap:anywhere;white-space:normal;gap:8px}.unitTrigger::after{flex-shrink:0}
 @media(max-width:650px){.entityEditor .editorHeading{padding:12px 16px;gap:8px;flex-wrap:wrap}.editorState.card{max-width:100%}.editorState .entityState{padding:4px 8px;min-height:28px}.editorState .stateValue{font-size:15px}.editorState .valueIcon{display:none}.editorState .stateLabel{display:none}.entityEditor .editorSection{padding:12px}.entityEditor .editorFields{gap:10px}.editorHelp summary{min-height:32px}}
@@ -851,6 +861,30 @@ class OpcuaNodePanel extends HTMLElement {
       }),
     );
     meta.append(subscriptionControl);
+    const pathControl = element("div", undefined, {
+      class: "endpointSubscription",
+    });
+    const pathLabel = element("label", undefined, { class: "toggle" });
+    const pathToggle = element("input", undefined, {
+      type: "checkbox",
+      role: "switch",
+      "aria-label": this._t("endpointNamePath"),
+      "aria-describedby": "name-path-help",
+      "data-name-path-toggle": "",
+    });
+    pathToggle.checked = Boolean(endpoint.name_with_path);
+    pathToggle.addEventListener("change", () =>
+      this._setNamePath(endpoint, pathToggle),
+    );
+    pathLabel.append(pathToggle, element("span", this._t("endpointNamePath")));
+    pathControl.append(
+      pathLabel,
+      element("p", this._t("endpointNamePathHelp"), {
+        class: "hint",
+        id: "name-path-help",
+      }),
+    );
+    meta.append(pathControl);
     // A root change or a PLC provider switch can orphan dozens of entities
     // at once; offer one cleanup for all of them next to the rediscover.
     const orphans = endpoint.rows.filter((r) => r.orphan);
@@ -906,6 +940,7 @@ class OpcuaNodePanel extends HTMLElement {
     }
     const navRow = element("div", undefined, { class: "navRow" });
     navRow.append(nav);
+    const navTools = element("div", undefined, { class: "navTools" });
     const viewToggle = element("div", undefined, {
       class: "viewToggle",
       role: "group",
@@ -917,7 +952,7 @@ class OpcuaNodePanel extends HTMLElement {
         type: "button",
         class: this._viewMode === mode ? "selected" : "",
         "aria-label": this._t(mode === "grid" ? "gridView" : "listView"),
-        title: this._t(mode === "grid" ? "gridView" : "listView"),
+        "data-tip": this._t(mode === "grid" ? "gridView" : "listView"),
         "aria-pressed": String(this._viewMode === mode),
       });
       button.addEventListener("click", () => {
@@ -932,7 +967,7 @@ class OpcuaNodePanel extends HTMLElement {
       });
       viewToggle.append(button);
     }
-    navRow.append(viewToggle);
+    navTools.append(viewToggle);
     // Only worth offering when this endpoint actually has something to
     // group by - otherwise it is a control with no visible effect.
     const groupModes = ["category"];
@@ -945,30 +980,36 @@ class OpcuaNodePanel extends HTMLElement {
         role: "group",
         "aria-label": this._t("groupModeLabel"),
       });
+      const labels = {
+        category: ["groupByCategory", "groupTipCategory", "groupCategory"],
+        array: ["groupByArray", "groupTipArray", "groupArray"],
+        path: ["groupByPath", "groupTipPath", "groupPath"],
+      };
       for (const mode of groupModes) {
-        const button = this._button(
-          {
-            category: "groupByCategory",
-            array: "groupByArray",
-            path: "groupByPath",
-          }[mode],
-          () => {
-            if (activeMode === mode) return;
-            this._groupMode = mode;
-            try {
-              localStorage.setItem("ha-opcua-group-mode", mode);
-            } catch {
-              /* private browsing / blocked storage: not persisted this time */
-            }
-            this._render();
-          },
-          activeMode === mode ? "selected" : "",
-        );
-        button.setAttribute("aria-pressed", String(activeMode === mode));
+        const [label, tip, icon] = labels[mode];
+        const button = element("button", undefined, {
+          type: "button",
+          class: activeMode === mode ? "selected" : "",
+          "aria-label": this._t(label),
+          "aria-pressed": String(activeMode === mode),
+          "data-tip": this._t(tip),
+        });
+        button.append(valueIcon(icon));
+        button.addEventListener("click", () => {
+          if (activeMode === mode) return;
+          this._groupMode = mode;
+          try {
+            localStorage.setItem("ha-opcua-group-mode", mode);
+          } catch {
+            /* private browsing / blocked storage: not persisted this time */
+          }
+          this._render();
+        });
         groupToggle.append(button);
       }
-      navRow.append(groupToggle);
+      navTools.append(groupToggle);
     }
+    navRow.append(navTools);
     main.append(navRow);
     this._rows = element("section");
     main.append(this._rows);
@@ -1176,30 +1217,26 @@ class OpcuaNodePanel extends HTMLElement {
         numeric: true,
       }),
     );
-    const details = element("details", undefined, {
-      class: "group",
-      open: "",
-      "data-platform": "grouped",
-    });
-    details.append(
-      element("summary", `${this._t(grouping.summary)} · ${groups.length}`),
-    );
-    const container = element("div", undefined, { class: "arrayGroups" });
+    // Each group folds on its own, like the platform sections above.
     for (const fields of groups) {
       fields.sort((a, b) => (a[grouping.sort] > b[grouping.sort] ? 1 : -1));
-      const section = element("div", undefined, { class: "arrayGroup" });
-      section.append(
-        element("h3", fields[0][grouping.label], { class: "arrayGroupTitle" }),
+      const details = element("details", undefined, {
+        class: "group arrayGroup",
+        open: "",
+        "data-platform": "grouped",
+      });
+      details.append(
+        element("summary", `${fields[0][grouping.label]} · ${fields.length}`, {
+          class: "arrayGroupTitle",
+        }),
       );
       const grid = element("div", undefined, {
         class: this._viewMode === "list" ? "grid list" : "grid",
       });
       for (const row of fields) grid.append(this._buildCard(row));
-      section.append(grid);
-      container.append(section);
+      details.append(grid);
+      this._rows.append(details);
     }
-    details.append(container);
-    this._rows.append(details);
   }
   _renderRows() {
     if (!this._rows) return;
@@ -1219,13 +1256,15 @@ class OpcuaNodePanel extends HTMLElement {
         `${r.name} ${r.node_id} ${r.entity_id}`.toLowerCase().includes(query),
     );
     if (!rows.length) this._rows.append(emptyMessage(this._t("empty")));
-    // Grouping by array element or by path only makes sense browsing
-    // everything at once - a platform filter or an active search wants its
-    // own flat, precise list - and only when the user has explicitly opted
-    // into it over the default category grouping.
+    // Grouping by array element only makes sense browsing everything at
+    // once - a platform filter or an active search wants its own flat,
+    // precise list. Grouping by path is a structure the user keeps while
+    // narrowing down, so it also applies inside a platform filter or a
+    // search. Either only when explicitly chosen over the default category
+    // grouping.
     const mode = this._activeGroupMode(endpoint);
     const grouping =
-      this._filter === "all" && !query && mode !== "category"
+      mode === "path" || (mode === "array" && this._filter === "all" && !query)
         ? GROUPINGS[mode]
         : null;
     const groupedRows = grouping ? rows.filter((r) => r[grouping.key]) : [];
@@ -1250,6 +1289,19 @@ class OpcuaNodePanel extends HTMLElement {
     }
     if (groupedRows.length) this._renderGroups(groupedRows, grouping);
     this._paintStates();
+  }
+  async _setNamePath(endpoint, control) {
+    control.disabled = true;
+    try {
+      await this._hass.callWS({
+        type: "ha_opcua/endpoint/name_with_path",
+        entry_id: endpoint.entry_id,
+        enabled: control.checked,
+      });
+    } catch (err) {
+      this._error = this._t(err.code in TEXT.en ? err.code : "error");
+    }
+    await this._load();
   }
   async _setEndpointSubscription(endpoint, enabled) {
     const key = endpoint.entry_id;

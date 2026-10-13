@@ -149,3 +149,50 @@ def display_name_for(
         if name is not None:
             return name
     return disambiguated_name(node_id, collides=collides)
+
+
+def _symbolic_segments(node_id):
+    """The dotted symbol path of a string NodeId as segments, or None."""
+    match = _STRING_NODE_ID_RE.match(node_id)
+    if match is None:
+        return None
+    segments = [part.strip('"') for part in match["path"].split(".")]
+    return segments if len(segments) >= 2 and all(segments) else None
+
+
+def _common_prefix(paths):
+    prefix = []
+    for parts in zip(*paths):
+        if any(part != parts[0] for part in parts):
+            break
+        prefix.append(parts[0])
+    return prefix
+
+
+def relative_paths(browse_paths):
+    """Each variable's path below the deepest node that holds all of them.
+
+    A PLC's symbol path (e.g. Application.GVL.variable) is what people
+    know, so a string NodeId is read as that path; only a numeric NodeId
+    falls back to the browse names recorded while discovering, which can
+    include organizing folders the symbols do not have. The leading
+    nodes every variable shares (the device, an application) say nothing
+    about where one variable lives, so they are dropped. What remains of
+    a variable's path always keeps its own name last.
+    """
+    symbolic = {}
+    browsed = {}
+    for node_id, browse in browse_paths.items():
+        segments = _symbolic_segments(node_id)
+        if segments is not None:
+            symbolic[node_id] = segments
+        elif browse:
+            browsed[node_id] = list(browse)
+    result = {}
+    for group in (symbolic, browsed):
+        if not group:
+            continue
+        shared = len(_common_prefix([segments[:-1] for segments in group.values()]))
+        for node_id, segments in group.items():
+            result[node_id] = segments[shared:]
+    return result
