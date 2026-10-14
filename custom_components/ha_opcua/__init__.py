@@ -20,7 +20,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .arrays import array_element_name, disambiguated_name, parse_array_element
+from .arrays import (
+    array_element_name,
+    display_name_for,
+    name_with_path_enabled,
+    parse_array_element,
+    relative_paths,
+)
 from .const import (
     CONF_CONNECTION_ENABLED,
     CONF_HUB_ID,
@@ -283,6 +289,9 @@ class OpcuaHub:
         self._password = password
         self.root_node_id = root_node_id
         self.discovery_complete = False
+        # Each discovered variable's path below the deepest node that holds
+        # all of them, by NodeId (see relative_paths).
+        self.node_paths: dict[str, list[str]] = {}
         self.client = None
         self._connected = False
         self._closed = False
@@ -435,19 +444,23 @@ class OpcuaHub:
     async def discover_nodes(self) -> list[dict[str, Any]]:
         """Discover each NodeId once and cache its entity classification."""
         discovered = []
+        paths = {}
         visited = set()
         self.discovery_complete = True
 
-        async def visit(node):
+        async def visit(node, parent_path):
             node_id = node.nodeid.to_string()
             if node_id in visited:
                 return
             visited.add(node_id)
             node_class = await node.read_node_class()
             name = (await node.read_browse_name()).Name
+            path = [] if parent_path is None else [*parent_path, name]
             if node_class == ua.NodeClass.Variable:
                 try:
-                    discovered.append(await self._read_node_metadata(node, name))
+                    metadata = await self._read_node_metadata(node, name)
+                    discovered.append(metadata)
+                    paths[metadata["node_id"]] = path
                 except ValueError:
                     _LOGGER.debug("Skipping unsupported value on node %s", node_id)
                 except ua.UaStatusCodeError as err:
@@ -477,7 +490,7 @@ class OpcuaHub:
             ):
                 for child in await node.get_children():
                     try:
-                        await visit(child)
+                        await visit(child, path)
                     except ua.UaStatusCodeError as err:
                         if _connection_error(err):
                             raise
@@ -487,7 +500,8 @@ class OpcuaHub:
                         )
 
         async with self._session() as client:
-            await visit(client.get_node(self.root_node_id))
+            await visit(client.get_node(self.root_node_id), None)
+        self.node_paths = relative_paths(paths)
         return discovered
 
     async def get_values(self, node_ids) -> dict[str, Any]:
@@ -990,6 +1004,8 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             else set()
         )
         name_counts = Counter(node["name"] for node in candidates.values())
+        with_path = name_with_path_enabled(self.config_entry)
+        root_node_id = getattr(self._hub, "root_node_id", None)
         self.nodes = {}
         self._platforms = {}
         for node_id, original in candidates.items():
@@ -1051,11 +1067,20 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 # struct instances ("...Pump_North.xEnable" and
                 # "...Pump_South.xEnable"): its parent struct instance
                 # tells them apart. A name that is unique stays untouched.
-                disambiguated = disambiguated_name(
-                    node_id, collides=name_counts[original["name"]] > 1
+                #
+                # A connection that opted into path naming gives every node
+                # nested below its root the full path instead ("SP · xError",
+                # "PARAM · Pump_North · xEnable"), so the group a variable
+                # lives in is part of its name and entity ID from the start.
+                generated = display_name_for(
+                    node_id,
+                    collides=name_counts[original["name"]] > 1,
+                    root_node_id=root_node_id,
+                    with_path=with_path,
+                    path=self._discovered_path(target_id),
                 )
-                if disambiguated is not None:
-                    saved = {**saved, "display_name": disambiguated}
+                if generated is not None:
+                    saved = {**saved, "display_name": generated}
             # A persisted display name (from this node's own "new" pass,
             # possibly in an earlier run) always wins over the raw field
             # name - but only ever a name this feature computed and saved
@@ -1098,6 +1123,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             self._last_discovery_snapshot = (seen_ids, full_discovery)
             self._persist_discovery_state(seen_ids, full_discovery=full_discovery)
 
+    def _discovered_path(self, node_id):
+        """The browse path below the root recorded for a node, if discovered."""
+        paths = getattr(self._hub, "node_paths", None)
+        return paths.get(node_id) if isinstance(paths, dict) else None
+
     def _reconcile_legacy_array_display_names(self):
         """Backfill display_name for array fields renamed before it existed.
 
@@ -1129,11 +1159,22 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             registered = registry.async_get(entity_id) if entity_id else None
             if registered is None or registered.name is None:
                 continue
-            expected = array_element_name(node_id, parsed["field"])
-            if registered.name != expected:
+            expected = {
+                array_element_name(node_id, parsed["field"]),
+                display_name_for(
+                    node_id,
+                    collides=False,
+                    root_node_id=getattr(self._hub, "root_node_id", None),
+                    with_path=name_with_path_enabled(self.config_entry),
+                    path=self._discovered_path(
+                        self.node_settings.get(node_id, {}).get("node_id", node_id)
+                    ),
+                ),
+            }
+            if registered.name not in expected:
                 continue
-            node["name"] = expected
-            updated = {**settings, "display_name": expected}
+            node["name"] = registered.name
+            updated = {**settings, "display_name": registered.name}
             self.node_settings[node_id] = updated
             self._pending_node_settings[node_id] = updated
 

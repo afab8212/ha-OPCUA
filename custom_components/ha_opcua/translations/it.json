@@ -9,7 +9,8 @@
           "username": "Nome utente",
           "password": "Password",
           "scan_interval": "Intervallo di lettura (secondi)",
-          "hub_root": "NodeId radice"
+          "hub_root": "NodeId radice",
+          "name_with_path": "Includi il percorso del PLC nei nomi delle entità"
         }
       }
     },
@@ -32,7 +33,11 @@
           "username": "Nome utente",
           "password": "Password",
           "scan_interval": "Intervallo di lettura (secondi)",
-          "hub_root": "NodeId radice"
+          "hub_root": "NodeId radice",
+          "name_with_path": "Includi il percorso del PLC nei nomi delle entità"
+        },
+        "data_description": {
+          "name_with_path": "Se attivo, le nuove entità prendono il percorso completo sotto il NodeId radice (es. \"SP · xError\") e l'azione di rinomina del pannello propone questo nome per quelle esistenti. I nomi esistenti non cambiano mai da soli."
         }
       },
       "nodes": {

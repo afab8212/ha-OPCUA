@@ -3,8 +3,12 @@
 from custom_components.ha_opcua.arrays import (
     array_element_name,
     disambiguated_name,
+    display_name_for,
     parse_array_element,
     parse_struct_field,
+    path_group,
+    path_name,
+    relative_paths,
     struct_field_name,
 )
 
@@ -90,3 +94,175 @@ def test_array_elements_are_always_disambiguated_by_their_index():
     expected = "Alarms 3 · xActive"
     assert disambiguated_name(node_id, collides=False) == expected
     assert disambiguated_name(node_id, collides=True) == expected
+
+
+ROOT = "ns=4;s=|var|PLC.Application"
+
+
+def test_path_name_joins_every_segment_below_the_root():
+    assert path_name(f"{ROOT}.SP.xError", ROOT) == "SP · xError"
+    assert (
+        path_name(f"{ROOT}.PARAM.Pump_North.xEnable", ROOT)
+        == "PARAM · Pump_North · xEnable"
+    )
+    # An array index stays readable the same way array element names are.
+    assert (
+        path_name(f"{ROOT}.PlantRelay.astAlarms[3].xActive", ROOT)
+        == "PlantRelay · astAlarms 3 · xActive"
+    )
+    # Quoted segments lose their quotes, and a stray space in the root is fine.
+    assert path_name('ns=3;s="DB1"."Pump"."xRun"', 'ns=3;s="DB1"') == "Pump · xRun"
+    assert path_name('ns=3;s=Root."DB1"."xRun"', " ns=3;s=Root ") == "DB1 · xRun"
+
+
+def test_path_name_needs_a_symbolic_path_nested_below_the_root():
+    # Directly under the root there is no group to show.
+    assert path_name(f"{ROOT}.Speed", ROOT) is None
+    # Outside the root, numeric NodeIds and a missing root have no path.
+    assert path_name("ns=4;s=|var|OTHER.Application.SP.xError", ROOT) is None
+    assert path_name("ns=2;i=4", ROOT) is None
+    assert path_name(f"{ROOT}.SP.xError", None) is None
+    assert path_name(f"{ROOT}.SP.xError", "ns=2;i=1") is None
+
+
+def test_path_group_is_the_parent_path_below_the_root():
+    assert path_group(f"{ROOT}.SP.xError", ROOT) == {"key": "SP", "label": "SP"}
+    assert path_group(f"{ROOT}.PARAM.Pump_North.xEnable", ROOT) == {
+        "key": "PARAM.Pump_North",
+        "label": "PARAM › Pump_North",
+    }
+    assert path_group(f"{ROOT}.astAlarms[3].xActive", ROOT) == {
+        "key": "astAlarms[3]",
+        "label": "astAlarms 3",
+    }
+    assert path_group(f"{ROOT}.Speed", ROOT) is None
+    assert path_group("ns=2;i=4", ROOT) is None
+
+
+def test_display_name_for_prefers_the_path_only_when_enabled():
+    node_id = f"{ROOT}.SP.xError"
+    assert display_name_for(node_id, collides=False, root_node_id=ROOT) is None
+    assert (
+        display_name_for(node_id, collides=False, root_node_id=ROOT, with_path=True)
+        == "SP · xError"
+    )
+    # Without a path to show, the collision-based names still apply.
+    assert (
+        display_name_for(node_id, collides=True, root_node_id=None, with_path=True)
+        == "SP · xError"
+    )
+    array_id = f"{ROOT}.astAlarms[3].xActive"
+    assert display_name_for(array_id, collides=False) == "astAlarms 3 · xActive"
+
+
+def test_a_recorded_browse_path_works_for_a_numeric_root():
+    node_id = "ns=4;i=2001"
+    path = ["PARAM", "Pump_North", "xEnable"]
+    assert path_name(node_id, "ns=4;i=5000", path) == "PARAM · Pump_North · xEnable"
+    assert path_group(node_id, "ns=4;i=5000", path) == {
+        "key": "PARAM.Pump_North",
+        "label": "PARAM › Pump_North",
+    }
+    assert (
+        display_name_for(
+            node_id,
+            collides=False,
+            root_node_id="ns=4;i=5000",
+            with_path=True,
+            path=path,
+        )
+        == "PARAM · Pump_North · xEnable"
+    )
+    # A variable directly below the root has no group to show.
+    assert path_name(node_id, "ns=4;i=5000", ["Speed"]) is None
+    assert path_group(node_id, "ns=4;i=5000", ["Speed"]) is None
+    # Without a recorded path, a numeric root cannot be resolved.
+    assert path_name(node_id, "ns=4;i=5000", None) is None
+
+
+DEVICE = "ns=4;s=|var|PLC.Application"
+
+
+def test_relative_paths_drop_the_nodes_every_variable_shares():
+    browse = {
+        f"{DEVICE}.A_IN.rTemp": ["Application", "Folder", "A_IN", "rTemp"],
+        f"{DEVICE}.PARAM.Pump_North.xEnable": [
+            "Application",
+            "Folder",
+            "PARAM",
+            "Pump_North",
+            "xEnable",
+        ],
+        f"{DEVICE}.PRG.rLocal": ["Application", "PRG", "rLocal"],
+    }
+    # The symbol path is what people know: organizing browse folders such as
+    # "Folder" are not part of it, and the shared device/application are
+    # dropped because they say nothing about where a variable lives.
+    assert relative_paths(browse) == {
+        f"{DEVICE}.A_IN.rTemp": ["A_IN", "rTemp"],
+        f"{DEVICE}.PARAM.Pump_North.xEnable": ["PARAM", "Pump_North", "xEnable"],
+        f"{DEVICE}.PRG.rLocal": ["PRG", "rLocal"],
+    }
+
+
+def test_relative_paths_for_numeric_node_ids_use_the_browse_names():
+    browse = {
+        "ns=4;i=2": ["Root", "Group_A", "xOne"],
+        "ns=4;i=3": ["Root", "Group_B", "Sub", "xTwo"],
+    }
+    assert relative_paths(browse) == {
+        "ns=4;i=2": ["Group_A", "xOne"],
+        "ns=4;i=3": ["Group_B", "Sub", "xTwo"],
+    }
+
+
+def test_relative_paths_keep_a_single_group_next_to_a_sibling_group():
+    browse = {
+        f"{DEVICE}.SP.xError": ["SP", "xError"],
+        f"{DEVICE}.SP.xWarning": ["SP", "xWarning"],
+        f"{DEVICE}.FLAG.xOn": ["FLAG", "xOn"],
+    }
+    assert relative_paths(browse)[f"{DEVICE}.SP.xError"] == ["SP", "xError"]
+    # With only one group at all, that group is the shared node and its
+    # variables have nothing left to be grouped by.
+    only = {k: v for k, v in browse.items() if ".SP." in k}
+    assert relative_paths(only)[f"{DEVICE}.SP.xError"] == ["xError"]
+    assert relative_paths({}) == {}
+
+
+def test_relative_paths_ignore_a_few_stray_variables_in_a_large_installation():
+    other = "ns=4;s=|var|OTHER.Application"
+    browse = {}
+    for index in range(150):
+        group = "A" if index % 2 else "B"
+        browse[f"{DEVICE}.{group}.x{index}"] = []
+    stray = f"{other}.Info.sVersion"
+    browse[stray] = []
+    result = relative_paths(browse)
+    # The shared device/application prefix is still recognized ...
+    assert result[f"{DEVICE}.A.x1"] == ["A", "x1"]
+    assert result[f"{DEVICE}.B.x0"] == ["B", "x0"]
+    # ... and the variable outside it gets no path, so it keeps its name.
+    assert stray not in result
+
+
+def test_relative_paths_are_exact_for_a_small_installation():
+    other = "ns=4;s=|var|OTHER.Application"
+    browse = {f"{DEVICE}.A.x{index}": [] for index in range(10)}
+    browse[f"{other}.Info.sVersion"] = []
+    result = relative_paths(browse)
+    # With so few variables a deviating one counts: nothing is shared, so the
+    # full symbol path is kept for everyone rather than guessing.
+    assert result[f"{DEVICE}.A.x1"] == ["PLC", "Application", "A", "x1"]
+    assert len(result) == 11
+
+
+def test_a_property_of_a_variable_shares_the_prefix_of_its_variables():
+    variable = "ns=4;s=|var|PLC.Application.PARAM.Pump_North.aValues[0]"
+    prop = "ns=4;s=|vprop|PLC.Application.PARAM.Pump_North.aValues.Dimensions"
+    other = "ns=4;s=|var|PLC.Application.SP.xError"
+    result = relative_paths({variable: [], prop: [], other: []})
+    # The kind tag does not make the property a stray: it keeps its group.
+    assert result[variable] == ["PARAM", "Pump_North", "aValues[0]"]
+    assert result[prop] == ["PARAM", "Pump_North", "aValues", "Dimensions"]
+    assert result[other] == ["SP", "xError"]
