@@ -849,16 +849,6 @@ class OpcuaNodePanel extends HTMLElement {
         class: "hint",
         id: "subscription-help",
       }),
-      element("p", "", {
-        class: "hint",
-        id: "subscription-status",
-        role: "status",
-      }),
-      element("p", "", {
-        class: "error",
-        "data-subscription-error": "",
-        role: "alert",
-      }),
     );
     meta.append(subscriptionControl);
     const pathControl = element("div", undefined, {
@@ -885,6 +875,24 @@ class OpcuaNodePanel extends HTMLElement {
       }),
     );
     meta.append(pathControl);
+    // Status and error of the subscription switch sit below both switches so
+    // the two controls stay together.
+    const subscriptionFeedback = element("div", undefined, {
+      class: "endpointSubscription",
+    });
+    subscriptionFeedback.append(
+      element("p", "", {
+        class: "hint",
+        id: "subscription-status",
+        role: "status",
+      }),
+      element("p", "", {
+        class: "error",
+        "data-subscription-error": "",
+        role: "alert",
+      }),
+    );
+    meta.append(subscriptionFeedback);
     // A root change or a PLC provider switch can orphan dozens of entities
     // at once; offer one cleanup for all of them next to the rediscover.
     const orphans = endpoint.rows.filter((r) => r.orphan);
