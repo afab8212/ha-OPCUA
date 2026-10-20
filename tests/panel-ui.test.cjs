@@ -237,6 +237,7 @@ async function pageFor(width = 1280, admin = true) {
           return { reclassified };
         }
         if (msg.type.endsWith("/name_with_path")) {
+          if (window.failNamePath) throw { code: window.failNamePath };
           const endpoint = window.fixture.endpoints.find(
             (e) => e.entry_id === msg.entry_id,
           );
@@ -1210,6 +1211,89 @@ test("path naming is switched on and off from the endpoint panel", async () => {
       2,
   );
   assert.equal((await saves())[1].enabled, false);
+});
+
+test("a failed path naming save restores the switch and keeps the message", async () => {
+  const page = await pageFor(1280);
+  const toggle = () => page.locator("[data-name-path-toggle]");
+  const saves = () =>
+    page.evaluate(
+      () =>
+        window.calls.filter((m) => m.type.endsWith("/name_with_path")).length,
+    );
+  await page.evaluate(() => {
+    window.failNamePath = "error";
+  });
+  await toggle().click();
+  await page.waitForFunction(() =>
+    window.calls.some((m) => m.type.endsWith("/name_with_path")),
+  );
+  // The reload that follows the failed save must not wipe the message ...
+  const alert = page.locator(".message.error");
+  await alert.waitFor();
+  assert.match(await alert.innerText(), /Operazione non riuscita/);
+  // ... and the switch shows what is really saved: still off.
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("opcua-node-panel")
+        .shadowRoot.querySelectorAll("[data-name-path-toggle]").length === 1,
+  );
+  assert.equal(await toggle().isChecked(), false);
+  assert.equal(await toggle().isDisabled(), false);
+  assert.equal(await saves(), 1);
+  // A later successful save clears the message again.
+  await page.evaluate(() => {
+    window.failNamePath = "";
+  });
+  await toggle().click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("opcua-node-panel")
+        .shadowRoot.querySelector("[data-name-path-toggle]")?.checked,
+  );
+  assert.equal(await page.locator(".message.error").count(), 0);
+});
+
+test("a group's path can be found by searching when the names are short", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    const row = (key, group, label, name) => ({
+      key,
+      node_id: `ns=4;i=${key.length}${name.length}`,
+      name,
+      entity_id: `sensor.${key}`,
+      platform: "sensor",
+      variant_type: "Double",
+      reclassifiable: false,
+      path_group: group,
+      path_label: label,
+    });
+    endpoint.rows.push(
+      row("found1", "Tank", "Tank", "Level"),
+      row("found2", "Tank", "Tank", "Flow"),
+      row("other1", "Pump", "Pump", "Speed"),
+    );
+    window.testHass.states = {
+      ...window.testHass.states,
+      "sensor.found1": { state: "1", attributes: {} },
+      "sensor.found2": { state: "2", attributes: {} },
+      "sensor.other1": { state: "3", attributes: {} },
+    };
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Per gruppo (GVL / struct)", exact: true })
+    .click();
+  await page
+    .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
+    .fill("tank");
+  const groups = page.locator(".arrayGroup");
+  assert.equal(await groups.count(), 1);
+  assert.equal(await groups.locator("article").count(), 2);
 });
 
 test("fields can be grouped by their PLC path as a third explicit choice", async () => {
