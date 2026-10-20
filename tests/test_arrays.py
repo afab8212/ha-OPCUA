@@ -1,6 +1,12 @@
 """Generic array-of-struct detection, independent of size or field count."""
 
-from custom_components.ha_opcua.arrays import array_element_name, parse_array_element
+from custom_components.ha_opcua.arrays import (
+    array_element_name,
+    disambiguated_name,
+    parse_array_element,
+    parse_struct_field,
+    struct_field_name,
+)
 
 WAGO_PREFIX = "ns=4;s=|var|WAGO 750-8212 PFC200 G2 2ETH RS.Application"
 
@@ -40,3 +46,47 @@ def test_array_element_name_disambiguates_by_index():
 def test_array_element_name_falls_back_to_the_raw_field_name():
     node_id = f"{WAGO_PREFIX}.PLC_PRG.rWert"
     assert array_element_name(node_id, "rWert") == "rWert"
+
+
+STRUCT_PREFIX = "ns=4;s=|var|PLC.Application.PARAM"
+STRUCT_NODE = f"{STRUCT_PREFIX}.Pump_North.xEnable"
+
+
+def test_parses_the_parent_struct_instance_and_field():
+    assert parse_struct_field(STRUCT_NODE) == {
+        "parent": "Pump_North",
+        "field": "xEnable",
+    }
+    assert struct_field_name(STRUCT_NODE) == "Pump_North · xEnable"
+
+
+def test_quoted_segments_and_missing_namespace_are_handled():
+    assert parse_struct_field('ns=3;s="DB1"."Pump"."xRun"') == {
+        "parent": "Pump",
+        "field": "xRun",
+    }
+    assert parse_struct_field("s=Motor.rSpeed") == {
+        "parent": "Motor",
+        "field": "rSpeed",
+    }
+
+
+def test_nodes_without_a_symbolic_parent_do_not_match():
+    assert parse_struct_field("ns=2;i=4") is None
+    assert parse_struct_field("ns=2;s=rTopLevel") is None
+    assert parse_struct_field("ns=4;s=.rField") is None
+    assert struct_field_name("ns=2;i=4") is None
+
+
+def test_disambiguated_name_depends_on_collision_for_plain_structs():
+    assert disambiguated_name(STRUCT_NODE, collides=False) is None
+    assert disambiguated_name(STRUCT_NODE, collides=True) == "Pump_North · xEnable"
+    # Numeric NodeIds carry no parent, so there is nothing to add.
+    assert disambiguated_name("ns=2;i=4", collides=True) is None
+
+
+def test_array_elements_are_always_disambiguated_by_their_index():
+    node_id = f"{STRUCT_PREFIX}.Alarms[3].xActive"
+    expected = "Alarms 3 · xActive"
+    assert disambiguated_name(node_id, collides=False) == expected
+    assert disambiguated_name(node_id, collides=True) == expected

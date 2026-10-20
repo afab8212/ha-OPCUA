@@ -321,7 +321,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.9.1",
+    "Pannello 1.9.2",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1001,7 +1001,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
         renamable: true,
       },
     );
-    endpoint.renamable_array_fields = 3;
+    endpoint.renamable_fields = 3;
     window.testHass.states = {
       ...window.testHass.states,
       "binary_sensor.arr1x": { state: "on", attributes: {} },
@@ -1090,7 +1090,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   await arrayToggle().click();
 
   await page
-    .getByRole("button", { name: "Rinomina campi array (3)", exact: true })
+    .getByRole("button", { name: "Rinomina campi duplicati (3)", exact: true })
     .click();
   const dialog = page.locator("dialog[open]");
   await dialog.waitFor();
