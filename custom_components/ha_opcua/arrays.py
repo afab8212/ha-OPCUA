@@ -169,10 +169,13 @@ def _symbolic_segments(node_id):
 def _shared_prefix(group):
     """The leading path nearly every variable shares, and who follows it.
 
-    A few stray variables must not stop the shared device and application
-    from being recognized (a PLC can expose a handful of properties under
-    another prefix), so up to 1% of the variables may deviate. Below 100
-    variables nobody may, which keeps a small installation exact.
+    A few stray variables must not stop the shared device from being
+    recognized (a PLC can expose a handful of nodes under another root), so
+    up to 1% of the variables may sit under a different first node. Below
+    100 variables nobody may, which keeps a small installation exact. Deeper
+    down every variable has to agree: a smaller sibling group (or a variable
+    sitting directly in the shared node) is where people look for it, so it
+    never gets cut off just because another group is much larger.
     """
     tolerance = len(group) // 100
     members = dict(group)
@@ -186,7 +189,7 @@ def _shared_prefix(group):
         if not counts:
             break
         value, count = max(counts.items(), key=lambda item: item[1])
-        if len(group) - count > tolerance:
+        if len(members) - count > (tolerance if depth == 0 else 0):
             break
         prefix.append(value)
         members = {

@@ -673,7 +673,7 @@ class OpcuaNodePanel extends HTMLElement {
   _endpoint() {
     return this._data?.endpoints.find((e) => e.entry_id === this._selected);
   }
-  async _load() {
+  async _load(keepError = false) {
     if (!this._hass?.user?.is_admin) {
       this._error = this._t("admin");
       this._render();
@@ -686,7 +686,7 @@ class OpcuaNodePanel extends HTMLElement {
       });
       if (generation !== this._generation || !this.isConnected) return;
       this._data = data;
-      this._error = "";
+      if (!keepError) this._error = "";
       if (!data.endpoints.some((e) => e.entry_id === this._selected))
         this._selected = data.endpoints[0]?.entry_id || "";
       this._render();
@@ -1261,7 +1261,9 @@ class OpcuaNodePanel extends HTMLElement {
     const rows = endpoint.rows.filter(
       (r) =>
         (this._filter === "all" || r.platform === this._filter) &&
-        `${r.name} ${r.node_id} ${r.entity_id}`.toLowerCase().includes(query),
+        `${r.name} ${r.node_id} ${r.entity_id} ${r.path_label || ""}`
+          .toLowerCase()
+          .includes(query),
     );
     if (!rows.length) this._rows.append(emptyMessage(this._t("empty")));
     // Grouping by array element only makes sense browsing everything at
@@ -1300,6 +1302,7 @@ class OpcuaNodePanel extends HTMLElement {
   }
   async _setNamePath(endpoint, control) {
     control.disabled = true;
+    let failed = false;
     try {
       await this._hass.callWS({
         type: "ha_opcua/endpoint/name_with_path",
@@ -1307,9 +1310,12 @@ class OpcuaNodePanel extends HTMLElement {
         enabled: control.checked,
       });
     } catch (err) {
+      failed = true;
       this._error = this._t(err.code in TEXT.en ? err.code : "error");
     }
-    await this._load();
+    // Reloading re-reads the saved state, which puts the switch back after a
+    // failed save; the failure message has to survive that reload.
+    await this._load(failed);
   }
   async _setEndpointSubscription(endpoint, enabled) {
     const key = endpoint.entry_id;

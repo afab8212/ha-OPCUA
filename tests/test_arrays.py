@@ -246,6 +246,25 @@ def test_relative_paths_ignore_a_few_stray_variables_in_a_large_installation():
     assert stray not in result
 
 
+def test_relative_paths_keep_a_small_sibling_group_next_to_a_large_one():
+    browse = {f"ns=4;i={index}": ["Root", "PARAM", f"x{index}"] for index in range(99)}
+    browse["ns=4;i=1000"] = ["Root", "SP", "xError"]
+    result = relative_paths(browse)
+    # One variable of a hundred is a group of its own, not a stray: it and
+    # the large group both keep the group they are in.
+    assert result["ns=4;i=1000"] == ["SP", "xError"]
+    assert result["ns=4;i=1"] == ["PARAM", "x1"]
+    assert len(result) == 100
+
+
+def test_relative_paths_keep_a_variable_next_to_the_group_that_dwarfs_it():
+    browse = {f"ns=4;i={index}": ["Root", "PARAM", f"x{index}"] for index in range(99)}
+    browse["ns=4;i=1000"] = ["Root", "xDirect"]
+    result = relative_paths(browse)
+    assert result["ns=4;i=1000"] == ["xDirect"]
+    assert result["ns=4;i=1"] == ["PARAM", "x1"]
+
+
 def test_relative_paths_are_exact_for_a_small_installation():
     other = "ns=4;s=|var|OTHER.Application"
     browse = {f"{DEVICE}.A.x{index}": [] for index in range(10)}
