@@ -1052,6 +1052,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 # field silently falling back to the raw float.
                 if node["variant_type"] in {"Float", "Double"}:
                     saved = {**saved, "precision": 2}
+                # A brand-new node receives push updates by default (when the
+                # endpoint's Auto-Subscription switch is on) instead of having
+                # to be switched over one variable at a time. Saved like the
+                # defaults above, so an existing node keeps its polling mode.
+                saved = {**saved, "update_mode": "subscription"}
                 # A brand-new field inside one element of a PLC array-of-struct
                 # (e.g. "astMeldungen[10].xAktiv") shares its raw field name
                 # with every other element, so HA would otherwise number the

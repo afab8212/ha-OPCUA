@@ -45,6 +45,7 @@ async def test_auto_assigned_settings_survive_until_entities_ready(hass, entry):
 
     assert c.node_settings["ns=2;i=9"]["platform"] == "number"
     assert c.node_settings["ns=2;i=9"]["precision"] == 2
+    assert c.node_settings["ns=2;i=9"]["update_mode"] == "subscription"
     assert "ns=2;i=9" not in entry.options.get(CONF_NODE_SETTINGS, {})
 
     # The next poll: the node already has settings in memory, so it no longer
@@ -56,6 +57,7 @@ async def test_auto_assigned_settings_survive_until_entities_ready(hass, entry):
     saved = entry.options[CONF_NODE_SETTINGS]["ns=2;i=9"]
     assert saved["platform"] == "number"
     assert saved["precision"] == 2
+    assert saved["update_mode"] == "subscription"
 
     await c.async_shutdown()
 
@@ -430,3 +432,24 @@ async def test_options_flow_preserves_the_generated_array_field_display_name(
         saved["data"][CONF_NODE_SETTINGS][field["node_id"]]["display_name"]
         == "astMeldungen 10 · xAktiv"
     )
+
+
+async def test_a_node_known_before_keeps_polling_by_default(hass, entry):
+    hub = Mock(
+        get_values=AsyncMock(),
+        set_value=AsyncMock(),
+        disconnect=AsyncMock(),
+        ensure_subscription=AsyncMock(),
+        disable_subscription=AsyncMock(),
+    )
+    c = AsyncuaCoordinator(hass, "PLC", hub, config_entry=entry)
+    # The node is part of the baseline: only genuinely new nodes receive the
+    # subscription default, an existing installation is never switched over.
+    c.known_node_ids = {"ns=2;i=9"}
+    c._known_node_ids_initialized = True
+
+    c.set_nodes([NEW_NODE], full_discovery=True)
+
+    assert "update_mode" not in c.node_settings.get("ns=2;i=9", {})
+
+    await c.async_shutdown()
