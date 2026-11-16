@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.9.4";
+const PANEL_VERSION = "1.9.5";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -606,6 +606,7 @@ dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:mi
 .card{--value-accent:var(--accent)}.card[data-value-type="text"]{--value-accent:var(--accent-text)}.card[data-value-type="datetime"]{--value-accent:var(--accent-datetime)}.card[data-value-type="boolean"]{--value-accent:var(--secondary-text-color,#637487)}.card[data-tone="active"]{--value-accent:var(--primary-color,#008fac)}.card[data-tone="alert"]{--value-accent:var(--error-color,#be3131)}.card:not([data-state-kind="value"]){--value-accent:var(--secondary-text-color,#637487)}.entityState{margin-top:8px;padding:6px 10px;gap:10px;border:1px solid color-mix(in srgb,var(--value-accent) 24%,transparent);border-radius:10px;background:color-mix(in srgb,var(--value-accent) 9%,var(--card-background-color,#fff));max-width:100%}.card .entityState .valueIcon{width:30px;height:30px;flex-basis:30px;background:transparent;color:var(--value-accent)}.grid.list .entityState{width:fit-content;max-width:100%;padding:6px 10px}.card[data-tone="alert"] .stateValue{color:color-mix(in srgb,var(--error-color,#be3131) 70%,var(--primary-text-color,#243346))}
 .customizations{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;min-width:0;order:2}.customizationBadge{padding:3px 7px;border-radius:5px;background:color-mix(in srgb,var(--secondary-text-color,#637487) 8%,transparent);border:1px solid var(--divider-color,#dce2ea);color:var(--secondary-text-color,#637487);font-size:11px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}.cardBottom{order:3}.grid.list .cardBottom{order:0}.grid.list .customizations{grid-column:1/-1;order:1;margin-top:-4px}.grid.list .card:has(.customizations){row-gap:10px}
 @media(max-width:650px){.grid.list .customizations{margin-top:0}.grid.list .cardBottom{order:2}}
+@media(min-width:651px){.grid.list{gap:5px}.grid.list .card,.grid.list .card:has(.customizations){grid-template-columns:minmax(160px,1fr) auto minmax(0,1.15fr) auto;column-gap:14px;row-gap:0;padding:6px 12px}.grid.list .cardTop{flex-wrap:nowrap;gap:8px}.grid.list .cardTitle h3{font-size:14px;line-height:1.3;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.grid.list .address{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}.grid.list .entityState{min-height:0;padding:3px 9px;gap:6px}.grid.list .stateLabel{display:none}.grid.list .card .entityState .valueIcon{width:20px;height:20px;flex-basis:20px}.grid.list .card .entityState .valueIcon svg{width:16px;height:16px}.grid.list .stateValue{font-size:16px;line-height:1.3}.grid.list .customizations{grid-column:3;grid-row:1;margin:0;gap:4px}.grid.list .customizationBadge{padding:1px 6px;font-size:11px}.grid.list .cardBottom{grid-column:4;grid-row:1;flex-direction:row;align-items:center;gap:10px}.grid.list .cardBottom .meta{font-size:11px;white-space:nowrap}.grid.list .actions button{min-height:28px;padding:3px 10px;border-radius:8px}}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
@@ -1134,9 +1135,12 @@ class OpcuaNodePanel extends HTMLElement {
     });
     const top = element("div", undefined, { class: "cardTop" });
     const text = element("div", undefined, { class: "cardTitle" });
+    const name = row.name || row.node_id;
+    // The list view cuts a long name or address to one line; the tooltips
+    // keep both readable.
     text.append(
-      element("h3", row.name || row.node_id),
-      element("div", row.node_id, { class: "address" }),
+      element("h3", name, { title: name }),
+      element("div", row.node_id, { class: "address", title: row.node_id }),
     );
     top.append(text);
     // An orphan row may have no cached type (node gone, never "always available").

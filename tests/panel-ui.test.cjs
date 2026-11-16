@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.9.4",
+    "Pannello 1.9.5",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -2530,10 +2530,25 @@ for (const width of [1280, 390]) {
       );
       const state = await number.locator(".entityState").boundingBox();
       const badges = await number.locator(".customizations").boundingBox();
+      // The grid puts them below the live state; a wide list row puts them
+      // in their own column to the right, so the row stays one line high.
+      const listRow = mode.endsWith("elenco") && width > 650;
       assert.ok(
-        badges.y >= state.y + state.height,
+        listRow
+          ? badges.x >= state.x + state.width
+          : badges.y >= state.y + state.height,
         "saved settings are separate from live state",
       );
+      if (listRow) {
+        // One row: only the tallest part (here the wrapped badges) sets the
+        // height, nothing is stacked below it.
+        const row = await number.boundingBox();
+        const tallest = Math.max(state.height, badges.height);
+        assert.ok(
+          row.height <= tallest + 16,
+          `a wide list row stays one line high (${row.height}px)`,
+        );
+      }
       await number.scrollIntoViewIfNeeded();
       await shot(
         page,
