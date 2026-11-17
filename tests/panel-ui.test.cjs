@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.14.0 · Build 20261117.1",
+    "Pannello 1.15.0 · Build 20261117.2",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1181,6 +1181,61 @@ test("view and grouping choices sit together as icons with a calm, delayed hint"
   await page.mouse.move(5, 5);
   await page.waitForTimeout(400);
   assert.equal((await hint(pathButton)).opacity, "0");
+});
+
+test("each setting badge keeps a fixed slot so the badges line up from row to row", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    for (const [key, settings] of [
+      ["slot1", { precision: 2, unit_of_measurement: "°C" }],
+      ["slot2", { unit_of_measurement: "%" }],
+      ["slot3", { precision: 1, update_mode: "subscription" }],
+      ["slot4", { update_mode: "subscription" }],
+    ]) {
+      endpoint.rows.push({
+        key,
+        node_id: key,
+        name: key,
+        entity_id: `sensor.${key}`,
+        platform: "sensor",
+        variant_type: "Float",
+        reclassifiable: false,
+        settings,
+      });
+    }
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  const left = (name, setting) =>
+    page
+      .locator("tr.entityRow", { hasText: name })
+      .locator(`[data-setting="${setting}"]`)
+      .evaluate((node) => node.getBoundingClientRect().left);
+  // The same setting starts at the same place in every row, even when the
+  // row before it has fewer settings.
+  assert.equal(
+    await left("slot1", "unit_of_measurement"),
+    await left("slot2", "unit_of_measurement"),
+  );
+  assert.equal(
+    await left("slot3", "update_mode"),
+    await left("slot4", "update_mode"),
+  );
+  assert.equal(
+    await left("slot1", "precision"),
+    await left("slot3", "precision"),
+  );
+  // Empty slots are placeholders only: no extra text for screen readers
+  // and no extra setting badge.
+  const slot2 = page.locator("tr.entityRow", { hasText: "slot2" });
+  assert.equal(await slot2.locator(".customizationBadge").count(), 1);
+  assert.ok((await slot2.locator(".settingSlot").count()) >= 2);
+  assert.equal(
+    await slot2.locator('.settingSlot[aria-hidden="true"]').count(),
+    await slot2.locator(".settingSlot").count(),
+  );
+  await shot(page, "setting-slots.png");
 });
 
 test("a column header sorts the rows inside each group and the endpoint buttons explain themselves", async () => {

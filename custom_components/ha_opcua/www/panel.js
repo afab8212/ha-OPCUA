@@ -1,9 +1,9 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.14.0";
+const PANEL_VERSION = "1.15.0";
 // Build shown next to the version: date and running number of that day
 // (YYYYMMDD.N). Bump with every change to this file.
-const PANEL_BUILD = "20261117.1";
+const PANEL_BUILD = "20261117.2";
 // The build this code was loaded as: the hash Home Assistant put into the
 // module URL. Taken from the newest load of this file, so a tab that already
 // ran an older panel still reports the build it actually executes.
@@ -846,6 +846,26 @@ const COLUMNS = [
   { key: "colSettings", min: 200 },
   { key: "", width: 90, min: 60 },
 ];
+// Order of the setting badges in the settings column. Each setting used by
+// any shown row gets its own fixed slot, so the same setting always sits at
+// the same place and the badges line up from row to row.
+const SETTING_SLOTS = [
+  "invert_state",
+  "device_class",
+  "conversion",
+  "precision",
+  "unit_of_measurement",
+  "always_available",
+  "update_mode",
+  "deadband",
+  "range",
+  "step",
+  "value_labels",
+  "pulse_ms",
+  "length",
+  "area",
+  "node_id",
+];
 const GROUPINGS = {
   array: {
     key: "array_group",
@@ -1065,6 +1085,7 @@ nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-col
 .entityRow .retainedValue{margin:0}
 .settingsCell .customizations{flex-wrap:nowrap;gap:4px;margin:0}
 .settingsCell .customizationBadge{padding:1px 6px;font-size:11px;white-space:nowrap}
+.settingsCell .customizationBadge,.settingSlot{box-sizing:border-box;flex:none}
 .actionsCell{text-align:right}
 .actionsCell .actions{justify-content:flex-end;flex-wrap:nowrap;gap:6px}
 .actionsCell .actions button{min-height:28px;padding:3px 10px;border-radius:8px;font-size:12px}
@@ -2133,7 +2154,53 @@ class OpcuaNodePanel extends HTMLElement {
       });
     }
     if (groupedRows.length) this._renderGroups(groupedRows, grouping);
+    this._alignSettings();
     this._paintStates();
+  }
+  _alignSettings() {
+    // Give every setting used in the table one fixed slot: rows without it
+    // keep the slot empty, and each slot is as wide as its widest badge.
+    const lists = [...this._rows.querySelectorAll(".customizations")];
+    if (!lists.length) return;
+    const badge = (list, key) =>
+      list.querySelector(`:scope > [data-setting="${key}"]`);
+    const used = SETTING_SLOTS.filter((key) =>
+      lists.some((list) => badge(list, key)),
+    );
+    // Measured outside the table: rows of a folded group have no size.
+    const probeCell = element("div", undefined, { class: "settingsCell" });
+    probeCell.style.cssText =
+      "position:absolute;visibility:hidden;top:0;left:0;width:max-content";
+    const probe = element("div", undefined, { class: "customizations" });
+    probeCell.append(probe);
+    this._rows.parentElement.append(probeCell);
+    const widths = {};
+    for (const key of used) {
+      const texts = new Set(
+        lists.map((list) => badge(list, key)?.textContent).filter(Boolean),
+      );
+      widths[key] = Math.max(
+        ...[...texts].map((text) => {
+          const span = element("span", text, { class: "customizationBadge" });
+          probe.append(span);
+          return Math.ceil(span.getBoundingClientRect().width);
+        }),
+      );
+    }
+    probeCell.remove();
+    for (const list of lists) {
+      for (const key of used) {
+        const item =
+          badge(list, key) ||
+          element("span", undefined, {
+            class: "settingSlot",
+            "data-slot": key,
+            "aria-hidden": "true",
+          });
+        if (widths[key]) item.style.width = `${widths[key]}px`;
+        list.append(item);
+      }
+    }
   }
   async _setNamePath(endpoint, control) {
     control.disabled = true;
