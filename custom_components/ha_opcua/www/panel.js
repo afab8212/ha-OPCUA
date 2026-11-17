@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.10.0";
+const PANEL_VERSION = "1.11.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -12,6 +12,7 @@ const TEXT = {
     lengthBadge: "Caratteri",
     remappedBadge: "NodeId riassegnato",
     subscriptionBadge: "Subscription configurata",
+    areaBadge: "Area",
     valueLabel: "Valore",
     textLabel: "Testo",
     dateLabel: "Data e ora",
@@ -240,6 +241,251 @@ const TEXT = {
       "I limiti numerici configurati superano quelli del nodo scelto.",
     info: "Configura categoria e limiti da Modifica. Le impostazioni di connessione restano nelle opzioni dell’integrazione.",
   },
+  de: {
+    version: "Integration",
+    panelVersion: "Panel",
+    customizations: "Gespeicherte Anpassungen",
+    invertedBadge: "Zustand invertiert",
+    classBadge: "Klasse",
+    rangeBadge: "Grenzen",
+    lengthBadge: "Zeichen",
+    remappedBadge: "NodeId neu zugeordnet",
+    subscriptionBadge: "Subscription konfiguriert",
+    areaBadge: "Bereich",
+    valueLabel: "Wert",
+    textLabel: "Text",
+    dateLabel: "Datum und Uhrzeit",
+    retainedValue: "Letzter bekannter Wert",
+    retainedHelp:
+      "Gehaltener Wert: Es wird auf einen neuen Messwert der SPS gewartet.",
+    alwaysAvailable: "Immer verfügbar",
+    alwaysAvailableHelp:
+      "Behält den letzten bekannten Wert, wenn die SPS getrennt oder die Verbindung deaktiviert ist. Ohne gespeicherten Wert ist der Zustand unbekannt. Schreiben erfordert eine Verbindung und einen frischen Messwert.",
+    invalid_availability: "Ungültige Verfügbarkeitseinstellung.",
+    endpointNamePath: "SPS-Pfad in Namen",
+    endpointNamePathHelp:
+      "Neue Entitäten werden mit ihrem vollen Pfad benannt (z. B. „SP · xError“). Für bestehende „Doppelte Felder umbenennen“ verwenden.",
+    endpointSubscription: "Auto-Subscription",
+    endpointSubscriptionHelp:
+      "Subscriptions für die ausgewählten Entitäten dieses Endpoints aktivieren. Das Polling bleibt aktiv.",
+    subscriptionUnavailable:
+      "Schalter nicht verfügbar. Prüfen, ob die Integration und die Auto-Subscription-Entität aktiviert sind.",
+    subscriptionFailed:
+      "Auto-Subscription konnte nicht geändert werden. Bitte erneut versuchen.",
+    subscriptionSaving: "Speichern…",
+    updateMode: "Aktualisierung",
+    polling: "Nur Polling",
+    subscription: "Polling + Subscription",
+    updateModeHelp:
+      "Benachrichtigungen erfordern zusätzlich, dass der Auto-Subscription-Schalter des Endpoints an ist. Das Polling läuft in beiden Modi weiter. Ausschalten des Schalters behält diese Auswahl.",
+    invalid_update_mode: "Ungültiger Aktualisierungsmodus.",
+    conversion: "Numerische Umrechnung",
+    conversionNone: "Keine (SPS-Wert)",
+    multiplier: "Multiplikator",
+    linear_scale: "Lineare Skalierung",
+    factor: "Faktor",
+    plc_min: "SPS-Startwert",
+    plc_max: "SPS-Endwert",
+    ha_min: "HA-Startwert",
+    ha_max: "HA-Endwert",
+    conversionHelp:
+      "Gelesene Werte werden umgerechnet, geschriebene umgekehrt. Grenzen und Schrittweite in HA-Einheiten, Totband in SPS-Einheiten. Ganzzahlige Schreibvorgänge runden zum nächsten Wert (bei Gleichstand gerade). Die Skalierung begrenzt Werte nicht auf ihre Endpunkte.",
+    invalid_conversion:
+      "Endliche Werte eingeben: einen Faktor ungleich null und unterschiedliche Endpunkte je Skala.",
+    precision: "Nachkommastellen",
+    precisionHelp:
+      "REAL/LREAL und umgerechnete Werte: 0 bis 10 Nachkommastellen. Leer lassen für keine Rundung. Gilt für den Home-Assistant-Wert inklusive Verlauf und Automationen; Schreibvorgänge zur SPS bleiben unverändert.",
+    invalid_precision:
+      "Eine ganze Zahl von 0 bis 10 für einen REAL/LREAL- oder umgerechneten Zahlenknoten eingeben.",
+    invalid_deadband:
+      "Ein endliches Totband von 0 oder mehr verwenden (ganzzahlig bei ganzzahligen Knotentypen).",
+    deadband: "Totband",
+    deadbandHelp:
+      "Nur Auto-Subscription: Push-Updates mit kleinerer absoluter Änderung unterdrücken (z. B. 0,01 blendet Gleitkomma-Rauschen ab der 2. Nachkommastelle aus). 0 deaktiviert den Filter. Polling ist nicht betroffen und liest immer den genauen Wert.",
+    unit: "Maßeinheit",
+    unitHelp:
+      "Eine Standard-Einheit von Home Assistant, „Keine“ oder „Eigene…“ wählen und selbst eintippen (z. B. Stück/min); sie steht neben dem Wert.",
+    filterUnits: "Einheiten suchen…",
+    moreInfo: "Details",
+    noMatches: "Keine Treffer",
+    availabilityShort: "Letzten Wert behalten, solange die SPS offline ist.",
+    invertShort: "Ein und Aus in Home Assistant tauschen.",
+    identitySection: "Identität",
+    sourceSection: "OPC-UA-Knoten",
+    valueSection: "Wert und Anzeige",
+    updatesSection: "Aktualisierung und Verfügbarkeit",
+    unitCustom: "Eigene…",
+    unitCustomLabel: "Eigene Einheit",
+    unitBadge: "Einheit",
+    invalid_unit: "Eine Maßeinheit mit höchstens 50 Zeichen eingeben.",
+    remove: "Entfernen",
+    removing: "Entfernen…",
+    removeTitle: "Manuellen Knoten entfernen",
+    removeHelp:
+      "Die manuelle Konfiguration und ihre Home-Assistant-Entitäten werden gelöscht. Automationen, die sie nutzen, müssen angepasst werden. Der SPS-Knoten bleibt unverändert. Findet die Erkennung ihn wieder, bleibt er ausgeschlossen.",
+    removed: "Manueller Knoten entfernt.",
+    removedReloading:
+      "Manueller Knoten entfernt. Der Endpoint wird neu geladen.",
+    not_manual_node:
+      "Hier können nur manuell angelegte Knoten entfernt werden.",
+    orphan: "Knoten fehlt",
+    deleteEntity: "Entität löschen",
+    deleting: "Löschen…",
+    deleteTitle: "Verwaiste Entität löschen",
+    deleteHelp:
+      "Die SPS stellt diesen Knoten nach vollständiger Erkennung nicht mehr bereit, oder die Entität blieb nach einem Kategoriewechsel zurück. Die Home-Assistant-Entität wird gelöscht. Automationen und Dashboards, die sie nutzen, müssen angepasst werden. Die SPS bleibt unverändert. Einstellungen, die eine Ersatz-Entität braucht, bleiben erhalten; Einstellungen eines bestätigt fehlenden Knotens werden ggf. ebenfalls entfernt, wenn keine andere Entität sie nutzt.",
+    deleted: "Verwaiste Entität gelöscht.",
+    deleteAll: "Alle fehlenden löschen",
+    deleteAllTitle: "Alle verwaisten Entitäten löschen",
+    deleteAllHelp:
+      "Jede Entität, deren Knoten die SPS nach vollständiger Erkennung nicht mehr bereitstellt, und jede nach einem Kategoriewechsel zurückgebliebene Entität wird gelöscht. Automationen und Dashboards, die sie nutzen, müssen angepasst werden. Die SPS bleibt unverändert. Einstellungen, die Ersatz-Entitäten brauchen, bleiben erhalten; Einstellungen bestätigt fehlender Knoten werden ggf. ebenfalls entfernt, wenn keine andere Entität sie nutzt.",
+    deletedAll: "Verwaiste Entitäten gelöscht.",
+    reclassifyBooleans: "Als binary_sensor einstufen",
+    reclassifyBooleansTitle: "Bestehende Boolean-Sensoren neu einstufen",
+    reclassifyBooleansHelp:
+      "Schreibgeschützte Boolean-Knoten auf Automatisch können statt sensor zu binary_sensor werden und zeigen dann An/Aus statt True/False – nur die unten ausgewählten werden geändert. Nur Knoten, die noch auf Automatisch stehen, kommen infrage – eine ausdrückliche Wahl, auch sensor, wird nie überschrieben. Jede alte sensor-Entität bleibt danach als verwaiste Entität zurück, bereit für „Alle fehlenden löschen“.",
+    reclassifySelectAll: "Alle auswählen",
+    reclassifyConvert: "Ausgewählte umwandeln",
+    reclassifying: "Umwandeln…",
+    reclassified: "Boolean-Sensoren neu eingestuft.",
+    groupModeLabel: "Gruppierung",
+    groupByCategory: "Nach Kategorie",
+    groupByArray: "Nach Array-Element",
+    groupByPath: "Nach Gruppe (GVL / Struct)",
+    groupTipCategory: "Abschnitte nach Typ: Sensoren, Schalter, Zahlen…",
+    groupTipArray: "Felder nach Array-Element gruppiert",
+    groupTipPath: "Felder nach SPS-Pfad gruppiert (GVL / Struct)",
+    renameFields: "Doppelte Felder umbenennen",
+    renameFieldsTitle: "Felder mit gleichen Namen unterscheiden",
+    renameFieldsHelp:
+      "Mehrere SPS-Felder haben denselben Namen: Jedes Feld eines Array-of-Struct-Elements (z. B. „Alarms[10].xActive“) wiederholt sich über die Elemente, und ein Feld wie „xEnable“ wiederholt sich über Struct-Instanzen (z. B. „...Pump_HK_North.xEnable“ und „...Pump_HK_South.xEnable“). Umbenennen der unten ausgewählten ergänzt den Array-Index oder das übergeordnete Struct im Namen. Nur die Namen der ausgewählten Entitäten ändern sich; ein manuell angepasster Name wird nie überschrieben.",
+    renameConfirm: "Ausgewählte umbenennen",
+    renaming: "Umbenennen…",
+    renamed: "Felder umbenannt.",
+    not_orphan:
+      "Diese Entität ist nicht mehr verwaist oder lässt sich gerade nicht prüfen (Verbindung weg oder Erkennung unvollständig). Nichts wurde gelöscht.",
+    node_in_use:
+      "Andere Entitäten sind diesem Knoten zugeordnet. Diese vor dem Entfernen neu zuordnen, auch ausgeschlossene.",
+    add: "Entität hinzufügen",
+    verify: "Knoten prüfen",
+    verifying: "Prüfen…",
+    category: "Kategorie",
+    auto: "Automatisch",
+    min: "Minimalwert",
+    max: "Maximalwert",
+    step: "Schrittweite",
+    min_length: "Minimale Länge",
+    max_length: "Maximale Länge",
+    categoryHelp:
+      "Ein Kategoriewechsel kann die Entitäts-ID ändern. Automationen und Dashboards anpassen; Entitäten der vorigen Kategorie bleiben deaktiviert.",
+    excludeHelp:
+      "Der Knoten wird vom zyklischen Lesen ausgeschlossen. Er lässt sich in diesem Panel wieder aktivieren.",
+    limitsHelp:
+      "Grenzen legen fest, welche Werte in Home Assistant einstellbar sind. Für Text die String-Kapazität der SPS verwenden, bis 255 Zeichen.",
+    invalid_limits: "Grenzen passen nicht zur gewählten Kategorie.",
+    invalid_number_limits:
+      "Endliche Werte verwenden, Minimum unter Maximum und eine positive Schrittweite nicht größer als der Bereich.",
+    integer_limits_required:
+      "Dieser Knoten braucht ganzzahlige Grenzen und Schrittweite.",
+    unsafe_integer_limits:
+      "Ganzzahlige Grenzen müssen innerhalb ±9007199254740991 liegen.",
+    invalid_text_limits:
+      "Ganzzahlige Längen von 0 bis 255 verwenden, Minimum nicht größer als Maximum.",
+    manualHelp:
+      "Die vollständige NodeId eingeben, auch für Knoten außerhalb der Erkennung. Die Prüfung liest den Knoten, ohne ihn zu ändern.",
+    invalid_node_id: "Ungültige NodeId. Beispiel: ns=4;i=2",
+    unsupported_node:
+      "Eine skalare Boolean-, Zahl-, String- oder DateTime-Variable wählen.",
+    node_unreadable:
+      "Der Knoten existiert nicht oder ist mit den konfigurierten Zugangsdaten nicht lesbar.",
+    node_already_configured:
+      "Dieser Knoten hat bereits eine Entität. Sie in der Liste oder den Integrationsoptionen bearbeiten.",
+    connection_disabled:
+      "Die Verbindung aktivieren, um den Knoten zu prüfen und hinzuzufügen.",
+    connection_failed: "Endpoint nicht erreichbar. Die Verbindung prüfen.",
+    state: "Zustand",
+    stateUnknown: "Unbekannt",
+    stateUnavailable: "Nicht verfügbar",
+    statePending: "Noch nicht registriert",
+    stateExcluded: "Ausgeschlossen",
+    stateEmpty: "Leerer Text",
+    stateOn: "An",
+    stateOff: "Aus",
+    title: "OPC UA Connect",
+    subtitle: "Entitäten deiner Endpoints konfigurieren",
+    endpoint: "Endpoint",
+    refresh: "Aktualisieren",
+    search: "Name oder NodeId suchen",
+    colName: "Name",
+    colNode: "NodeId",
+    colType: "Typ",
+    colEntity: "Entität",
+    colValue: "Wert",
+    colSettings: "Einstellungen",
+    colArea: "Bereich",
+    shownOf: "{shown} von {total} Entitäten",
+    groupToggle: "Gruppe ein- oder ausblenden",
+    rediscover: "Neu erkennen",
+    rediscovering: "Erkennen…",
+    rediscovered: "SPS-Knoten neu erkannt.",
+    all: "Alle",
+    sensor: "Sensoren",
+    binary_sensor: "Binärsensoren",
+    switch: "Schalter",
+    number: "Zahlen",
+    text: "Text",
+    datetime: "Datum und Uhrzeit",
+    disabled: "Ausgeschlossen",
+    connected: "Verbunden",
+    disconnected: "Getrennt",
+    edit: "Bearbeiten",
+    name: "Name",
+    area: "Bereich",
+    inherit: "Vom Gerät übernehmen",
+    node: "Zugeordnete NodeId",
+    filterNodes: "Erkannte Knoten suchen",
+    deviceClass: "Geräteklasse",
+    none: "Keine",
+    invert: "Boolean-Zustand invertieren",
+    invertHelp: "Bei Schaltern werden auch die Befehle an die SPS invertiert.",
+    save: "Speichern",
+    cancel: "Abbrechen",
+    saving: "Speichern…",
+    loading: "Laden…",
+    manual: "Manuell",
+    empty: "Keine Entität passt zur Suche.",
+    noEndpoints:
+      "Keine Endpoints konfiguriert. Eine Verbindung unter Integrationen hinzufügen.",
+    noNodes:
+      "Keine Entitäten verfügbar. Verbindung und Erkennung in den Integrationsoptionen prüfen.",
+    notLoaded:
+      "Der Endpoint wird neu geladen oder ist nicht geladen. Zum erneuten Versuch aktualisieren.",
+    notReady: "Entität noch nicht registriert oder ausgeschlossen",
+    saved: "Konfiguration gespeichert.",
+    reloading: "Konfiguration gespeichert. Der Endpoint wird neu geladen.",
+    nameHelp: "Leer lassen, um den ursprünglichen Namen zu verwenden.",
+    nodeHelp:
+      "Die Identität der Entität bleibt erhalten. Einen passenden, auf diesem Endpoint erkannten Knoten wählen.",
+    admin: "Dieses Panel erfordert Administratorrechte.",
+    error: "Vorgang fehlgeschlagen. Bitte erneut versuchen.",
+    stale_configuration:
+      "Die Konfiguration hat sich geändert. Abbrechen, die Liste aktualisieren und erneut versuchen.",
+    node_not_found: "Die NodeId ist nicht unter den erkannten Knoten.",
+    incompatible_platform:
+      "Der gewählte Knoten passt nicht zu dieser Kategorie.",
+    area_not_found:
+      "Der Bereich existiert nicht mehr. Die Liste aktualisieren.",
+    invalid_device_class: "Unpassende Geräteklasse.",
+    invalid_inversion: "Invertieren erfordert einen Boolean-Knoten.",
+    entity_not_ready: "Die Entität ist noch nicht konfigurierbar.",
+    endpoint_not_loaded:
+      "Der Endpoint ist nicht geladen. Kurz warten und erneut versuchen.",
+    endpoint_not_found: "Der Endpoint existiert nicht mehr.",
+    invalid_name: "Namen dürfen höchstens 255 Zeichen lang sein.",
+    limits_outside_type:
+      "Die numerischen Grenzen überschreiten den Wertebereich des gewählten Knotens.",
+    info: "Kategorien und Grenzen über Bearbeiten einstellen. Die Verbindungseinstellungen bleiben in den Integrationsoptionen.",
+  },
   en: {
     version: "Integration",
     panelVersion: "Panel",
@@ -250,6 +496,7 @@ const TEXT = {
     lengthBadge: "Characters",
     remappedBadge: "Reassigned NodeId",
     subscriptionBadge: "Subscription configured",
+    areaBadge: "Area",
     valueLabel: "Value",
     textLabel: "Text",
     dateLabel: "Date and time",
@@ -474,6 +721,7 @@ const TEXT = {
     info: "Configure categories and limits with Edit. Connection settings remain in the integration options.",
   },
 };
+const LANGS = ["it", "de"];
 const GROUPINGS = {
   array: {
     key: "array_group",
@@ -683,6 +931,34 @@ nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-col
 .manualTag,.orphanTag{padding:1px 7px;font-size:11px}
 .pageHint{margin-top:12px}
 @media(max-width:650px){header{padding:12px}.content{padding:12px 12px 32px}.toolbar select,.toolbar input[type=search]{flex:1 1 100%}.endpointActions{width:100%}.endpointActions button{flex:1;min-height:44px}.tableWrap{min-height:320px}}
+.headerText>p{margin-top:0}.titleRow{gap:8px}.badge{padding:3px 8px}
+.endpointMeta{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 24px;margin-top:10px}
+.endpointSwitches{gap:8px 24px}
+.endpointIdentity{flex:0 1 auto;min-width:0;flex-wrap:wrap}.endpointAddress{min-width:0;overflow-wrap:anywhere}
+.endpointSwitches .endpointSubscription,.endpointSubscription{flex:0 0 auto;padding:0;border:0;margin:0}
+.endpointSubscription .toggle{position:relative;min-height:32px;padding:0;font-weight:500;font-size:13px;cursor:pointer}
+.endpointSubscription .toggle[data-tip]::after{left:0;right:auto;max-width:min(340px,calc(100vw - 64px))}
+.endpointFeedback{flex:1 1 100%}.endpointFeedback:not(:has(:not(:empty))){display:none}
+.endpointSubscription input[role="switch"]::after{display:none}
+input[type=checkbox][role=switch]{appearance:none;-webkit-appearance:none;position:relative;padding:0;border:0;min-height:0;box-shadow:none;flex:0 0 36px;width:36px;min-width:36px;height:14px;margin:0 6px;border-radius:7px;background:var(--switch-unchecked-track-color,#a0a8b4);cursor:pointer;transition:background var(--speed,.15s)}
+input[type=checkbox][role=switch]::before{content:"";position:absolute;top:-3px;left:-6px;transform:none;width:20px;height:20px;border-radius:50%;background:var(--switch-unchecked-button-color,#fafafa);box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform var(--speed,.15s),background var(--speed,.15s)}
+input[type=checkbox][role=switch]:checked{background:color-mix(in srgb,var(--switch-checked-color,var(--primary-color,#008fac)) 50%,transparent)}
+input[type=checkbox][role=switch]:checked::before{transform:translateX(28px);background:var(--switch-checked-color,var(--primary-color,#008fac))}
+input[type=checkbox][role=switch]:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:4px}
+input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
+.navRow{margin-top:10px;padding-top:10px}
+.entityTable th,.entityTable td{padding:4px 10px}
+.entityTable thead th{padding-top:7px;padding-bottom:7px}
+.groupToggle{padding:4px 12px;font-size:12px}
+.nameCell h3{font-size:13px;line-height:1.35;max-width:420px;cursor:default}
+.entityRow .stateValue{font-size:13px;line-height:1.35}
+.entityRow .entityState .valueIcon{width:16px;height:16px;flex-basis:16px}
+.entityRow .valueIcon svg{width:15px;height:15px}
+.actionsCell .actions button{min-height:24px;padding:2px 9px}
+.nodeTip{position:fixed;top:0;left:0;z-index:30;display:flex;flex-direction:column;gap:2px;max-width:min(560px,calc(100vw - 16px));padding:6px 10px;border-radius:7px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease}
+.nodeTip.visible{opacity:1;visibility:visible}
+.nodeTipId{font-family:ui-monospace,monospace;font-size:11px;opacity:.85;overflow-wrap:anywhere}
+.editorNodeId{margin:4px 0 0;font-family:ui-monospace,monospace;font-size:11px;overflow-wrap:anywhere;user-select:text}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
@@ -699,6 +975,22 @@ class OpcuaNodePanel extends HTMLElement {
     this._collapsed = new Set();
     this._subscriptionPending = new Set();
     this._subscriptionErrors = new Set();
+    // One floating hint for the full name and NodeId of a row. It waits until
+    // the pointer rests on a name, so moving across the table stays calm, and
+    // it floats above the scrolling table instead of being cut off by it.
+    this._tip = element("div", "", { class: "nodeTip", role: "tooltip" });
+    this.shadowRoot.addEventListener("pointerover", (event) => {
+      const target = event.target.closest?.("[data-node-tip]");
+      if (!target || target === this._tipTarget) return;
+      this._hideTip();
+      this._tipTarget = target;
+      this._tipTimer = setTimeout(() => this._showTip(target), 700);
+    });
+    this.shadowRoot.addEventListener("pointerout", (event) => {
+      if (this._tipTarget && !this._tipTarget.contains(event.relatedTarget))
+        this._hideTip();
+    });
+    this.shadowRoot.addEventListener("scroll", () => this._hideTip(), true);
     try {
       const storedGroup = localStorage.getItem("ha-opcua-group-mode");
       if (storedGroup === "category" || storedGroup in GROUPINGS)
@@ -725,7 +1017,9 @@ class OpcuaNodePanel extends HTMLElement {
   }
   _t(key) {
     return (
-      TEXT[this._hass?.language?.startsWith("it") ? "it" : "en"][key] || key
+      TEXT[LANGS.find((l) => this._hass?.language?.startsWith(l)) || "en"][
+        key
+      ] || key
     );
   }
   _start() {
@@ -771,10 +1065,31 @@ class OpcuaNodePanel extends HTMLElement {
       this._render();
     }
   }
+  _showTip(target) {
+    if (!target.isConnected) return;
+    const name = target.textContent;
+    const nodeId = target.dataset.nodeTip;
+    this._tip.replaceChildren(
+      element("strong", name),
+      element("span", nodeId, { class: "nodeTipId" }),
+    );
+    this._tip.classList.add("visible");
+    const box = target.getBoundingClientRect();
+    const tip = this._tip.getBoundingClientRect();
+    const below = box.bottom + 6 + tip.height <= window.innerHeight;
+    this._tip.style.top = `${below ? box.bottom + 6 : box.top - 6 - tip.height}px`;
+    this._tip.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - tip.width - 8))}px`;
+  }
+  _hideTip() {
+    clearTimeout(this._tipTimer);
+    this._tipTarget = null;
+    this._tip.classList.remove("visible");
+  }
   _render() {
     if (this._dialog?.open) return;
     const root = this.shadowRoot;
-    root.replaceChildren(element("style", CSS));
+    this._hideTip();
+    root.replaceChildren(element("style", CSS), this._tip);
     const header = element("header");
     const menu = this._button(
       "☰",
@@ -903,7 +1218,12 @@ class OpcuaNodePanel extends HTMLElement {
     const subscriptionControl = element("div", undefined, {
       class: "endpointSubscription",
     });
-    const subscriptionLabel = element("label", undefined, { class: "toggle" });
+    // The help texts are hints on the switch label, shown after a short
+    // rest of the pointer; screen readers still get them as description.
+    const subscriptionLabel = element("label", undefined, {
+      class: "toggle",
+      "data-tip": this._t("endpointSubscriptionHelp"),
+    });
     const subscriptionToggle = element("input", undefined, {
       type: "checkbox",
       role: "switch",
@@ -923,13 +1243,17 @@ class OpcuaNodePanel extends HTMLElement {
       element("p", this._t("endpointSubscriptionHelp"), {
         class: "hint",
         id: "subscription-help",
+        hidden: "",
       }),
     );
     switches.append(subscriptionControl);
     const pathControl = element("div", undefined, {
       class: "endpointSubscription",
     });
-    const pathLabel = element("label", undefined, { class: "toggle" });
+    const pathLabel = element("label", undefined, {
+      class: "toggle",
+      "data-tip": this._t("endpointNamePathHelp"),
+    });
     const pathToggle = element("input", undefined, {
       type: "checkbox",
       role: "switch",
@@ -947,6 +1271,7 @@ class OpcuaNodePanel extends HTMLElement {
       element("p", this._t("endpointNamePathHelp"), {
         class: "hint",
         id: "name-path-help",
+        hidden: "",
       }),
     );
     switches.append(pathControl);
@@ -1077,12 +1402,10 @@ class OpcuaNodePanel extends HTMLElement {
     const head = element("tr");
     for (const key of [
       "colName",
-      "colNode",
       "colType",
       "colEntity",
       "colValue",
       "colSettings",
-      "colArea",
     ])
       head.append(element("th", this._t(key), { scope: "col" }));
     head.append(
@@ -1194,6 +1517,12 @@ class OpcuaNodePanel extends HTMLElement {
       if (min !== 0 || max !== 255)
         add("length", `${this._t("lengthBadge")}: ${min} – ${max}`);
     }
+    // An own area only matters when it differs from the device; the
+    // default (inherit) is not worth a column of its own.
+    const area = row.area_id
+      ? this._data.areas.find((a) => a.id === row.area_id)?.name
+      : "";
+    if (area) add("area", `${this._t("areaBadge")}: ${area}`);
     if (row.key && row.node_id && row.node_id !== row.key)
       add("node_id", this._t("remappedBadge"), `${row.key} → ${row.node_id}`);
     return badges.childElementCount ? badges : null;
@@ -1239,8 +1568,11 @@ class OpcuaNodePanel extends HTMLElement {
     const name = row.name || row.node_id;
     const nameCell = element("td", undefined, { class: "nameCell" });
     const nameLine = element("div", undefined, { class: "nameLine" });
-    // A long name or address is cut to one line; the tooltip keeps it readable.
-    nameLine.append(element("h3", name, { title: name }));
+    // A long name is cut to one line. Resting the pointer on it shows the
+    // full name and the NodeId after a short delay.
+    nameLine.append(
+      element("h3", name, { "data-node-tip": row.node_id || "" }),
+    );
     if (row.orphan)
       nameLine.append(
         element("span", this._t("orphan"), { class: "orphanTag" }),
@@ -1250,10 +1582,6 @@ class OpcuaNodePanel extends HTMLElement {
         element("span", this._t("manual"), { class: "manualTag" }),
       );
     nameCell.append(nameLine);
-    const addressCell = element("td", undefined, { class: "addressCell" });
-    addressCell.append(
-      element("div", row.node_id, { class: "address", title: row.node_id }),
-    );
     // An orphan row may have no cached type (node gone, never "always available").
     const typeCell = element("td", row.variant_type || "", {
       class: "muted typeCell",
@@ -1266,10 +1594,6 @@ class OpcuaNodePanel extends HTMLElement {
     const settingsCell = element("td", undefined, { class: "settingsCell" });
     const customizations = this._customizations(row);
     if (customizations) settingsCell.append(customizations);
-    const area =
-      this._data.areas.find((a) => a.id === row.area_id)?.name ||
-      this._t("inherit");
-    const areaCell = element("td", area, { class: "muted meta areaCell" });
     const actionsCell = element("td", undefined, { class: "actionsCell" });
     const actions = element("div", undefined, { class: "actions" });
     let open = null;
@@ -1292,12 +1616,10 @@ class OpcuaNodePanel extends HTMLElement {
     actionsCell.append(actions);
     tr.append(
       nameCell,
-      addressCell,
       typeCell,
       platformCell,
       valueCell,
       settingsCell,
-      areaCell,
       actionsCell,
     );
     // Like the other device panels a click anywhere on the row opens the
@@ -1328,7 +1650,7 @@ class OpcuaNodePanel extends HTMLElement {
       "data-platform": extra.platform || "grouped",
     });
     const headRow = element("tr", undefined, { class: "groupRow" });
-    const cell = element("th", undefined, { colspan: "8", scope: "rowgroup" });
+    const cell = element("th", undefined, { colspan: "6", scope: "rowgroup" });
     const toggle = element("button", `${label} · ${items.length}`, {
       type: "button",
       class: `groupToggle${extra.titleClass ? ` ${extra.titleClass}` : ""}`,
@@ -2282,6 +2604,14 @@ class OpcuaNodePanel extends HTMLElement {
       this._field("name", name),
       element("p", this._t("nameHelp"), { class: "hint" }),
     );
+    // The NodeId behind the entity, right below its name and selectable for
+    // copying; a manual entity picks its node further down instead.
+    if (!manual && row.node_id)
+      identitySection.append(
+        element("p", `${this._t("colNode")}: ${row.node_id}`, {
+          class: "hint editorNodeId",
+        }),
+      );
     const area = element("select", undefined, { name: "area" });
     area.append(element("option", this._t("inherit"), { value: "" }));
     for (const item of this._data.areas)

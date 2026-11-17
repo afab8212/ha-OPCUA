@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.10.0",
+    "Pannello 1.11.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1037,7 +1037,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   assert.equal(
     await page
       .locator("tr.entityRow")
-      .filter({ hasText: "astMeldungen" })
+      .filter({ has: page.locator(`[data-node-tip*="astMeldungen"]`) })
       .count(),
     3,
   );
@@ -1081,7 +1081,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   assert.equal(
     await page
       .locator("tr.entityRow")
-      .filter({ hasText: "astMeldungen" })
+      .filter({ has: page.locator(`[data-node-tip*="astMeldungen"]`) })
       .count(),
     2,
   );
@@ -2219,7 +2219,7 @@ for (const [width, dark] of [
     const edges = await page
       .locator("tr.entityRow")
       .evaluateAll((rows) =>
-        [".nameCell", ".addressCell", ".valueCell", ".settingsCell"].map(
+        [".nameCell", ".typeCell", ".valueCell", ".settingsCell"].map(
           (cell) =>
             new Set(
               rows.map((row) =>
@@ -2575,7 +2575,12 @@ for (const width of [1280, 390]) {
       };
       await document.querySelector("opcua-node-panel")._load();
     });
-    assert.equal(await page.locator(".customizations").count(), 0);
+    assert.equal(
+      await page
+        .locator('.customizationBadge:not([data-setting="area"])')
+        .count(),
+      0,
+    );
     await page.close();
   });
 }
@@ -2650,3 +2655,52 @@ for (const width of [1280, 390]) {
     await page.close();
   });
 }
+
+test("German texts, delayed NodeId hint on the name and NodeId in the editor", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(async () => {
+    window.testHass.language = "de";
+    const panel = document.querySelector("opcua-node-panel");
+    panel.hass = { ...window.testHass };
+    await panel._load();
+  });
+  assert.equal(
+    await page
+      .getByRole("searchbox", { name: "Name oder NodeId suchen", exact: true })
+      .count(),
+    1,
+  );
+  assert.equal(
+    await page.getByRole("columnheader", { name: "Einstellungen" }).count(),
+    1,
+  );
+  // No NodeId or area column any more; the help of a switch is a hint.
+  assert.equal(
+    await page.locator("th").filter({ hasText: "NodeId" }).count(),
+    0,
+  );
+  assert.equal(await page.locator("#subscription-help").isVisible(), false);
+  const row = page.locator("tr.entityRow").filter({ hasText: "Marcia" });
+  const name = row.locator(".nameCell h3");
+  const tip = page.locator(".nodeTip");
+  await name.hover();
+  await page.waitForTimeout(200);
+  assert.equal(
+    await tip.isVisible(),
+    false,
+    "hint waits for a resting pointer",
+  );
+  await page.waitForTimeout(900);
+  assert.equal(await tip.isVisible(), true);
+  assert.match(await tip.textContent(), /ns=4;i=1/);
+  await page.mouse.move(5, 5);
+  assert.equal(await tip.isVisible(), false);
+  await row.getByRole("button", { name: "Bearbeiten", exact: true }).click();
+  const dialog = page.locator("dialog[open]");
+  assert.match(
+    await dialog.locator(".editorNodeId").textContent(),
+    /NodeId: ns=4;i=1/,
+  );
+  await dialog.getByRole("button", { name: "Abbrechen", exact: true }).click();
+  await page.close();
+});
