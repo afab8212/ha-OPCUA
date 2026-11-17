@@ -200,6 +200,10 @@ async def test_panel_registration_is_once_and_versioned(hass):
     assert register.call_args.kwargs["module_url"] == (
         f"/ha-opcua-panel/panel.js?v=1.4.0&panel={digest}"
     )
+    # The panel reloads a tab that still runs an older build.
+    assert register.call_args.kwargs["config"] == {"build": digest}
+    static = hass.http.async_register_static_paths.call_args.args[0][0]
+    assert static.cache_headers is False
     assert commands.call_count == 11
     assert panel_snapshot(hass)["version"] == "1.4.0"
 

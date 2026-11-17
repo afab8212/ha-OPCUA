@@ -83,7 +83,14 @@ async def async_setup_panel(hass):
     )
     panel_hash = hashlib.sha256(panel_source).hexdigest()[:16]
     await hass.http.async_register_static_paths(
-        [StaticPathConfig("/ha-opcua-panel", str(Path(__file__).parent / "www"), True)]
+        [
+            # No long-lived browser cache: the hash in module_url already
+            # changes with every panel update, and a stale copy must never
+            # survive a page reload.
+            StaticPathConfig(
+                "/ha-opcua-panel", str(Path(__file__).parent / "www"), False
+            )
+        ]
     )
     await panel_custom.async_register_panel(
         hass,
@@ -92,6 +99,9 @@ async def async_setup_panel(hass):
         sidebar_title="OPC UA Connect",
         sidebar_icon="mdi:lan-connect",
         module_url=f"/ha-opcua-panel/panel.js?v={version}&panel={panel_hash}",
+        # The panel compares this with the build it was loaded as and reloads
+        # the page once when a browser tab still runs an older panel.
+        config={"build": panel_hash},
         require_admin=True,
     )
     websocket_api.async_register_command(hass, ws_snapshot)

@@ -1,6 +1,24 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.13.2";
+const PANEL_VERSION = "1.14.0";
+// Build shown next to the version: date and running number of that day
+// (YYYYMMDD.N). Bump with every change to this file.
+const PANEL_BUILD = "20261117.1";
+// The build this code was loaded as: the hash Home Assistant put into the
+// module URL. Taken from the newest load of this file, so a tab that already
+// ran an older panel still reports the build it actually executes.
+const LOADED_BUILD = (() => {
+  try {
+    const loads = performance
+      .getEntriesByType("resource")
+      .filter((entry) => entry.name.includes("/ha-opcua-panel/panel.js"));
+    return loads.length
+      ? new URL(loads.at(-1).name).searchParams.get("panel")
+      : null;
+  } catch {
+    return null;
+  }
+})();
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -1080,7 +1098,7 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 .entityRow .valueIcon svg{width:15px;height:15px}
 .actionsCell .actions button{min-height:24px;padding:2px 9px}
 .entityTable thead th{position:sticky;overflow:visible}
-.entityTable thead th.sortable{cursor:pointer;user-select:none}.entityTable thead th.sortable:hover,.entityTable thead th[aria-sort=ascending],.entityTable thead th[aria-sort=descending]{color:var(--primary-text-color,#243346)}.sortArrow{display:inline-block;width:1em;margin-left:4px;color:var(--primary-color,#008fac)}.endpointActions button{position:relative}.endpointActions [data-tip]::after{left:0;right:auto;max-width:min(300px,calc(100vw - 64px))}
+.entityTable thead th.sortable{cursor:pointer;user-select:none}.entityTable thead th.sortable:hover,.entityTable thead th[aria-sort=ascending],.entityTable thead th[aria-sort=descending]{color:var(--primary-text-color,#243346)}.sortArrow{display:inline-block;width:1em;margin-left:4px;color:var(--primary-color,#008fac)}.endpointActions button{position:relative}.endpointActions [data-tip]::after{left:0;right:auto;max-width:min(300px,calc(100vw - 64px))}.endpointActions [data-tip]:not(:hover):not(:focus-visible)::after{display:none}@media(hover:hover){.endpointActions [data-tip]:hover::after{animation:tipIn .12s ease .8s both}}.endpointActions [data-tip]:focus-visible::after{animation:tipIn .12s ease .3s both}@keyframes tipIn{from{opacity:0}to{opacity:1}}
 .colResizer{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;touch-action:none;user-select:none}
 .colResizer:hover{background:color-mix(in srgb,var(--secondary-text-color,#637487) 25%,transparent)}
 .entityRow .stateValue{font-variant-numeric:tabular-nums}
@@ -1148,6 +1166,24 @@ class OpcuaNodePanel extends HTMLElement {
     } catch {
       /* private browsing / blocked storage: keep the default */
     }
+  }
+  set panel(value) {
+    this._panel = value;
+    // A tab left open across an update keeps running the old panel code: a
+    // custom element cannot be replaced without loading the page again. Do
+    // that once per new build; never loop if the reload did not help.
+    const build = value?.config?.build;
+    if (!build || !LOADED_BUILD || build === LOADED_BUILD) return;
+    try {
+      if (sessionStorage.getItem("ha-opcua-panel-reload") === build) return;
+      sessionStorage.setItem("ha-opcua-panel-reload", build);
+    } catch {
+      return; // blocked storage: no loop protection, so no automatic reload
+    }
+    location.reload();
+  }
+  get panel() {
+    return this._panel;
   }
   set hass(value) {
     this._hass = value;
@@ -1274,9 +1310,11 @@ class OpcuaNodePanel extends HTMLElement {
       );
     }
     titleRow.append(
-      element("span", `${this._t("panelVersion")} ${PANEL_VERSION}`, {
-        class: "badge version panelVersion",
-      }),
+      element(
+        "span",
+        `${this._t("panelVersion")} ${PANEL_VERSION} · Build ${PANEL_BUILD}`,
+        { class: "badge version panelVersion" },
+      ),
     );
     title.append(titleRow, element("p", this._t("subtitle")));
     header.append(
