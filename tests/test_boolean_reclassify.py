@@ -130,7 +130,7 @@ async def test_only_auto_readonly_boolean_nodes_are_reclassified(hass, entry):
     await c.async_shutdown()
 
 
-async def test_reclassify_preserves_custom_name_and_area_and_disables_old_entity(
+async def test_reclassify_preserves_custom_name_and_area_and_removes_old_entity(
     hass, entry
 ):
     """Mirrors a manual category change: rename/area travel, old entity is disabled.
@@ -166,8 +166,8 @@ async def test_reclassify_preserves_custom_name_and_area_and_disables_old_entity
     assert new_entity.name == "Front Door Alarm"
     assert new_entity.area_id == area.id
 
-    old_entity = registry.async_get(old_sensor.entity_id)
-    assert old_entity.disabled_by == er.RegistryEntryDisabler.INTEGRATION
+    # The replaced sensor can never become active again: removed.
+    assert registry.async_get(old_sensor.entity_id) is None
 
     await c.async_shutdown()
 

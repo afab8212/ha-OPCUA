@@ -216,10 +216,8 @@ async def test_panel_category_exclusion_and_restore_preserve_registry_metadata(
     new_id = registry.async_get_entity_id("binary_sensor", DOMAIN, unique_id)
     binary = registry.async_get(new_id)
     assert binary.name == "Pump" and binary.area_id == msg["area_id"]
-    assert (
-        registry.async_get(registered.entity_id).disabled_by
-        == er.RegistryEntryDisabler.INTEGRATION
-    )
+    # The previous category's entity is replaced, not kept disabled.
+    assert registry.async_get(registered.entity_id) is None
     assert new_id != registered.entity_id
     # Exclude and restore through the same endpoint without discarding identity.
     for platform in ("disabled", "switch"):

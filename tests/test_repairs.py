@@ -75,6 +75,14 @@ async def save(hass, entry, platform, **changes):
     )
 
 
+def change_category(hass, entry, platform):
+    """Save a new category whose entity is not registered yet (reload pending)."""
+    options = deepcopy(dict(entry.options))
+    options.setdefault(CONF_NODE_SETTINGS, {})[KEY] = {"platform": platform}
+    hass.config_entries.async_update_entry(entry, options=options)
+    async_sync_orphan_repairs(hass, entry)
+
+
 def issue(hass, entity):
     return ir.async_get(hass).async_get_issue(DOMAIN, f"{ISSUE_PREFIX}{entity.id}")
 
@@ -91,7 +99,7 @@ async def start_flow(hass, entity):
 
 async def test_panel_change_repair_confirmation_removes_only_old_entity(hass, entry):
     c, registry, old = await prepare(hass, entry)
-    new = (await save(hass, entry, "binary_sensor"))["entity_id"]
+    change_category(hass, entry, "binary_sensor")
     assert issue(hass, old).is_fixable
     for language in ("en", "it"):
         translations = await async_get_translations(
@@ -104,7 +112,6 @@ async def test_panel_change_repair_confirmation_removes_only_old_entity(hass, en
             **issue(hass, old).translation_placeholders
         )
     assert registry.async_get(old.entity_id) is not None
-    assert registry.async_get(new) is not None
     options = deepcopy(dict(entry.options))
     manager, flow_id = await start_flow(hass, old)
     # Renaming after opening the dialog cannot defeat immutable identity checks.
@@ -116,7 +123,6 @@ async def test_panel_change_repair_confirmation_removes_only_old_entity(hass, en
     result = await manager.async_configure(flow_id, {})
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert registry.async_get(renamed.entity_id) is None
-    assert registry.async_get(new) is not None
     assert dict(entry.options) == options
     assert issue(hass, old) is None
     c.hub.set_value.assert_not_awaited()
@@ -125,7 +131,7 @@ async def test_panel_change_repair_confirmation_removes_only_old_entity(hass, en
 
 async def test_cancel_and_revert_while_dialog_open_do_not_delete(hass, entry):
     c, registry, old = await prepare(hass, entry)
-    await save(hass, entry, "binary_sensor")
+    change_category(hass, entry, "binary_sensor")
     manager, flow_id = await start_flow(hass, old)
     manager.async_abort(flow_id)
     assert registry.async_get(old.entity_id) and issue(hass, old)
@@ -141,7 +147,7 @@ async def test_cancel_and_revert_while_dialog_open_do_not_delete(hass, entry):
 
 async def test_external_deletion_and_reused_entity_id_are_safe(hass, entry):
     c, registry, old = await prepare(hass, entry)
-    await save(hass, entry, "binary_sensor")
+    change_category(hass, entry, "binary_sensor")
     manager, flow_id = await start_flow(hass, old)
     registry.async_remove(old.entity_id)
     other = registry.async_get_or_create(
@@ -268,9 +274,32 @@ async def test_metadata_exclusion_connection_controls_and_endpoint_removal(hass,
             "switch", DOMAIN, f"{entry.entry_id}:{key}", config_entry=entry
         )
         assert not is_orphan(hass, entry, control)
-    await save(hass, entry, "binary_sensor")
+    change_category(hass, entry, "binary_sensor")
     assert issue(hass, old)
     await async_remove_entry(hass, entry)
     assert issue(hass, old) is None
     assert registry.async_get(old.entity_id) is not None
+    await c.async_shutdown()
+
+
+async def test_category_change_removes_replaced_entity_without_repair(hass, entry):
+    c, registry, old = await prepare(hass, entry)
+    new = (await save(hass, entry, "binary_sensor"))["entity_id"]
+    await hass.async_block_till_done()
+    assert registry.async_get(old.entity_id) is None
+    assert registry.async_get(new).disabled_by is None
+    assert issue(hass, old) is None
+    # The node settings describe the replacement and stay.
+    assert entry.options[CONF_NODE_SETTINGS][KEY]["platform"] == "binary_sensor"
+    c.hub.set_value.assert_not_awaited()
+    await c.async_shutdown()
+
+
+async def test_excluding_a_node_keeps_its_entity_disabled(hass, entry):
+    c, registry, old = await prepare(hass, entry)
+    await save(hass, entry, "disabled")
+    await hass.async_block_till_done()
+    kept = registry.async_get(old.entity_id)
+    assert kept.disabled_by == er.RegistryEntryDisabler.INTEGRATION
+    assert issue(hass, old) is None
     await c.async_shutdown()

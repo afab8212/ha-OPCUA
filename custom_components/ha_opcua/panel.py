@@ -342,8 +342,9 @@ def _migrate_entity_registry(
 ):
     """Move a node's registered entity to `platform`, preserving name/area.
 
-    Any other related entry (same unique_id, different platform) is left
-    disabled instead of dangling, matching a manual category change. Shared
+    Any other related entry (same unique_id, different platform) is
+    disabled; the orphan sync then deletes it once the selected entry exists
+    (an excluded node keeps it disabled for reactivation). Shared
     by a panel-driven edit and the bulk Boolean reclassification so both go
     through identical registry handling.
     """
@@ -763,8 +764,8 @@ async def async_reclassify_boolean_sensors(hass, msg):
 
     The old sensor's custom name and area, if any, are carried over to the
     new binary_sensor (same registry handling a manual category change
-    uses), and the old entity is left disabled instead of dangling enabled
-    - a normal category change leaves it exactly that way too.
+    uses). The old entity is first disabled, then deleted by the orphan
+    sync once the new entity is registered - like a normal category change.
     """
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if entry is None or entry.domain != DOMAIN:

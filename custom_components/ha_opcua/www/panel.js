@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.13.0";
+const PANEL_VERSION = "1.13.1";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -134,7 +134,7 @@ const TEXT = {
     min_length: "Lunghezza minima",
     max_length: "Lunghezza massima",
     categoryHelp:
-      "Cambiare categoria può cambiare l’ID dell’entità. Aggiorna automazioni e dashboard; le entità della categoria precedente resteranno disabilitate.",
+      "Cambiare categoria può cambiare l’ID dell’entità. Aggiorna automazioni e dashboard; l’entità della categoria precedente viene eliminata.",
     excludeHelp:
       "Il nodo sarà escluso dalla lettura periodica. Potrai riattivarlo da questo pannello.",
     limitsHelp:
@@ -404,7 +404,7 @@ const TEXT = {
     min_length: "Minimale Länge",
     max_length: "Maximale Länge",
     categoryHelp:
-      "Ein Kategoriewechsel kann die Entitäts-ID ändern. Automationen und Dashboards anpassen; Entitäten der vorigen Kategorie bleiben deaktiviert.",
+      "Ein Kategoriewechsel kann die Entitäts-ID ändern. Automationen und Dashboards anpassen; die Entität der vorigen Kategorie wird gelöscht.",
     excludeHelp:
       "Der Knoten wird vom zyklischen Lesen ausgeschlossen. Er lässt sich in diesem Panel wieder aktivieren.",
     limitsHelp:
@@ -672,7 +672,7 @@ const TEXT = {
     min_length: "Minimum length",
     max_length: "Maximum length",
     categoryHelp:
-      "Changing category may change the entity ID. Update automations and dashboards; entities from the previous category remain disabled.",
+      "Changing category may change the entity ID. Update automations and dashboards; the entity of the previous category is deleted.",
     excludeHelp:
       "The node will be excluded from periodic reads. You can enable it again from this panel.",
     limitsHelp:

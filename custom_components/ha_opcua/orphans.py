@@ -190,11 +190,33 @@ def async_remove_orphan(hass, entry, entity):
 
 @callback
 def async_sync_orphan_repairs(hass, entry):
-    """Reconcile issues by immutable registry ID; never delete entities here."""
+    """Reconcile issues by immutable registry ID.
+
+    The only entity deleted here is the leftover of a category change whose
+    replacement (same node, current category) is registered and not itself
+    an orphan: it can never become active again and only clutters the
+    panel. Its node settings stay, they describe the replacement. A node
+    gone from the PLC is never deleted automatically; it gets a repair.
+    """
     registry = er.async_get(hass)
     wanted = set()
-    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if not is_orphan(hass, entry, entity):
+    entities = er.async_entries_for_config_entry(registry, entry.entry_id)
+    orphans = {
+        entity.entity_id for entity in entities if is_orphan(hass, entry, entity)
+    }
+    for entity in entities:
+        if entity.entity_id not in orphans:
+            continue
+        if any(
+            other.unique_id == entity.unique_id
+            and other.entity_id not in orphans
+            and other.domain in NODE_PLATFORMS
+            for other in entities
+        ):
+            # A removal triggers this sync again (registry event); the inner
+            # pass may already have removed a later entry of this list.
+            if registry.async_get(entity.entity_id) is not None:
+                async_remove_orphan(hass, entry, entity)
             continue
         issue_id = f"{ISSUE_PREFIX}{entity.id}"
         wanted.add(issue_id)
