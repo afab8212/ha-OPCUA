@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.16.0 · Build 20261117.4",
+    "Pannello 1.17.0 · Build 20261117.5",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1182,6 +1182,90 @@ test("view and grouping choices sit together as icons with a calm, delayed hint"
   await page.waitForTimeout(400);
   assert.equal((await hint(pathButton)).opacity, "0");
 });
+
+for (const width of [1920, 1280, 768, 390]) {
+  test(`only the table scrolls and the controls stay compact at ${width}px`, async () => {
+    const page = await pageFor(width);
+    await page.evaluate(() => {
+      // Like Home Assistant: the panel sits in a wrapper of automatic
+      // height, not in a full-height page.
+      const panel = document.querySelector("opcua-node-panel");
+      const wrapper = document.createElement("div");
+      panel.before(wrapper);
+      wrapper.append(panel);
+      document.body.style.height = "auto";
+      const endpoint = window.fixture.endpoints[0];
+      for (let i = 0; i < 80; i++)
+        endpoint.rows.push({
+          key: `many${i}`,
+          node_id: `many${i}`,
+          name: `Valore ${i}`,
+          entity_id: `sensor.many${i}`,
+          platform: "sensor",
+          variant_type: "Float",
+          reclassifiable: false,
+        });
+      document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+    });
+    await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+    const content = page.locator(".content");
+    const table = page.locator(".tableWrap");
+    const toolbarTop = () =>
+      page
+        .locator(".endpointPanel")
+        .evaluate((node) => node.getBoundingClientRect().top);
+    const height = (name) =>
+      page
+        .getByRole("button", { name, exact: true })
+        .evaluate((node) => node.getBoundingClientRect().height);
+    const before = await toolbarTop();
+    if (width > 650) {
+      // The page itself does not scroll; the table does, below a fixed toolbar.
+      assert.equal(
+        await content.evaluate((el) => el.scrollHeight > el.clientHeight + 1),
+        false,
+        "page scrolls",
+      );
+      await table.evaluate((el) => (el.scrollTop = 600));
+      assert.ok((await table.evaluate((el) => el.scrollTop)) > 0);
+      assert.equal(await toolbarTop(), before, "toolbar moved");
+      // The table fills the window down to its bottom edge.
+      const bottom = await page
+        .locator(".pageHint")
+        .evaluate((node) => node.getBoundingClientRect().bottom);
+      assert.ok(bottom > 900 - 80, `table leaves the window empty (${bottom})`);
+      assert.ok(bottom <= 900, "page hint below the window");
+      // The table header stays visible while its rows scroll.
+      const head = await page
+        .locator("thead th")
+        .first()
+        .evaluate((node) => node.getBoundingClientRect().top);
+      const frame = await table.evaluate(
+        (node) => node.getBoundingClientRect().top,
+      );
+      assert.ok(Math.abs(head - frame) <= 2, "table header scrolled away");
+      // Compact controls on a desktop.
+      assert.ok((await height("Rileva di nuovo")) <= 34);
+      assert.ok(
+        (await page
+          .getByRole("searchbox")
+          .evaluate((node) => node.getBoundingClientRect().height)) <= 34,
+      );
+    } else {
+      // A phone keeps finger-sized buttons and scrolls the whole page.
+      assert.ok((await height("Rileva di nuovo")) >= 44);
+      assert.ok(
+        await content.evaluate((el) => el.scrollHeight > el.clientHeight + 1),
+      );
+    }
+    // Nothing is wider than the page.
+    assert.equal(
+      await content.evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+      false,
+    );
+    await shot(page, `table-scroll-${width}.png`);
+  });
+}
 
 test("each setting badge keeps a fixed slot so the badges line up from row to row", async () => {
   const page = await pageFor(1280);

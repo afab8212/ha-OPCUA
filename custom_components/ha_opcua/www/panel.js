@@ -1,9 +1,9 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.16.0";
+const PANEL_VERSION = "1.17.0";
 // Build shown next to the version: date and running number of that day
 // (YYYYMMDD.N). Bump with every change to this file.
-const PANEL_BUILD = "20261117.4";
+const PANEL_BUILD = "20261117.5";
 // The build this code was loaded as: the hash Home Assistant put into the
 // module URL. Taken from the newest load of this file, so a tab that already
 // ran an older panel still reports the build it actually executes.
@@ -1130,6 +1130,10 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 .nodeTip.visible{opacity:1;visibility:visible}
 .nodeTipId{font-family:ui-monospace,monospace;font-size:11px;opacity:.85;overflow-wrap:anywhere}
 .field .editorNodeId{display:flex;gap:8px;align-items:baseline;min-width:0;margin-top:2px;font-size:12px;font-weight:400;color:var(--secondary-text-color,#637487);cursor:text}.editorNodeIdLabel{flex:none}.editorNodeId code{min-width:0;font-family:ui-monospace,monospace;font-size:11.5px;overflow-wrap:anywhere;user-select:all;color:var(--primary-text-color,#243346)}
+/* Compact desktop layout: lower buttons and fields; phones keep 44px touch targets. */
+@media(min-width:651px){button{padding:5px 12px;min-height:32px}input,select{padding:5px 10px;min-height:32px}.endpointPanel{padding:12px 14px;margin-bottom:12px}.endpointMeta{gap:8px;margin-top:8px}.endpointSubscription .toggle{min-height:26px}.navRow{margin-top:8px;padding-top:8px}nav button{padding:3px 10px;min-height:28px}.viewToggle{padding:2px}.viewToggle button{padding:5px 9px;min-height:28px}.entityEditor .editorBody{padding:12px 16px;gap:10px}.entityEditor .editorSection{padding:10px 14px}.entityEditor .editorSection h3{margin-bottom:8px}.field{gap:4px}.entityForm footer{padding-top:10px;padding-bottom:10px}.entityForm footer button{min-height:32px}.entityEditor input:not([type=checkbox]),.entityEditor select{min-height:32px}}
+/* Only the table scrolls; the endpoint toolbar above stays in place. A short window scrolls the whole page instead. */
+@media(min-width:651px) and (min-height:560px){:host{height:100vh;height:100dvh}.content{overflow:hidden}.content>.tableWrap{flex:1 1 0;min-height:200px}}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
