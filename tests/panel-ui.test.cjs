@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.17.1 · Build 20261117.6",
+    "Pannello 1.17.2 · Build 20261117.7",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1181,6 +1181,42 @@ test("view and grouping choices sit together as icons with a calm, delayed hint"
   await page.mouse.move(5, 5);
   await page.waitForTimeout(400);
   assert.equal((await hint(pathButton)).opacity, "0");
+});
+
+test("a low desktop window still scrolls only the table", async () => {
+  const page = await pageFor(1045);
+  await page.setViewportSize({ width: 1045, height: 530 });
+  await page.evaluate(() => {
+    const panel = document.querySelector("opcua-node-panel");
+    const wrapper = document.createElement("div");
+    panel.before(wrapper);
+    wrapper.append(panel);
+    document.body.style.height = "auto";
+    const endpoint = window.fixture.endpoints[0];
+    for (let i = 0; i < 80; i++)
+      endpoint.rows.push({
+        key: `low${i}`,
+        node_id: `low${i}`,
+        name: `Basso ${i}`,
+        entity_id: `sensor.low${i}`,
+        platform: "sensor",
+        variant_type: "Float",
+        reclassifiable: false,
+      });
+    panel.hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  const scrolls = (selector) =>
+    page.evaluate((selector) => {
+      const el = selector
+        ? document.querySelector("opcua-node-panel").shadowRoot.querySelector(selector)
+        : document.scrollingElement;
+      return el.scrollHeight > el.clientHeight + 1;
+    }, selector);
+  assert.equal(await scrolls(null), false, "Home Assistant page scrolls");
+  assert.equal(await scrolls(".content"), false, "panel scrolls");
+  assert.equal(await scrolls(".tableWrap"), true, "table does not scroll");
+  await shot(page, "table-scroll-low.png");
 });
 
 for (const width of [1920, 1280, 768, 390]) {
