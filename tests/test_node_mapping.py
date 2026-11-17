@@ -38,9 +38,13 @@ def node(kind="String", writable=True, node_id="ns=2;i=1"):
     ("kind", "writable", "choices"),
     [
         ("String", True, ["auto", "sensor", "text", "disabled"]),
-        ("Boolean", True, ["auto", "sensor", "binary_sensor", "switch", "disabled"]),
+        (
+            "Boolean",
+            True,
+            ["auto", "sensor", "binary_sensor", "switch", "button", "disabled"],
+        ),
         ("Boolean", False, ["auto", "sensor", "binary_sensor", "disabled"]),
-        ("Int16", True, ["auto", "sensor", "number", "disabled"]),
+        ("Int16", True, ["auto", "sensor", "number", "select", "disabled"]),
         ("Float", False, ["auto", "sensor", "disabled"]),
     ],
 )

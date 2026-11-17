@@ -10,7 +10,7 @@
 
 ## 🔌 Overview
 
-**OPC UA Connect** (project **ha-OPCUA**) is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `number`, `text` or `datetime` entities in Home Assistant.
+**OPC UA Connect** (project **ha-OPCUA**) is a custom [Home Assistant](https://www.home-assistant.io) integration that enables automatic discovery of OPC UA variable nodes from an OPC UA server (e.g., Siemens, B&R, etc.) and exposes them as configurable `sensor`, `binary_sensor`, `switch`, `button`, `number`, `select`, `text` or `datetime` entities in Home Assistant.
 
 This integration uses the `asyncua` library for **local polling**, with optional **OPC UA data-change subscriptions selected per entity**. Polling remains enabled in both update modes; subscriptions provide additional updates when the server reports a value change.
 
@@ -252,12 +252,14 @@ Open the **OPC UA Connect** sidebar panel, select an endpoint and click **Edit**
 | Choice | Compatible nodes | Behavior |
 | --- | --- | --- |
 | Automatic | Supported scalar types | Writable Boolean → switch; writable DateTime → datetime; all others → sensor |
-| sensor | Supported scalar types | Read only, even when the node is writable |
+| sensor | Supported scalar types | Read only, even when the node is writable; an integer sensor can show texts from an optional value table |
 | binary_sensor | Boolean | Read only on/off state |
 | switch | Writable Boolean | Read and write on/off |
 | number | Writable integer, Float or Double | Read and write numbers with minimum, maximum and step |
 | text | Writable String | Read and write text with minimum and maximum length |
 | datetime | Writable DateTime | Read and write date/time using UTC and the native HA control |
+| select | Writable integer | Read and write through a value table (for example 0 = Off, 1 = Auto, 2 = Manual) edited in the panel; a value missing from the table shows as unknown, the raw value stays in the `raw_value` attribute |
+| button | Writable Boolean | A press sets the bit, waits the pulse length (default 500 ms, 50 – 10000 ms) and resets it; the reset is retried and presses never overlap |
 | Excluded | Supported scalar types | No entity or periodic reads after reload |
 
 Choices are keyed by **NodeId**, so nodes with identical names can be configured independently. Write controls are offered only when both AccessLevel and UserAccessLevel permit writes. If a saved choice becomes incompatible after a PLC type or permission change, the entity is skipped and a warning is logged; use the panel to fix the choice. Missing nodes retain their saved choices for when they return. Discovery runs at setup/reload.

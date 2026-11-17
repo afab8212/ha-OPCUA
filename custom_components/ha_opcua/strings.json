@@ -98,7 +98,13 @@
       "unsafe_integer_limits": "Integer limits must be within ±9007199254740991 for exact representation in the interface.",
       "limits_outside_type": "The limits exceed the OPC UA data type range.",
       "invalid_text_limits": "Use integer lengths with 0 ≤ minimum ≤ maximum ≤ 255.",
-      "invalid_deadband": "Use a finite deadband of 0 or more (an integer for integer node types)."
+      "invalid_deadband": "Use a finite deadband of 0 or more (an integer for integer node types).",
+      "value_labels_required": "A select needs a value table. Edit it in the OPC UA panel.",
+      "invalid_value_labels": "Each value table row needs an integer value and a text of up to 64 characters.",
+      "duplicate_value_labels": "Values and texts in the value table must be unique.",
+      "value_labels_outside_type": "A value in the value table exceeds the OPC UA data type range.",
+      "value_labels_conversion": "A value table cannot be combined with a linear conversion.",
+      "invalid_pulse": "The pulse length must be an integer between 50 and 10000 ms."
     },
     "abort": {
       "integration_not_loaded": "Load the integration before configuring its discovered nodes.",
@@ -115,7 +121,9 @@
         "text": "text",
         "auto": "Automatic (existing behavior)",
         "disabled": "Excluded",
-        "datetime": "Date and time"
+        "datetime": "Date and time",
+        "select": "select",
+        "button": "button"
       }
     }
   },

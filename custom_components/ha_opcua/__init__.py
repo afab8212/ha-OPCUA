@@ -63,7 +63,16 @@ from .orphans import (
 from .values import scalar_variant
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = ["sensor", "binary_sensor", "switch", "number", "text", "datetime"]
+PLATFORMS = [
+    "sensor",
+    "binary_sensor",
+    "switch",
+    "number",
+    "text",
+    "datetime",
+    "select",
+    "button",
+]
 _CONNECTION_STATUS_CODES = {
     ua.StatusCodes.BadSessionIdInvalid,
     ua.StatusCodes.BadSessionClosed,
@@ -927,6 +936,8 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
             "step",
             "min_length",
             "max_length",
+            "value_labels",
+            "pulse_ms",
             "device_class",
             "unit_of_measurement",
             "display_name",

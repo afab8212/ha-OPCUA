@@ -19,7 +19,16 @@ from .const import (
 from .node_settings import effective_platform, validate_settings
 
 ISSUE_PREFIX = "orphan_entity_"
-NODE_PLATFORMS = {"sensor", "binary_sensor", "switch", "number", "text", "datetime"}
+NODE_PLATFORMS = {
+    "sensor",
+    "binary_sensor",
+    "switch",
+    "number",
+    "text",
+    "datetime",
+    "select",
+    "button",
+}
 
 
 def _reload_options(options):

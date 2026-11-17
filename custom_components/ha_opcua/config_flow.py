@@ -38,6 +38,7 @@ from .node_settings import (
     number_defaults,
     supports_deadband,
     supports_unit,
+    supports_value_labels,
     validate_settings,
 )
 
@@ -234,6 +235,8 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 "update_mode",
                 "display_name",
                 "unit_of_measurement",
+                "value_labels",
+                "pulse_ms",
             )
         }
         if self._node["variant_type"] not in {"Float", "Double"} and not common.get(
@@ -249,6 +252,12 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
             common.pop("device_class", None)
         if not supports_unit(self._node, effective_platform(self._node, settings)):
             common.pop("unit_of_measurement", None)
+        if not supports_value_labels(
+            self._node, effective_platform(self._node, settings)
+        ):
+            common.pop("value_labels", None)
+        if settings["platform"] != "button":
+            common.pop("pulse_ms", None)
         merged = {**common, **settings}
         if merged == {"platform": "auto"}:
             mappings.pop(self._node_id, None)
@@ -273,6 +282,17 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_number()
             elif platform == "text":
                 return await self.async_step_text()
+            elif platform in ("select", "button"):
+                # The value table / pulse length are edited in the panel;
+                # keep what is saved, require a table for a select.
+                try:
+                    settings = validate_settings(
+                        self._node, {**self._current_settings(), "platform": platform}
+                    )
+                except ValueError as err:
+                    errors["base"] = str(err)
+                else:
+                    return self._save_node(settings)
             elif supports_deadband(self._node, platform):
                 return await self.async_step_sensor()
             else:

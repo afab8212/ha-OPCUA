@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.12.0";
+const PANEL_VERSION = "1.13.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -192,6 +192,33 @@ const TEXT = {
     number: "Numeri",
     text: "Testi",
     datetime: "Data e ora",
+    select: "Selezioni",
+    button: "Pulsanti",
+    valueLabels: "Tabella valori",
+    valueLabelsHelp:
+      "Assegna un testo a ogni valore intero. Home Assistant mostra il testo; un select scrive il valore del testo scelto. Un valore assente dalla tabella appare come sconosciuto.",
+    valueLabelsSensorHelp:
+      "Facoltativo: assegna un testo a ogni valore intero, così il sensore mostra il testo invece del numero. Vuota: il sensore mostra il numero.",
+    rawValue: "Valore",
+    labelText: "Testo",
+    addValueLabel: "Aggiungi riga",
+    removeValueLabel: "Rimuovi riga",
+    valueLabelsBadge: "Testi",
+    pulseMs: "Durata impulso (ms)",
+    pulseHelp:
+      "Una pressione imposta il bit, attende questa durata e lo azzera. Per logiche PLC che reagiscono al fronte. 50 – 10000 ms.",
+    pulseBadge: "Impulso",
+    value_labels_required:
+      "Un select richiede almeno una riga nella tabella valori.",
+    invalid_value_labels:
+      "Ogni riga richiede un valore intero e un testo di massimo 64 caratteri.",
+    duplicate_value_labels:
+      "Valori e testi della tabella devono essere univoci.",
+    value_labels_outside_type:
+      "Un valore della tabella supera l'intervallo del tipo di dato.",
+    value_labels_conversion:
+      "Una tabella valori non può essere combinata con una conversione.",
+    invalid_pulse: "Durata impulso: intero tra 50 e 10000 ms.",
     disabled: "Esclusi",
     connected: "Connesso",
     disconnected: "Disconnesso",
@@ -435,6 +462,33 @@ const TEXT = {
     number: "Zahlen",
     text: "Text",
     datetime: "Datum und Uhrzeit",
+    select: "Auswahl",
+    button: "Taster",
+    valueLabels: "Wertetabelle",
+    valueLabelsHelp:
+      "Jedem ganzzahligen Wert einen Text zuordnen. Home Assistant zeigt den Text; eine Auswahl schreibt den Wert des gewählten Texts. Ein Wert, der nicht in der Tabelle steht, erscheint als unbekannt.",
+    valueLabelsSensorHelp:
+      "Optional: jedem ganzzahligen Wert einen Text zuordnen, dann zeigt der Sensor den Text statt der Zahl. Leer: der Sensor zeigt die Zahl.",
+    rawValue: "Wert",
+    labelText: "Text",
+    addValueLabel: "Zeile hinzufügen",
+    removeValueLabel: "Zeile entfernen",
+    valueLabelsBadge: "Texte",
+    pulseMs: "Pulsdauer (ms)",
+    pulseHelp:
+      "Ein Druck setzt das Bit, wartet diese Dauer und setzt es zurück. Für SPS-Logik, die auf die Flanke reagiert. 50 – 10000 ms.",
+    pulseBadge: "Puls",
+    value_labels_required:
+      "Eine Auswahl braucht mindestens eine Zeile in der Wertetabelle.",
+    invalid_value_labels:
+      "Jede Zeile braucht einen ganzzahligen Wert und einen Text mit höchstens 64 Zeichen.",
+    duplicate_value_labels:
+      "Werte und Texte der Tabelle müssen eindeutig sein.",
+    value_labels_outside_type:
+      "Ein Wert der Tabelle liegt außerhalb des Datentyps.",
+    value_labels_conversion:
+      "Eine Wertetabelle lässt sich nicht mit einer Umrechnung kombinieren.",
+    invalid_pulse: "Pulsdauer: ganze Zahl von 50 bis 10000 ms.",
     disabled: "Ausgeschlossen",
     connected: "Verbunden",
     disconnected: "Getrennt",
@@ -673,6 +727,32 @@ const TEXT = {
     number: "Numbers",
     text: "Text",
     datetime: "Date and time",
+    select: "Selects",
+    button: "Buttons",
+    valueLabels: "Value table",
+    valueLabelsHelp:
+      "Assign a text to each integer value. Home Assistant shows the text; a select writes the value of the chosen text. A value missing from the table shows as unknown.",
+    valueLabelsSensorHelp:
+      "Optional: assign a text to each integer value, so the sensor shows the text instead of the number. Empty: the sensor shows the number.",
+    rawValue: "Value",
+    labelText: "Text",
+    addValueLabel: "Add row",
+    removeValueLabel: "Remove row",
+    valueLabelsBadge: "Texts",
+    pulseMs: "Pulse length (ms)",
+    pulseHelp:
+      "A press sets the bit, waits this long and resets it. For PLC logic that reacts to the edge. 50 – 10000 ms.",
+    pulseBadge: "Pulse",
+    value_labels_required:
+      "A select needs at least one row in the value table.",
+    invalid_value_labels:
+      "Each row needs an integer value and a text of up to 64 characters.",
+    duplicate_value_labels: "Values and texts in the table must be unique.",
+    value_labels_outside_type:
+      "A value in the table exceeds the data type range.",
+    value_labels_conversion:
+      "A value table cannot be combined with a conversion.",
+    invalid_pulse: "Pulse length: integer from 50 to 10000 ms.",
     disabled: "Excluded",
     connected: "Connected",
     disconnected: "Disconnected",
@@ -751,8 +831,20 @@ const GROUPS = [
   "number",
   "text",
   "datetime",
+  "select",
+  "button",
   "disabled",
 ];
+const INTEGER = new Set([
+  "SByte",
+  "Byte",
+  "Int16",
+  "UInt16",
+  "Int32",
+  "UInt32",
+  "Int64",
+  "UInt64",
+]);
 const NUMERIC = new Set([
   "SByte",
   "Byte",
@@ -780,6 +872,8 @@ function valueType(row) {
     return "boolean";
   if (row.platform === "datetime" || row.variant_type === "DateTime")
     return "datetime";
+  if (row.platform === "select" || row.settings?.value_labels?.length)
+    return "text";
   if (row.platform === "number" || NUMERIC.has(row.variant_type))
     return "numeric";
   return "text";
@@ -845,16 +939,20 @@ function compatible(row, node) {
     return node.variant_type === "String" && node.writable;
   if (row.platform === "datetime")
     return node.variant_type === "DateTime" && node.writable;
+  if (row.platform === "select")
+    return INTEGER.has(node.variant_type) && node.writable;
+  if (row.platform === "button")
+    return node.variant_type === "Boolean" && node.writable;
   return true;
 }
 const CSS = `
-:host{display:flex;flex-direction:column;height:100%;min-height:0;color:var(--primary-text-color,#243346);background:var(--primary-background-color,#f5f7fb);font:14px var(--paper-font-body1_-_font-family,Roboto,Arial,sans-serif);--accent-sensor:#0f9d8a;--accent-binary_sensor:#6366f1;--accent-switch:#d97a06;--accent-number:#7c4fd6;--accent-text:#e0447a;--accent-datetime:#0891b2;--accent-disabled:var(--disabled-text-color,#9aa5b1);--speed:180ms}
+:host{display:flex;flex-direction:column;height:100%;min-height:0;color:var(--primary-text-color,#243346);background:var(--primary-background-color,#f5f7fb);font:14px var(--paper-font-body1_-_font-family,Roboto,Arial,sans-serif);--accent-sensor:#0f9d8a;--accent-binary_sensor:#6366f1;--accent-switch:#d97a06;--accent-number:#7c4fd6;--accent-text:#e0447a;--accent-datetime:#0891b2;--accent-select:#2f7d32;--accent-button:#c2410c;--accent-disabled:var(--disabled-text-color,#9aa5b1);--speed:180ms}
 @media(prefers-reduced-motion:reduce){:host{--speed:0ms}}
 *{box-sizing:border-box}button,input,select{font:inherit}button{cursor:pointer;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:10px 15px;background:var(--card-background-color,#fff);color:inherit;min-height:42px;transition:background var(--speed),border-color var(--speed)}button:hover{border-color:var(--primary-color,#009ac0);background:color-mix(in srgb,var(--primary-color,#009ac0) 5%,var(--card-background-color,#fff))}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--primary-color,#009ac0);outline-offset:3px}.primary,.primary:hover{background:var(--primary-color,#008fac);border-color:transparent;color:var(--text-primary-color,#fff)}
 header{display:flex;flex-shrink:0;gap:16px;align-items:center;padding:18px 28px;background:var(--card-background-color,#fff);border-bottom:1px solid var(--divider-color,#e0e6ee)}h1{font-size:22px;line-height:1.3;margin:0;font-weight:650}p{margin:0;color:var(--secondary-text-color,#637487);line-height:1.5}.headerText{flex:1;min-width:0}.headerText>p{margin-top:5px}.titleRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.version{white-space:nowrap}.menu{display:none;border:0;background:none;font-size:22px;padding:4px 10px}.content{flex:1;min-height:0;width:100%;max-width:1480px;margin:0 auto;padding:24px 28px 48px;overflow:auto}
 .endpointPanel{background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#dce2ea);border-radius:16px;padding:20px;margin-bottom:22px}.toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:end;margin-bottom:16px}.field{display:flex;flex-direction:column;gap:7px;min-width:0}.field>span{font-weight:600;font-size:13px}input,select{width:100%;min-width:0;padding:12px;border:1px solid var(--divider-color,#d8e0e8);border-radius:9px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346)}.endpointMeta{display:flex;gap:16px;align-items:center;flex-wrap:wrap;min-width:0;color:var(--secondary-text-color,#637487)}.endpointIdentity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1 1 220px;min-width:0}.endpointAddress{font:12px ui-monospace,monospace;overflow-wrap:anywhere;line-height:1.6}.endpointActions{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;border-radius:7px;padding:4px 8px;background:color-mix(in srgb,var(--secondary-text-color,#637487) 9%,transparent);color:var(--secondary-text-color,#637487)}[data-connection]{border-radius:20px;white-space:nowrap;padding:5px 10px}[data-connection]::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}.online{color:var(--success-color,#138260);background:color-mix(in srgb,var(--success-color,#138260) 12%,transparent)}
-.navRow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--divider-color,#e0e6ee)}nav{display:flex;gap:7px;flex-wrap:wrap;max-width:100%}nav button{border:1px solid transparent;background:transparent;padding:8px 12px;min-height:38px;color:var(--secondary-text-color,#637487)}nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 10%,var(--card-background-color,#fff));border-color:color-mix(in srgb,var(--primary-color,#008fac) 28%,transparent);color:var(--primary-text-color,#243346);font-weight:600}.navTools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.viewToggle button{position:relative}.viewToggle svg{display:block;width:18px;height:18px}[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);right:0;z-index:20;width:max-content;max-width:210px;padding:5px 9px;border-radius:7px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:12px;font-weight:400;line-height:1.35;text-align:left;white-space:normal;opacity:0;pointer-events:none;transition:opacity .12s ease}@media(hover:hover){[data-tip]:hover::after{opacity:1;transition-delay:.8s}}[data-tip]:focus-visible::after{opacity:1;transition-delay:.3s}.viewToggle{display:flex;gap:3px;padding:3px;border:1px solid var(--divider-color,#dce2ea);border-radius:11px;background:var(--card-background-color,#fff)}.viewToggle button{border:0;background:none;border-radius:7px;padding:8px 11px;min-height:34px;font-size:16px;line-height:1;color:var(--secondary-text-color,#637487)}.viewToggle .selected,.viewToggle .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 12%,transparent);color:var(--primary-color,#008fac)}.card{display:flex;flex-direction:column;position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:12px;padding:16px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.card h3{font-size:15px;line-height:1.45;font-weight:600;margin:0 0 5px;overflow-wrap:anywhere}.manualTag,.orphanTag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}.manualTag{color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent)}.address{font:11px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}.entityState{flex:1;margin-top:18px;min-width:0}.stateLabel{display:block;font-size:11px;color:var(--secondary-text-color,#637487);margin-bottom:4px}.stateValue{display:block;font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:15px;font-weight:400;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:7px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.actions button{padding:7px 12px;min-height:36px}.meta{color:var(--secondary-text-color,#637487);font-size:12px;overflow-wrap:anywhere}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
-[data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
+.navRow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--divider-color,#e0e6ee)}nav{display:flex;gap:7px;flex-wrap:wrap;max-width:100%}nav button{border:1px solid transparent;background:transparent;padding:8px 12px;min-height:38px;color:var(--secondary-text-color,#637487)}nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 10%,var(--card-background-color,#fff));border-color:color-mix(in srgb,var(--primary-color,#008fac) 28%,transparent);color:var(--primary-text-color,#243346);font-weight:600}.navTools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.viewToggle button{position:relative}.viewToggle svg{display:block;width:18px;height:18px}[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);right:0;z-index:20;width:max-content;max-width:210px;padding:5px 9px;border-radius:7px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:12px;font-weight:400;line-height:1.35;text-align:left;white-space:normal;opacity:0;pointer-events:none;transition:opacity .12s ease}@media(hover:hover){[data-tip]:hover::after{opacity:1;transition-delay:.8s}}[data-tip]:focus-visible::after{opacity:1;transition-delay:.3s}.viewToggle{display:flex;gap:3px;padding:3px;border:1px solid var(--divider-color,#dce2ea);border-radius:11px;background:var(--card-background-color,#fff)}.viewToggle button{border:0;background:none;border-radius:7px;padding:8px 11px;min-height:34px;font-size:16px;line-height:1;color:var(--secondary-text-color,#637487)}.viewToggle .selected,.viewToggle .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 12%,transparent);color:var(--primary-color,#008fac)}.card{display:flex;flex-direction:column;position:relative;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#e2e7ef);border-left:3px solid var(--accent,var(--divider-color,#e2e7ef));border-radius:12px;padding:16px;min-width:0;transition:border-color var(--speed) ease}.card:hover{border-color:color-mix(in srgb,var(--accent,var(--primary-color)) 45%,var(--divider-color,#e2e7ef));border-left-color:var(--accent,var(--divider-color,#e2e7ef))}.card h3{font-size:15px;line-height:1.45;font-weight:600;margin:0 0 5px;overflow-wrap:anywhere}.manualTag,.orphanTag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}.manualTag{color:var(--accent,var(--primary-color));background:color-mix(in srgb,var(--accent,var(--primary-color)) 15%,transparent)}.address{font:11px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--secondary-text-color,#637487);line-height:1.6}.valueTable{display:grid;gap:8px}.valueTableRow{display:grid;gap:8px;grid-template-columns:minmax(80px,1fr) minmax(120px,3fr) auto;align-items:end}.valueTableRow button{min-height:38px}.valueTableRow:not(:first-child) .field>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.limits{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}.entityState{flex:1;margin-top:18px;min-width:0}.stateLabel{display:block;font-size:11px;color:var(--secondary-text-color,#637487);margin-bottom:4px}.stateValue{display:block;font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:8em;overflow:auto}.stateValue[data-kind="unavailable"],.stateValue[data-kind="unknown"],.stateValue[data-kind="pending"],.stateValue[data-kind="disabled"]{font-size:15px;font-weight:400;color:var(--secondary-text-color,#637487)}.actions{display:flex;gap:7px;flex-wrap:wrap}.danger{color:var(--error-color,#be3131)}.actions button{padding:7px 12px;min-height:36px}.meta{color:var(--secondary-text-color,#637487);font-size:12px;overflow-wrap:anywhere}.message{padding:13px 16px;margin-bottom:16px;border-radius:10px;background:var(--secondary-background-color,#eaf0f7);line-height:1.5}.message.empty{display:flex;gap:12px;align-items:center;color:var(--secondary-text-color,#637487)}.message.empty svg{flex-shrink:0;opacity:.7}.error{color:var(--error-color,#be3131)}.hint{font-size:12px;line-height:1.5;color:var(--secondary-text-color,#637487)}
+[data-platform="sensor"]{--accent:var(--accent-sensor)}[data-platform="binary_sensor"]{--accent:var(--accent-binary_sensor)}[data-platform="switch"]{--accent:var(--accent-switch)}[data-platform="number"]{--accent:var(--accent-number)}[data-platform="text"]{--accent:var(--accent-text)}[data-platform="datetime"]{--accent:var(--accent-datetime)}[data-platform="select"]{--accent:var(--accent-select)}[data-platform="button"]{--accent:var(--accent-button)}[data-platform="disabled"]{--accent:var(--accent-disabled)}
 .endpointSubscription{display:flex;flex:1 1 100%;gap:8px 20px;flex-wrap:wrap;align-items:center;min-width:0;padding-top:14px;border-top:1px solid var(--divider-color,#e2e7ef)}.endpointSubscription .hint{flex:1 1 270px;font-size:12px;margin:0}.endpointSubscription #subscription-status,.endpointSubscription .error{flex-basis:100%}.endpointSubscription .toggle{font-weight:600;color:var(--primary-text-color,#243346);padding:4px 0;min-height:36px}.endpointSubscription input[role="switch"]{appearance:none;position:relative;width:42px;min-width:42px;height:24px;padding:0;border:0;border-radius:12px;background:var(--disabled-color,#8695a5);cursor:pointer}.endpointSubscription input[role="switch"]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.endpointSubscription input[role="switch"]:checked{background:var(--primary-color,#008fac)}.endpointSubscription input[role="switch"]:checked::after{left:21px}.endpointSubscription input[role="switch"]:disabled{opacity:.5;cursor:default}.endpointSubscription+.endpointSubscription{border-top:0;padding-top:0}
 dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;background:var(--card-background-color,#fff);color:var(--primary-text-color,#243346);opacity:0;transform:translateY(10px) scale(.98);transition:opacity var(--speed) ease,transform var(--speed) ease;overflow:hidden}dialog[open]{opacity:1;transform:none;display:flex;flex-direction:column}dialog::backdrop{background:#10223480;backdrop-filter:blur(1px)}form{padding:24px;display:flex;flex-direction:column;gap:17px;overflow-y:auto;flex:1;min-height:0}form h2{margin:0;font-size:21px;overflow-wrap:anywhere}footer{display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:-24px;margin:6px -24px -24px;padding:14px 24px 24px;background:var(--card-background-color,#fff)}.toggle{display:flex;gap:10px;align-items:center}.toggle input{width:20px;height:20px;min-width:20px;accent-color:var(--primary-color,#008fac)}[hidden]{display:none!important}.orphanTag{color:var(--error-color,#be3131);background:color-mix(in srgb,var(--error-color,#be3131) 15%,transparent)}.card.orphan{border-left-color:var(--error-color,#be3131);border-style:dashed}
 .pickList{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:6px}.pickItem{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:7px;cursor:pointer}.pickItem:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 6%,transparent)}.pickItem input{width:18px;height:18px;min-width:18px;flex-shrink:0;accent-color:var(--primary-color,#008fac)}.pickInfo{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.pickName{font-weight:600;overflow-wrap:anywhere}.pickNodeId{font:11px ui-monospace,monospace;color:var(--secondary-text-color,#637487);overflow-wrap:anywhere}.pickState{font-size:12px;font-weight:600;color:var(--secondary-text-color,#637487);white-space:nowrap;flex-shrink:0}
@@ -1603,6 +1701,14 @@ class OpcuaNodePanel extends HTMLElement {
       if (Number.isFinite(step) && step !== (floating ? 0.1 : 1))
         add("step", `${this._t("step")}: ${number(step)}`);
     }
+    if (settings.value_labels?.length)
+      add(
+        "value_labels",
+        `${this._t("valueLabelsBadge")}: ${settings.value_labels.length}`,
+        settings.value_labels.map((i) => `${i.value} = ${i.label}`).join(", "),
+      );
+    if (row.platform === "button" && (settings.pulse_ms ?? 500) !== 500)
+      add("pulse_ms", `${this._t("pulseBadge")}: ${settings.pulse_ms} ms`);
     if (row.platform === "text") {
       const min = settings.min_length ?? 0;
       const max = settings.max_length ?? 255;
@@ -1752,13 +1858,14 @@ class OpcuaNodePanel extends HTMLElement {
     });
     const headRow = element("tr", undefined, { class: "groupRow" });
     const cell = element("th", undefined, { colspan: "6", scope: "rowgroup" });
-    const toggle = element("button", `${label} · ${items.length}`, {
+    // The count already shows in the filter chips above the table.
+    const toggle = element("button", label, {
       type: "button",
       class: `groupToggle${extra.titleClass ? ` ${extra.titleClass}` : ""}`,
       "aria-expanded": String(!collapsed),
       // Own accessible name, so it never clashes with the filter button of
       // the same category above the table.
-      "aria-label": `${label} · ${items.length} – ${this._t("groupToggle")}`,
+      "aria-label": `${label} – ${this._t("groupToggle")}`,
       title: this._t("groupToggle"),
     });
     toggle.addEventListener("click", () => {
@@ -1854,7 +1961,7 @@ class OpcuaNodePanel extends HTMLElement {
     for (const group of GROUPS) {
       const items = ungroupedRows.filter((r) => r.platform === group);
       if (!items.length) continue;
-      this._appendGroup(`platform:${group}`, this._t(group), items, {
+      this._appendGroup(`platform:${group}`, group, items, {
         platform: group,
       });
     }
@@ -1948,6 +2055,14 @@ class OpcuaNodePanel extends HTMLElement {
       } else if (!entity || entity.state === "unavailable") {
         kind = "unavailable";
         label = this._t("stateUnavailable");
+      } else if (platform === "button") {
+        const bit = entity.attributes?.bit_state;
+        if (typeof bit === "boolean")
+          label = this._t(bit ? "stateOn" : "stateOff");
+        else {
+          kind = "unknown";
+          label = this._t("stateUnknown");
+        }
       } else if (entity.state === "unknown") {
         kind = "unknown";
         label = this._t("stateUnknown");
@@ -1976,7 +2091,10 @@ class OpcuaNodePanel extends HTMLElement {
       let visual = kind === "value" ? type : kind;
       let tone = "neutral";
       if (kind === "value" && type === "boolean") {
-        const raw = entity.state.toLowerCase();
+        const raw =
+          platform === "button"
+            ? String(entity.attributes?.bit_state)
+            : entity.state.toLowerCase();
         if (["on", "true"].includes(raw)) {
           visual = "on";
           tone = [
@@ -2738,9 +2856,15 @@ class OpcuaNodePanel extends HTMLElement {
       return [
         ...(manual ? [] : ["auto"]),
         "sensor",
-        ...["binary_sensor", "switch", "number", "text", "datetime"].filter(
-          (platform) => compatible({ platform }, node),
-        ),
+        ...[
+          "binary_sensor",
+          "switch",
+          "button",
+          "number",
+          "select",
+          "text",
+          "datetime",
+        ].filter((platform) => compatible({ platform }, node)),
         ...(manual ? [] : ["disabled"]),
       ];
     };
@@ -2856,6 +2980,86 @@ class OpcuaNodePanel extends HTMLElement {
     }
     const limitsHelp = element("p", this._t("limitsHelp"), { class: "hint" });
     valueSection.append(limitsHelp);
+    // Value table (raw integer -> text) for a select or an integer sensor.
+    const valueTable = element("div", undefined, { class: "valueTable" });
+    const valueTableHead = element("span", this._t("valueLabels"));
+    const valueTableField = element("div", undefined, {
+      class: "valueTableField",
+    });
+    const valueTableLabel = element("div", undefined, {
+      class: "field tableLabel",
+    });
+    valueTableLabel.append(valueTableHead);
+    const valueTableRows = element("div", undefined, { class: "valueTable" });
+    const tableRows = () =>
+      [...valueTableRows.querySelectorAll(".valueTableRow")].map((line) => ({
+        value: Number(line.querySelector("[name=value_label_value]").value),
+        label: line.querySelector("[name=value_label_text]").value,
+      }));
+    const addTableRow = (entry = {}) => {
+      const line = element("div", undefined, { class: "valueTableRow" });
+      const value = element("input", undefined, {
+        type: "number",
+        step: "1",
+        name: "value_label_value",
+        required: "",
+        "aria-label": this._t("rawValue"),
+      });
+      value.value = entry.value ?? "";
+      const text = element("input", undefined, {
+        type: "text",
+        name: "value_label_text",
+        maxlength: "64",
+        required: "",
+        "aria-label": this._t("labelText"),
+      });
+      text.value = entry.label ?? "";
+      const remove = element("button", "✕", {
+        type: "button",
+        class: "danger",
+        title: this._t("removeValueLabel"),
+        "aria-label": this._t("removeValueLabel"),
+      });
+      remove.addEventListener("click", () => {
+        line.remove();
+        updateFields();
+      });
+      const valueField = this._field("rawValue", value);
+      const textField = this._field("labelText", text);
+      line.append(valueField, textField, remove);
+      valueTableRows.append(line);
+      return line;
+    };
+    for (const entry of initial.value_labels || []) addTableRow(entry);
+    const addRow = element("button", this._t("addValueLabel"), {
+      type: "button",
+    });
+    addRow.addEventListener("click", () => {
+      const used = tableRows()
+        .map((r) => r.value)
+        .filter(Number.isFinite);
+      const line = addTableRow({
+        value: used.length ? Math.max(...used) + 1 : 0,
+      });
+      updateFields();
+      line.querySelector("[name=value_label_text]").focus();
+    });
+    valueTable.append(valueTableRows, addRow);
+    valueTableLabel.append(valueTable);
+    valueTableField.append(valueTableLabel);
+    const valueTableHelp = element("p", "", { class: "hint" });
+    valueSection.append(valueTableField, valueTableHelp);
+    const pulse = element("input", undefined, {
+      type: "number",
+      name: "pulse_ms",
+      min: "50",
+      max: "10000",
+      step: "1",
+    });
+    pulse.value = initial.pulse_ms ?? 500;
+    const pulseField = this._field("pulseMs", pulse);
+    const pulseHelp = element("p", this._t("pulseHelp"), { class: "hint" });
+    valueSection.append(pulseField, pulseHelp);
     const conversion = element("select", undefined, { name: "conversion" });
     for (const kind of ["none", "multiplier", "linear_scale"])
       conversion.append(
@@ -2991,7 +3195,23 @@ class OpcuaNodePanel extends HTMLElement {
     const updateFields = () => {
       const platform = effective();
       nodePicker?.refresh();
-      const classes = classesFor(platform);
+      const tableVisible =
+        ["select", "sensor"].includes(platform) &&
+        INTEGER.has(selectedNode()?.variant_type);
+      valueTableField.hidden = valueTableHelp.hidden = !tableVisible;
+      for (const input of valueTableRows.querySelectorAll("input"))
+        input.disabled = !tableVisible;
+      valueTableHelp.textContent = this._t(
+        platform === "select" ? "valueLabelsHelp" : "valueLabelsSensorHelp",
+      );
+      // Texts replace the number: no conversion, unit or device class.
+      const labelled =
+        tableVisible &&
+        (platform === "select" || valueTableRows.childElementCount > 0);
+      pulseField.hidden = pulseHelp.hidden = platform !== "button";
+      pulse.disabled = pulseField.hidden;
+      pulse.required = !pulse.disabled;
+      const classes = labelled ? [] : classesFor(platform);
       const configuredClass = deviceClass.value;
       classField.hidden = classes.length === 0;
       deviceClass.replaceChildren(
@@ -3010,9 +3230,8 @@ class OpcuaNodePanel extends HTMLElement {
       deviceClass.value = classes.includes(configuredClass)
         ? configuredClass
         : "";
-      conversionField.hidden = conversionHelp.hidden = !NUMERIC.has(
-        selectedNode()?.variant_type,
-      );
+      conversionField.hidden = conversionHelp.hidden =
+        labelled || !NUMERIC.has(selectedNode()?.variant_type);
       conversion.disabled = conversionField.hidden;
       conversionGroup.hidden =
         conversion.disabled || conversion.value === "none";
@@ -3040,6 +3259,7 @@ class OpcuaNodePanel extends HTMLElement {
       );
       deadband.disabled = deadbandField.hidden;
       unitField.hidden = unitHelp.hidden = !(
+        !labelled &&
         ["number", "sensor"].includes(platform) &&
         NUMERIC.has(selectedNode()?.variant_type)
       );
@@ -3122,6 +3342,7 @@ class OpcuaNodePanel extends HTMLElement {
         if (
           child.contains(name) ||
           child.classList.contains("limits") ||
+          child === valueTableField ||
           child === availabilityToggle ||
           child === toggle ||
           child.contains(nodes) ||
@@ -3200,6 +3421,8 @@ class OpcuaNodePanel extends HTMLElement {
                 ),
               }
             : {}),
+          ...(!valueTableField.hidden ? { value_labels: tableRows() } : {}),
+          ...(!pulse.disabled ? { pulse_ms: Number(pulse.value) } : {}),
           ...(!deadband.disabled
             ? {
                 deadband: deadband.value === "" ? null : Number(deadband.value),

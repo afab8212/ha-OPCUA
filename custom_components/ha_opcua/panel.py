@@ -56,6 +56,8 @@ SNAPSHOT_SETTINGS = (
     "deadband",
     "min_length",
     "max_length",
+    "value_labels",
+    "pulse_ms",
     "precision",
     "conversion",
     "always_available",
@@ -471,6 +473,8 @@ def _entity_settings(node, msg, saved=None):
         "always_available",
         "update_mode",
         "unit_of_measurement",
+        "value_labels",
+        "pulse_ms",
     ):
         if field in msg:
             proposed[field] = msg[field]
@@ -490,7 +494,17 @@ def _entity_settings(node, msg, saved=None):
             {
                 key: value
                 for key, value in (saved or {}).items()
-                if key in ("min", "max", "step", "deadband", "min_length", "max_length")
+                if key
+                in (
+                    "min",
+                    "max",
+                    "step",
+                    "deadband",
+                    "min_length",
+                    "max_length",
+                    "value_labels",
+                    "pulse_ms",
+                )
             }
         )
     return result
@@ -1023,6 +1037,8 @@ async def ws_inspect(hass, connection, msg):
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/entity/create",
+        vol.Optional("value_labels"): vol.Any(list, None),
+        vol.Optional("pulse_ms"): vol.Any(int, None),
         vol.Required("entry_id"): str,
         vol.Required("revision"): str,
         vol.Required("node_id"): str,
@@ -1061,6 +1077,8 @@ async def ws_snapshot(hass, connection, msg):
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/entity/update",
+        vol.Optional("value_labels"): vol.Any(list, None),
+        vol.Optional("pulse_ms"): vol.Any(int, None),
         vol.Required("entry_id"): str,
         vol.Required("revision"): str,
         vol.Required("key"): str,

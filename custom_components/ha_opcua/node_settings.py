@@ -27,6 +27,11 @@ INTEGER_TYPES = {
 NUMERIC_TYPES = INTEGER_TYPES | {"Float", "Double"}
 SCALAR_TYPES = NUMERIC_TYPES | {"String", "Boolean", "DateTime"}
 MAX_SAFE_INTEGER = 2**53 - 1
+MAX_VALUE_LABELS = 256
+MAX_LABEL_LENGTH = 64
+PULSE_DEFAULT_MS = 500
+PULSE_MIN_MS = 50
+PULSE_MAX_MS = 10000
 DEVICE_CLASS_ENUMS = {
     "binary_sensor": BinarySensorDeviceClass,
     "number": NumberDeviceClass,
@@ -43,9 +48,11 @@ def allowed_platforms(node):
         choices.append("binary_sensor")
     if node["writable"]:
         if kind == "Boolean":
-            choices.append("switch")
+            choices.extend(("switch", "button"))
         elif kind in NUMERIC_TYPES:
             choices.append("number")
+            if kind in INTEGER_TYPES:
+                choices.append("select")
         elif kind == "String":
             choices.append("text")
         elif kind == "DateTime":
@@ -89,6 +96,50 @@ def available_device_classes(node, platform):
 def supports_unit(node, platform):
     """A unit of measurement only makes sense for an analog sensor or number."""
     return platform in ("number", "sensor") and node["variant_type"] in NUMERIC_TYPES
+
+
+def supports_value_labels(node, platform):
+    """A value table maps raw integers to texts on a select or a sensor."""
+    return platform in ("select", "sensor") and node["variant_type"] in INTEGER_TYPES
+
+
+def normalize_value_labels(node, raw):
+    """Validate a value table: unique integers of the node type, unique texts."""
+    if not isinstance(raw, list) or len(raw) > MAX_VALUE_LABELS:
+        raise ValueError("invalid_value_labels")
+    variant_type = ua.VariantType[node["variant_type"]]
+    result, values, labels = [], set(), set()
+    for item in raw:
+        if not isinstance(item, dict) or set(item) != {"value", "label"}:
+            raise ValueError("invalid_value_labels")
+        value, label = item["value"], item["label"]
+        if type(value) is not int or not isinstance(label, str):
+            raise ValueError("invalid_value_labels")
+        label = label.strip()
+        if not label or len(label) > MAX_LABEL_LENGTH:
+            raise ValueError("invalid_value_labels")
+        if value in values or label in labels:
+            raise ValueError("duplicate_value_labels")
+        try:
+            if abs(value) > MAX_SAFE_INTEGER:
+                raise ValueError("unsafe integer")
+            scalar_variant(value, variant_type)
+        except ValueError as err:
+            raise ValueError("value_labels_outside_type") from err
+        values.add(value)
+        labels.add(label)
+        result.append({"value": value, "label": label})
+    return result
+
+
+def label_for_value(settings, value):
+    """Text for a raw value, or None when the table does not list it."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    for item in settings.get("value_labels") or ():
+        if item["value"] == value:
+            return item["label"]
+    return None
 
 
 def standard_units():
@@ -137,6 +188,21 @@ def validate_settings(node, settings):
         ):
             raise ValueError("invalid_precision")
         result["precision"] = precision
+    # A value table (raw integer -> text) drives a select and may turn an
+    # integer sensor into a text sensor. Like the deadband, it is silently
+    # dropped for platforms it cannot apply to, so switching a node to
+    # "number" or "disabled" keeps loading with an old table still stored.
+    labels = None
+    if supports_value_labels(node, effective_platform(node, settings)):
+        raw_labels = settings.get("value_labels")
+        if raw_labels is not None:
+            labels = normalize_value_labels(node, raw_labels)
+        if platform == "select" and not labels:
+            raise ValueError("value_labels_required")
+        if labels:
+            if conversion:
+                raise ValueError("value_labels_conversion")
+            result["value_labels"] = labels
     # Deadband is independent of the number limits: a read-only float sensor
     # has exactly the same float-noise problem as a writable number. It is
     # silently dropped (not rejected) for platforms/types it cannot apply to,
@@ -184,7 +250,7 @@ def validate_settings(node, settings):
     if settings.get("device_class") is not None:
         if settings["device_class"] not in available_device_classes(
             node, effective_platform(node, settings)
-        ):
+        ) or (labels and settings["device_class"] != SensorDeviceClass.ENUM.value):
             raise ValueError("invalid_device_class")
         result["device_class"] = settings["device_class"]
     if settings.get("unit_of_measurement") is not None:
@@ -196,6 +262,7 @@ def validate_settings(node, settings):
             not unit
             or len(unit) > 50
             or not supports_unit(node, effective_platform(node, settings))
+            or labels
         ):
             raise ValueError("invalid_unit")
         result["unit_of_measurement"] = unit
@@ -245,6 +312,11 @@ def validate_settings(node, settings):
         ):
             raise ValueError("invalid_text_limits")
         result.update(min_length=minimum, max_length=maximum)
+    elif platform == "button":
+        pulse_ms = settings.get("pulse_ms", PULSE_DEFAULT_MS)
+        if type(pulse_ms) is not int or not PULSE_MIN_MS <= pulse_ms <= PULSE_MAX_MS:
+            raise ValueError("invalid_pulse")
+        result["pulse_ms"] = pulse_ms
     return result
 
 

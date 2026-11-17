@@ -172,7 +172,7 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator], RestoreEntity):
                 return 0.0
         return value
 
-    async def _async_write_value(self, value):
+    async def _async_write_value(self, value, *, refresh=True):
         if self.coordinator._platforms.get(self._node_id) == "disabled":
             raise HomeAssistantError("This OPC UA entity is disabled or removed")
         if self._settings.get("always_available", False) and not self._value_is_live:
@@ -185,7 +185,8 @@ class OpcuaEntity(CoordinatorEntity[AsyncuaCoordinator], RestoreEntity):
             await self.coordinator.hub.set_value(self._target_node_id, value)
         except Exception as err:
             raise HomeAssistantError(f"OPC UA write failed: {err}") from err
-        await self.coordinator.async_request_refresh()
+        if refresh:
+            await self.coordinator.async_request_refresh()
 
 
 def async_setup_node_entities(

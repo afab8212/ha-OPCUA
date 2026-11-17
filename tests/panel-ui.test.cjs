@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.12.0",
+    "Pannello 1.13.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1363,7 +1363,7 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
   assert.equal(
     await groups
       .filter({
-        has: page.locator(".arrayGroupTitle", { hasText: /^SP · 2$/ }),
+        has: page.locator(".arrayGroupTitle", { hasText: /^SP$/ }),
       })
       .locator("tr.entityRow")
       .count(),
@@ -2743,6 +2743,96 @@ test("columns keep their place when a value changes and can be resized", async (
   assert.ok(
     Math.abs((await name.boundingBox()).width - wider) <= 1,
     "width kept after re-render",
+  );
+  await page.close();
+});
+
+test("integer select with a value table and a Boolean push button", async () => {
+  const page = await pageFor();
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    const node = endpoint.nodes.find((n) => n.node_id === "ns=4;i=3");
+    node.variant_type = "Int16";
+    node.writable = true;
+    endpoint.rows.find((r) => r.key === "ns=4;i=3").variant_type = "Int16";
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  const row = page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Velocità linea" });
+  await row.locator("td.typeCell").click();
+  let dialog = page.locator("dialog[open]");
+  // Optional on an integer sensor, required on a select.
+  assert.equal(await dialog.locator(".valueTableField").isVisible(), true);
+  await dialog.getByLabel("Categoria", { exact: true }).selectOption("select");
+  assert.equal(
+    await dialog.getByLabel("Unità di misura", { exact: true }).isVisible(),
+    false,
+  );
+  const add = dialog.getByRole("button", {
+    name: "Aggiungi riga",
+    exact: true,
+  });
+  await add.click();
+  await add.click();
+  const texts = dialog.locator("[name=value_label_text]");
+  await texts.nth(0).fill("Spento");
+  await texts.nth(1).fill("Auto");
+  assert.deepEqual(
+    await dialog
+      .locator("[name=value_label_value]")
+      .evaluateAll((inputs) => inputs.map((i) => i.value)),
+    ["0", "1"],
+  );
+  await add.click();
+  await dialog
+    .getByRole("button", { name: "Rimuovi riga", exact: true })
+    .last()
+    .click();
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  let saved = await page.evaluate(() =>
+    window.calls.findLast((m) => m.type.endsWith("/update")),
+  );
+  assert.equal(saved.platform, "select");
+  assert.deepEqual(saved.value_labels, [
+    { value: 0, label: "Spento" },
+    { value: 1, label: "Auto" },
+  ]);
+  assert.equal(saved.unit_of_measurement, undefined);
+  assert.equal(saved.pulse_ms, undefined);
+
+  const button = page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Marcia macchina" });
+  await button.locator("td.typeCell").click();
+  dialog = page.locator("dialog[open]");
+  assert.equal(
+    await dialog.getByLabel("Durata impulso (ms)", { exact: true }).isVisible(),
+    false,
+  );
+  await dialog.getByLabel("Categoria", { exact: true }).selectOption("button");
+  const pulse = dialog.getByLabel("Durata impulso (ms)", { exact: true });
+  assert.equal(await pulse.inputValue(), "500");
+  assert.equal(await dialog.locator(".valueTableField").isVisible(), false);
+  await pulse.fill("800");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  saved = await page.evaluate(() =>
+    window.calls.findLast((m) => m.type.endsWith("/update")),
+  );
+  assert.equal(saved.platform, "button");
+  assert.equal(saved.pulse_ms, 800);
+  assert.equal(saved.value_labels, undefined);
+  // Group headings name the platform and leave the count to the chips.
+  const headings = await page.locator(".groupToggle").allTextContents();
+  assert.ok(
+    ["select", "button"].every((p) => headings.includes(p)),
+    headings.join(", "),
+  );
+  assert.ok(
+    headings.every((h) => !h.includes("·")),
+    headings.join(", "),
   );
   await page.close();
 });

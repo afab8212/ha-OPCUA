@@ -79,7 +79,13 @@
       "integer_limits_required": "Questo nodo richiede limiti e passo interi.",
       "unsafe_integer_limits": "I limiti interi devono essere compresi tra -9007199254740991 e 9007199254740991 per una rappresentazione esatta nell’interfaccia.",
       "limits_outside_type": "I limiti superano l’intervallo del tipo di dato OPC UA.",
-      "invalid_text_limits": "Usa lunghezze intere con 0 ≤ minimo ≤ massimo ≤ 255."
+      "invalid_text_limits": "Usa lunghezze intere con 0 ≤ minimo ≤ massimo ≤ 255.",
+      "value_labels_required": "Un select richiede una tabella valori. Modificala nel pannello OPC UA.",
+      "invalid_value_labels": "Ogni riga della tabella valori richiede un valore intero e un testo di massimo 64 caratteri.",
+      "duplicate_value_labels": "Valori e testi della tabella valori devono essere univoci.",
+      "value_labels_outside_type": "Un valore della tabella supera l'intervallo del tipo di dato OPC UA.",
+      "value_labels_conversion": "Una tabella valori non può essere combinata con una conversione lineare.",
+      "invalid_pulse": "La durata dell'impulso deve essere un intero tra 50 e 10000 ms."
     },
     "abort": {
       "integration_not_loaded": "Carica l’integrazione prima di configurare i nodi scoperti.",
@@ -96,7 +102,9 @@
         "text": "text",
         "auto": "Automatico (comportamento attuale)",
         "disabled": "Escluso",
-        "datetime": "Data e ora"
+        "datetime": "Data e ora",
+        "select": "select",
+        "button": "button"
       }
     }
   },
