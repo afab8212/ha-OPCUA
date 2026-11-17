@@ -111,7 +111,7 @@ async def test_rename_sets_custom_name_and_leaves_others_untouched(hass, entry):
     )
 
     assert result["renamed"] == [FIELD_1["node_id"]]
-    assert registry.async_get(entity_1.entity_id).name == "astMeldungen 1 · xAktiv"
+    assert registry.async_get(entity_1.entity_id).name == "astMeldungen[1].xAktiv"
     # The unselected, equally-eligible field is untouched.
     assert registry.async_get(entity_2.entity_id).name is None
 
@@ -143,7 +143,7 @@ async def test_rename_persists_display_name_so_the_raw_duplicate_check_clears(
 
     assert (
         entry.options[CONF_NODE_SETTINGS][FIELD_1["node_id"]]["display_name"]
-        == "astMeldungen 1 · xAktiv"
+        == "astMeldungen[1].xAktiv"
     )
     # The unselected field's settings are untouched.
     assert FIELD_2["node_id"] not in entry.options.get(CONF_NODE_SETTINGS, {})
@@ -169,7 +169,7 @@ async def test_legacy_rename_without_display_name_is_reconciled_on_rediscovery(
     # Simulate the pre-fix rename: the registry already has the generated
     # name, but node_settings has nothing - exactly what the old action
     # left behind.
-    registry.async_update_entity(entity_1.entity_id, name="astMeldungen 1 · xAktiv")
+    registry.async_update_entity(entity_1.entity_id, name="astMeldungen[1].xAktiv")
     assert FIELD_1["node_id"] not in entry.options.get(CONF_NODE_SETTINGS, {})
 
     # A rediscovery - e.g. the restart that applies the upgrade - must
@@ -179,14 +179,14 @@ async def test_legacy_rename_without_display_name_is_reconciled_on_rediscovery(
 
     assert (
         entry.options[CONF_NODE_SETTINGS][FIELD_1["node_id"]]["display_name"]
-        == "astMeldungen 1 · xAktiv"
+        == "astMeldungen[1].xAktiv"
     )
     # The unrelated legacy duplicate-name check reads coordinator.nodes'
     # raw "name" directly - confirm it is actually disambiguated now, not
     # just the persisted setting.
     c.hub.discovery_complete = True
     names = [node["name"] for node in c.nodes.values()]
-    assert names.count("astMeldungen 1 · xAktiv") == 1
+    assert names.count("astMeldungen[1].xAktiv") == 1
     # FIELD_2 was never renamed, so it still legitimately carries the raw
     # name - but now only once, so it no longer collides with anything.
     assert names.count("xAktiv") == 1
@@ -209,7 +209,7 @@ async def test_legacy_reconcile_actually_clears_the_duplicate_warning(
     """
     c, entity_1, _ = await prepare(hass, entry)
     registry = er.async_get(hass)
-    registry.async_update_entity(entity_1.entity_id, name="astMeldungen 1 · xAktiv")
+    registry.async_update_entity(entity_1.entity_id, name="astMeldungen[1].xAktiv")
     c.hub.discovery_complete = True
 
     caplog.clear()

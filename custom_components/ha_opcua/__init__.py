@@ -23,6 +23,7 @@ from homeassistant.util import dt as dt_util
 from .arrays import (
     array_element_name,
     display_name_for,
+    migrated_display_name,
     name_with_path_enabled,
     parse_array_element,
     relative_paths,
@@ -1086,6 +1087,21 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 )
                 if generated is not None:
                     saved = {**saved, "display_name": generated}
+            # Earlier versions generated names like "SP · xError"; such a
+            # saved name (and only an exact match - never one the user
+            # typed) is rewritten once to today's "SP.xError" form.
+            migrated = migrated_display_name(
+                saved.get("display_name"),
+                node_id,
+                root_node_id=root_node_id,
+                path=self._discovered_path(target_id),
+            )
+            if migrated is not None:
+                saved = {**saved, "display_name": migrated}
+                self._pending_node_settings[node_id] = {
+                    **self._pending_node_settings.get(node_id, saved),
+                    "display_name": migrated,
+                }
             # A persisted display name (from this node's own "new" pass,
             # possibly in an earlier run) always wins over the raw field
             # name - but only ever a name this feature computed and saved
@@ -1115,6 +1131,7 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
                 elif saved:
                     self.node_settings[node_id] = settings
                     self._pending_node_settings[node_id] = settings
+        self._migrate_legacy_registry_names()
         self._reconcile_legacy_array_display_names()
         seen_ids = set(candidates)
         # persist=False here means this pass is fundamentally not eligible to
@@ -1132,6 +1149,39 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         """The browse path below the root recorded for a node, if discovered."""
         paths = getattr(self._hub, "node_paths", None)
         return paths.get(node_id) if isinstance(paths, dict) else None
+
+    def _migrate_legacy_registry_names(self):
+        """Rewrite registry names an earlier version generated ("SP · xError").
+
+        The panel's bulk rename stored its generated name as the entity's
+        registry name too, which overrides the entity's own name. Only a
+        registry name that is exactly such a legacy generated name is
+        rewritten to today's form; a name the user typed stays untouched.
+        """
+        if not self.hass or not self.config_entry:
+            return
+        registry = er.async_get(self.hass)
+        entry_id = self.config_entry.entry_id
+        root_node_id = getattr(self._hub, "root_node_id", None)
+        for node_id in self.nodes:
+            platform = self._platforms.get(node_id)
+            if platform in (None, "disabled"):
+                continue
+            entity_id = registry.async_get_entity_id(
+                platform, DOMAIN, entity_unique_id(entry_id, node_id)
+            )
+            registered = registry.async_get(entity_id) if entity_id else None
+            if registered is None or registered.name is None:
+                continue
+            target_id = self.node_settings.get(node_id, {}).get("node_id", node_id)
+            migrated = migrated_display_name(
+                registered.name,
+                node_id,
+                root_node_id=root_node_id,
+                path=self._discovered_path(target_id),
+            )
+            if migrated is not None:
+                registry.async_update_entity(entity_id, name=migrated)
 
     def _reconcile_legacy_array_display_names(self):
         """Backfill display_name for array fields renamed before it existed.

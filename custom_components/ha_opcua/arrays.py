@@ -13,6 +13,12 @@ import re
 
 from .const import CONF_NAME_WITH_PATH
 
+# Earlier versions joined name parts with a middle dot ("SP · xError") and
+# wrote an array index as "astAlarms 3". Names now read like the PLC symbol
+# ("SP.xError", "astAlarms[3]"); the legacy form is only kept to recognize
+# generated names saved by those versions and migrate them.
+_LEGACY_SEPARATOR = " · "
+
 _ARRAY_ELEMENT_RE = re.compile(
     r"^(?P<prefix>.*\.(?P<array>[^.\[\]]+)\[(?P<index>\d+)\])\.(?P<field>[^.\[\]]+)$"
 )
@@ -31,12 +37,19 @@ def parse_array_element(node_id):
     }
 
 
-def array_element_name(node_id, field_name):
-    """A field's default display name, disambiguated by its array index."""
+def array_element_name(node_id, field_name, *, legacy=False):
+    """A field's default display name, disambiguated by its array index.
+
+    Written like the PLC symbol itself ("astMeldungen[10].xAktiv"); the
+    legacy form ("astMeldungen 10 · xAktiv") is what earlier versions
+    generated and is only still produced to recognize and migrate it.
+    """
     parsed = parse_array_element(node_id)
     if parsed is None:
         return field_name
-    return f"{parsed['array']} {parsed['index']} · {field_name}"
+    if legacy:
+        return f"{parsed['array']} {parsed['index']} · {field_name}"
+    return f"{parsed['array']}[{parsed['index']}].{field_name}"
 
 
 _STRING_NODE_ID_RE = re.compile(r"^(?:ns=\d+;)?s=(?P<path>.+)$")
@@ -56,12 +69,13 @@ def parse_struct_field(node_id):
     return {"parent": parent, "field": field}
 
 
-def struct_field_name(node_id):
+def struct_field_name(node_id, *, legacy=False):
     """A field's display name prefixed with its parent struct instance."""
     parsed = parse_struct_field(node_id)
     if parsed is None:
         return None
-    return f"{parsed['parent']} · {parsed['field']}"
+    separator = _LEGACY_SEPARATOR if legacy else "."
+    return f"{parsed['parent']}{separator}{parsed['field']}"
 
 
 def disambiguated_name(node_id, *, collides):
@@ -108,12 +122,14 @@ def _relative_segments(node_id, root_node_id, path=None):
     return segments if all(segments) else None
 
 
-def _segment_label(segment):
+def _segment_label(segment, *, legacy=False):
+    if not legacy:
+        return segment
     match = _INDEXED_SEGMENT_RE.match(segment)
     return f"{match['name']} {match['index']}" if match else segment
 
 
-def path_name(node_id, root_node_id, path=None):
+def path_name(node_id, root_node_id, path=None, *, legacy=False):
     """A node's full path below the root as a display name, or None.
 
     Only a node nested at least one level below the root has a path to show.
@@ -121,7 +137,10 @@ def path_name(node_id, root_node_id, path=None):
     segments = _relative_segments(node_id, root_node_id, path)
     if segments is None or len(segments) < 2:
         return None
-    return " · ".join(_segment_label(segment) for segment in segments)
+    separator = _LEGACY_SEPARATOR if legacy else "."
+    return separator.join(
+        _segment_label(segment, legacy=legacy) for segment in segments
+    )
 
 
 def path_group(node_id, root_node_id, path=None):
@@ -150,6 +169,38 @@ def display_name_for(
         if name is not None:
             return name
     return disambiguated_name(node_id, collides=collides)
+
+
+def migrated_display_name(name, node_id, *, root_node_id=None, path=None):
+    """The current form of a name an earlier version generated, or None.
+
+    Only a name that is exactly one of the legacy generated names for this
+    node is migrated; anything else (a name the user typed) is left alone.
+    """
+    if not isinstance(name, str) or _LEGACY_SEPARATOR not in name:
+        return None
+    candidates = []
+    parsed = parse_array_element(node_id)
+    if parsed is not None:
+        candidates.append(
+            (
+                array_element_name(node_id, parsed["field"], legacy=True),
+                array_element_name(node_id, parsed["field"]),
+            )
+        )
+    candidates.append(
+        (struct_field_name(node_id, legacy=True), struct_field_name(node_id))
+    )
+    candidates.append(
+        (
+            path_name(node_id, root_node_id, path, legacy=True),
+            path_name(node_id, root_node_id, path),
+        )
+    )
+    for legacy, current in candidates:
+        if legacy is not None and legacy == name and current != name:
+            return current
+    return None
 
 
 def _symbolic_segments(node_id):

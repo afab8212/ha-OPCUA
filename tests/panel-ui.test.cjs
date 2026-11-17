@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.11.0",
+    "Pannello 1.12.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -348,7 +348,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   await page.setViewportSize({ width: 1280, height: 900 });
   await shot(page, "desktop.png");
   await page
-    .getByRole("button", { name: "Sensori binari · 1", exact: true })
+    .getByRole("button", { name: "binary_sensor · 1", exact: true })
     .click();
   assert.equal(await page.locator("tr.entityRow").count(), 1);
   await page.getByRole("button", { name: "Tutte · 4", exact: true }).click();
@@ -378,7 +378,7 @@ test("editing saves correct fields and live hass updates preserve draft", async 
   await page
     .locator("tr.entityRow")
     .filter({ hasText: "Porta protezione" })
-    .getByRole("button", { name: "Modifica" })
+    .locator("td.typeCell")
     .click();
   const dialog = page.locator("dialog");
   await dialog.getByLabel("Nome", { exact: true }).fill("Porta ingresso");
@@ -425,7 +425,7 @@ test("sensor device class is configurable and saved", async () => {
   await page
     .locator("tr.entityRow")
     .filter({ hasText: "Velocità linea" })
-    .getByRole("button", { name: "Modifica" })
+    .locator("td.typeCell")
     .click();
   const dialog = page.locator("dialog");
   const deviceClass = dialog.getByLabel("Classe dispositivo", { exact: true });
@@ -454,7 +454,7 @@ test("mobile dialog, cancel and rejected save keep data intact", async () => {
   await page
     .locator("tr.entityRow")
     .filter({ hasText: "Marcia macchina" })
-    .getByRole("button", { name: "Modifica" })
+    .locator("td.typeCell")
     .click();
   let dialog = page.locator("dialog");
   await dialog.getByLabel("Nome", { exact: true }).fill("Cancelled");
@@ -468,7 +468,7 @@ test("mobile dialog, cancel and rejected save keep data intact", async () => {
   await page
     .locator("tr.entityRow")
     .filter({ hasText: "Marcia macchina" })
-    .getByRole("button", { name: "Modifica" })
+    .locator("td.typeCell")
     .click();
   dialog = page.locator("dialog");
   await dialog.getByLabel("Nome", { exact: true }).fill("Unsaved draft");
@@ -657,11 +657,9 @@ test("datetime manual creation, category filter and compatible remapping", async
     });
   });
   await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Data e ora · 1", exact: true })
-    .click();
+  await page.getByRole("button", { name: "datetime · 1", exact: true }).click();
   assert.equal(await page.locator("tr.entityRow").count(), 1);
-  await page.getByRole("button", { name: "Modifica", exact: true }).click();
+  await page.locator("tr.entityRow td.typeCell").click();
   const options = await dialog
     .locator("select[name=node_id]")
     .locator("option")
@@ -765,7 +763,7 @@ test("live entity states update without requests, rebuilding cards or losing dra
     await card("Nome ricetta").locator(".stateValue").textContent(),
     "  [Ricetta A]  ",
   );
-  await run.getByRole("button", { name: "Modifica", exact: true }).click();
+  await run.locator("td.typeCell").click();
   const dialog = page.locator("dialog[open]");
   await dialog.getByLabel("Nome", { exact: true }).fill("Bozza aperta");
   await page.evaluate(() => {
@@ -975,9 +973,9 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
         variant_type: "Boolean",
         reclassifiable: false,
         array_group: group1,
-        array_label: "astMeldungen 1",
+        array_label: "astMeldungen[1]",
         array_field: "xAktiv",
-        proposed_name: "astMeldungen 1 · xAktiv",
+        proposed_name: "astMeldungen[1].xAktiv",
         renamable: true,
       },
       {
@@ -989,9 +987,9 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
         variant_type: "String",
         reclassifiable: false,
         array_group: group1,
-        array_label: "astMeldungen 1",
+        array_label: "astMeldungen[1]",
         array_field: "sText",
-        proposed_name: "astMeldungen 1 · sText",
+        proposed_name: "astMeldungen[1].sText",
         renamable: true,
       },
       {
@@ -1003,9 +1001,9 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
         variant_type: "Boolean",
         reclassifiable: false,
         array_group: group2,
-        array_label: "astMeldungen 2",
+        array_label: "astMeldungen[2]",
         array_field: "xAktiv",
-        proposed_name: "astMeldungen 2 · xAktiv",
+        proposed_name: "astMeldungen[2].xAktiv",
         renamable: true,
       },
     );
@@ -1056,7 +1054,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   await arrayToggle().click();
   const groups = page.locator(".arrayGroup");
   assert.equal(await groups.count(), 2);
-  const group1Card = groups.filter({ hasText: "astMeldungen 1" });
+  const group1Card = groups.filter({ hasText: "astMeldungen[1]" });
   assert.equal(
     await group1Card.locator("tr.entityRow").count(),
     2,
@@ -1075,7 +1073,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   // A platform filter wants its own flat, precise list instead, even while
   // array grouping is selected.
   await page
-    .getByRole("button", { name: "Sensori binari · 3", exact: true })
+    .getByRole("button", { name: "binary_sensor · 3", exact: true })
     .click();
   assert.equal(await page.locator(".arrayGroup").count(), 0);
   assert.equal(
@@ -1118,7 +1116,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
     .first();
   assert.equal(
     await item.locator(".pickArrow").textContent(),
-    "→ astMeldungen 1 · xAktiv",
+    "→ astMeldungen[1].xAktiv",
   );
   await item.locator("input").check();
   assert.equal(await confirm.textContent(), "Rinomina selezionati (1)");
@@ -1139,7 +1137,7 @@ test("view and grouping choices sit together as icons with a calm, delayed hint"
     endpoint.rows.push({
       key: "tipsp1",
       node_id: "ns=4;s=PLC.Application.SP.xError",
-      name: "SP · xError",
+      name: "SP.xError",
       entity_id: "binary_sensor.tipsp1",
       platform: "binary_sensor",
       variant_type: "Boolean",
@@ -1389,10 +1387,10 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
 
   // Path grouping is kept while narrowing down: a platform filter groups
   // only what it still shows, and a search does too.
-  await page.getByRole("button", { name: /^Sensori binari · \d+$/ }).click();
+  await page.getByRole("button", { name: /^binary_sensor · \d+$/ }).click();
   assert.equal(await page.locator(".arrayGroup").count(), 1);
   assert.equal(await page.locator(".arrayGroup tr.entityRow").count(), 2);
-  await page.getByRole("button", { name: /^Sensori · \d+$/ }).click();
+  await page.getByRole("button", { name: /^sensor · \d+$/ }).click();
   assert.equal(await page.locator(".arrayGroup").count(), 1);
   await page.getByRole("button", { name: /^Tutte · \d+$/ }).click();
   assert.equal(await page.locator(".arrayGroup").count(), 2);
@@ -1424,7 +1422,7 @@ test("edit number limits, preserve draft, exclude and re-enable from the panel",
   const card = page
     .locator("tr.entityRow")
     .filter({ hasText: "Velocità linea" });
-  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  await card.locator("td.typeCell").click();
   let dialog = page.locator("dialog[open]");
   assert.equal(
     await dialog.getByLabel("Valore minimo", { exact: true }).inputValue(),
@@ -1450,7 +1448,7 @@ test("edit number limits, preserve draft, exclude and re-enable from the panel",
   );
   assert.deepEqual(saved.limits, { min: -5, max: 125.5, step: 0.25 });
   assert.equal(saved.platform, "number");
-  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  await card.locator("td.typeCell").click();
   dialog = page.locator("dialog[open]");
   await dialog
     .getByLabel("Categoria", { exact: true })
@@ -1461,9 +1459,9 @@ test("edit number limits, preserve draft, exclude and re-enable from the panel",
   );
   await dialog.getByRole("button", { name: "Salva", exact: true }).click();
   await page
-    .getByRole("button", { name: "Esclusi · 1", exact: true })
+    .getByRole("button", { name: "disabled · 1", exact: true })
     .waitFor();
-  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  await card.locator("td.typeCell").click();
   await page
     .locator("dialog[open]")
     .getByLabel("Categoria", { exact: true })
@@ -1472,7 +1470,7 @@ test("edit number limits, preserve draft, exclude and re-enable from the panel",
     .locator("dialog[open]")
     .getByRole("button", { name: "Salva", exact: true })
     .click();
-  await page.getByRole("button", { name: "Numeri · 1", exact: true }).waitFor();
+  await page.getByRole("button", { name: "number · 1", exact: true }).waitFor();
   await page.close();
 });
 
@@ -1510,11 +1508,11 @@ test("manual text limits and cancelled category edits on mobile", async () => {
   );
   assert.deepEqual(saved.limits, { min_length: 2, max_length: 64 });
   const card = page.locator("tr.entityRow").filter({ hasText: "Nome ricetta" });
-  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  await card.locator("td.typeCell").click();
   dialog = page.locator("dialog[open]");
   await dialog.getByLabel("Categoria", { exact: true }).selectOption("sensor");
   await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
-  await card.getByRole("button", { name: "Modifica", exact: true }).click();
+  await card.locator("td.typeCell").click();
   assert.equal(
     await page
       .locator("dialog[open]")
@@ -1530,8 +1528,7 @@ test("REAL precision can be saved, cleared and reset on a non-REAL remap", async
   const card = page
     .locator("tr.entityRow")
     .filter({ hasText: "Velocità linea" });
-  const edit = () =>
-    card.getByRole("button", { name: "Modifica", exact: true }).click();
+  const edit = () => card.locator("td.typeCell").click();
   const dialog = page.locator("dialog[open]");
   const field = () => dialog.getByLabel("Decimali", { exact: true });
   const save = async () => {
@@ -1595,8 +1592,7 @@ test("a unit of measurement can be picked from a searchable list, set to a custo
   const card = page
     .locator("tr.entityRow")
     .filter({ hasText: "Velocità linea" });
-  const edit = () =>
-    card.getByRole("button", { name: "Modifica", exact: true }).click();
+  const edit = () => card.locator("td.typeCell").click();
   const dialog = page.locator("dialog[open]");
   const field = () =>
     dialog.getByRole("button", { name: "Unità di misura", exact: true });
@@ -1713,7 +1709,7 @@ for (const width of [1280, 390]) {
     await page
       .locator("tr.entityRow")
       .filter({ hasText: "Marcia macchina" })
-      .getByRole("button", { name: "Modifica", exact: true })
+      .locator("td.typeCell")
       .click();
     const dialog = page.locator("dialog[open]");
     const invert = dialog.getByRole("switch", {
@@ -1751,9 +1747,14 @@ for (const width of [1280, 390]) {
       "Bozza interruttore",
     );
     assert.equal(await invert.isChecked(), true);
-    const help = dialog.locator(".editorHelp:visible").last();
-    await help.locator("summary").click();
-    assert.equal(await help.getAttribute("open"), "");
+    const help = dialog.locator(".helpTip:visible").last();
+    assert.equal(await help.locator(".hint").isVisible(), false);
+    // The help sits behind the label and opens as a tooltip on focus,
+    // without flipping the switch the label belongs to.
+    await help.focus();
+    assert.equal(await help.locator(".hint").isVisible(), true);
+    await help.click();
+    assert.equal(await invert.isChecked(), true);
     await shot(page, `editor-switches-${width}.png`);
     const search = dialog.getByRole("combobox", {
       name: "Cerca tra i nodi scoperti",
@@ -1795,7 +1796,7 @@ for (const width of [1280, 390]) {
     await page
       .locator("tr.entityRow")
       .filter({ hasText: "Velocità linea" })
-      .getByRole("button", { name: "Modifica", exact: true })
+      .locator("td.typeCell")
       .click();
     const dialog = page.locator("dialog[open]");
     assert.equal(await dialog.locator(".editorSection:visible").count(), 4);
@@ -1846,8 +1847,7 @@ test("always available is per entity, persists, clears and supports manual nodes
   const card = page
     .locator("tr.entityRow")
     .filter({ hasText: "Marcia macchina" });
-  const edit = () =>
-    card.getByRole("button", { name: "Modifica", exact: true }).click();
+  const edit = () => card.locator("td.typeCell").click();
   const dialog = page.locator("dialog[open]");
   const option = () => dialog.getByLabel("Sempre disponibile", { exact: true });
   const save = async () => {
@@ -1915,8 +1915,7 @@ for (const width of [390, 1280]) {
     const card = page
       .locator("tr.entityRow")
       .filter({ hasText: "Velocità linea" });
-    const edit = () =>
-      card.getByRole("button", { name: "Modifica", exact: true }).click();
+    const edit = () => card.locator("td.typeCell").click();
     const dialog = page.locator("dialog[open]");
     const mode = dialog.getByLabel("Modalità aggiornamento", { exact: true });
     const deadband = dialog.getByLabel("Deadband", { exact: true });
@@ -2022,7 +2021,7 @@ for (const width of [390, 1280]) {
     await page
       .locator("tr.entityRow")
       .filter({ hasText: "Marcia macchina" })
-      .getByRole("button", { name: "Modifica", exact: true })
+      .locator("td.typeCell")
       .click();
     const dialog = page.locator("dialog[open]");
     await dialog.getByLabel("Nome", { exact: true }).fill("Draft preserved");
@@ -2248,7 +2247,7 @@ for (const width of [1280, 390, 320]) {
     await page
       .locator("tr.entityRow")
       .filter({ hasText: "Velocità linea" })
-      .getByRole("button", { name: "Modifica" })
+      .locator("td.typeCell")
       .click();
     const dialog = page.locator("dialog");
     await dialog
@@ -2538,9 +2537,7 @@ for (const width of [1280, 390]) {
     await number.scrollIntoViewIfNeeded();
     await shot(page, `customizations-${width}.png`);
     // Use the real save handler: clearing an override must remove its badge.
-    await card("Porta protezione")
-      .getByRole("button", { name: "Modifica", exact: true })
-      .click();
+    await card("Porta protezione").locator("td.typeCell").click();
     const dialog = page.locator("dialog");
     await dialog
       .getByLabel("Inverti stato booleano", { exact: true })
@@ -2591,7 +2588,7 @@ for (const width of [1280, 390]) {
     const card = page
       .locator("tr.entityRow")
       .filter({ hasText: "Velocità linea" });
-    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    await card.locator("td.typeCell").click();
     let dialog = page.locator("dialog[open]");
     const selector = () =>
       dialog.getByLabel("Conversione numerica", { exact: true });
@@ -2611,7 +2608,7 @@ for (const width of [1280, 390]) {
       .locator('[data-setting="conversion"]')
       .getByText("Moltiplicatore", { exact: true })
       .waitFor();
-    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    await card.locator("td.typeCell").click();
     dialog = page.locator("dialog[open]");
     assert.equal(await selector().inputValue(), "multiplier");
     assert.equal(
@@ -2639,7 +2636,7 @@ for (const width of [1280, 390]) {
         ha_max: 150,
       },
     );
-    await card.getByRole("button", { name: "Modifica", exact: true }).click();
+    await card.locator("td.typeCell").click();
     dialog = page.locator("dialog[open]");
     await selector().selectOption("none");
     await dialog.getByRole("button", { name: "Salva", exact: true }).click();
@@ -2695,7 +2692,13 @@ test("German texts, delayed NodeId hint on the name and NodeId in the editor", a
   assert.match(await tip.textContent(), /ns=4;i=1/);
   await page.mouse.move(5, 5);
   assert.equal(await tip.isVisible(), false);
-  await row.getByRole("button", { name: "Bearbeiten", exact: true }).click();
+  // No edit button any more: the focused row opens the editor with Enter.
+  assert.equal(
+    await row.getByRole("button", { name: "Bearbeiten", exact: true }).count(),
+    0,
+  );
+  await row.focus();
+  await page.keyboard.press("Enter");
   const dialog = page.locator("dialog[open]");
   assert.match(
     await dialog.locator(".editorNodeId").textContent(),

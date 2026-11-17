@@ -82,7 +82,7 @@ async def test_off_by_default_keeps_unique_names_and_array_indexes(hass, entry):
 
     assert c.nodes[SP["node_id"]]["name"] == "xError"
     assert c.nodes[PUMP["node_id"]]["name"] == "xEnable"
-    assert c.nodes[ARRAY["node_id"]]["name"] == "astAlarms 3 · xActive"
+    assert c.nodes[ARRAY["node_id"]]["name"] == "astAlarms[3].xActive"
 
     await c.async_shutdown()
 
@@ -91,10 +91,10 @@ async def test_on_names_new_nodes_with_their_full_path(hass, entry):
     enable(hass, entry)
     c = coordinator(hass, entry, known=False)
 
-    assert c.nodes[SP["node_id"]]["name"] == "SP · xError"
-    assert c.nodes[PUMP["node_id"]]["name"] == "PARAM · Pump_North · xEnable"
-    assert c.nodes[ARRAY["node_id"]]["name"] == "PlantRelay · astAlarms 3 · xActive"
-    assert c.node_settings[SP["node_id"]]["display_name"] == "SP · xError"
+    assert c.nodes[SP["node_id"]]["name"] == "SP.xError"
+    assert c.nodes[PUMP["node_id"]]["name"] == "PARAM.Pump_North.xEnable"
+    assert c.nodes[ARRAY["node_id"]]["name"] == "PlantRelay.astAlarms[3].xActive"
+    assert c.node_settings[SP["node_id"]]["display_name"] == "SP.xError"
     # Directly under the root there is no group, and a node outside the
     # root has no path below it - both keep their plain name.
     assert c.nodes[TOP["node_id"]]["name"] == "Speed"
@@ -129,7 +129,7 @@ async def test_existing_nodes_are_offered_their_path_only_when_on(hass, entry):
     enable(hass, entry)
     snapshot = endpoint_snapshot(hass, entry)
     on = {r["key"]: r for r in snapshot["rows"]}
-    assert on[SP["node_id"]]["proposed_name"] == "SP · xError"
+    assert on[SP["node_id"]]["proposed_name"] == "SP.xError"
     assert on[SP["node_id"]]["renamable"] is True
     assert on[TOP["node_id"]]["renamable"] is False
     assert on[OUTSIDE["node_id"]]["renamable"] is False
@@ -155,14 +155,14 @@ async def test_renaming_applies_the_path_and_survives_a_reload(hass, entry):
 
     assert set(result["renamed"]) == {SP["node_id"], PUMP["node_id"]}
     registry = er.async_get(hass)
-    assert registry.async_get(entities[SP["node_id"]].entity_id).name == "SP · xError"
+    assert registry.async_get(entities[SP["node_id"]].entity_id).name == "SP.xError"
     assert (
         entry.options[CONF_NODE_SETTINGS][PUMP["node_id"]]["display_name"]
-        == "PARAM · Pump_North · xEnable"
+        == "PARAM.Pump_North.xEnable"
     )
     await c.async_shutdown()
     c = coordinator(hass, entry, known=True)
-    assert c.nodes[PUMP["node_id"]]["name"] == "PARAM · Pump_North · xEnable"
+    assert c.nodes[PUMP["node_id"]]["name"] == "PARAM.Pump_North.xEnable"
 
     await c.async_shutdown()
 
@@ -211,8 +211,8 @@ async def test_a_numeric_root_uses_the_paths_recorded_by_discovery(hass, entry):
     c.set_nodes(numeric)
     hass.data[DOMAIN] = {"PLC": c}
 
-    assert c.nodes["ns=4;i=2001"]["name"] == "SP · xError"
-    assert c.nodes["ns=4;i=2002"]["name"] == "PARAM · Pump_North · xEnable"
+    assert c.nodes["ns=4;i=2001"]["name"] == "SP.xError"
+    assert c.nodes["ns=4;i=2002"]["name"] == "PARAM.Pump_North.xEnable"
     # No group below the root, and no recorded path at all (e.g. a manually
     # added node) - both keep their plain name.
     assert c.nodes["ns=4;i=2003"]["name"] == "Speed"
@@ -249,5 +249,57 @@ async def test_panel_switch_saves_the_option_without_reloading_the_endpoint(
 
     with pytest.raises(ValueError, match="endpoint_not_found"):
         await async_set_name_with_path(hass, {"entry_id": "missing", "enabled": True})
+
+    await c.async_shutdown()
+
+
+async def test_legacy_generated_names_are_migrated_to_the_dotted_form(hass, entry):
+    """Names an earlier version generated ("SP · xError") move to "SP.xError".
+
+    Only an exact legacy generated name is rewritten - in the saved
+    display_name and in the registry - while a name the user typed, even
+    one containing a middle dot, stays as it is.
+    """
+    enable(hass, entry)
+    hass.config_entries.async_update_entry(
+        entry,
+        options={
+            **entry.options,
+            CONF_NODE_SETTINGS: {
+                SP["node_id"]: {"display_name": "SP · xError"},
+                PUMP["node_id"]: {"display_name": "Pumpe · Nord"},
+                ARRAY["node_id"]: {
+                    "display_name": "PlantRelay · astAlarms 3 · xActive"
+                },
+            },
+        },
+    )
+    entities = register(hass, entry)
+    registry = er.async_get(hass)
+    registry.async_update_entity(entities[SP["node_id"]].entity_id, name="SP · xError")
+    registry.async_update_entity(
+        entities[TOP["node_id"]].entity_id, name="Halle · Speed"
+    )
+    c = coordinator(hass, entry, known=True)
+
+    assert c.nodes[SP["node_id"]]["name"] == "SP.xError"
+    assert c.nodes[ARRAY["node_id"]]["name"] == "PlantRelay.astAlarms[3].xActive"
+    assert c.nodes[PUMP["node_id"]]["name"] == "Pumpe · Nord"
+    assert registry.async_get(entities[SP["node_id"]].entity_id).name == "SP.xError"
+    assert (
+        registry.async_get(entities[TOP["node_id"]].entity_id).name == "Halle · Speed"
+    )
+    # Entity IDs stay the same: only the shown name changes.
+    assert (
+        entities[SP["node_id"]].entity_id
+        == registry.async_get(entities[SP["node_id"]].entity_id).entity_id
+    )
+
+    c.entities_ready = True
+    c.flush_pending_discovery_state()
+    saved = entry.options[CONF_NODE_SETTINGS]
+    assert saved[SP["node_id"]]["display_name"] == "SP.xError"
+    assert saved[ARRAY["node_id"]]["display_name"] == "PlantRelay.astAlarms[3].xActive"
+    assert saved[PUMP["node_id"]]["display_name"] == "Pumpe · Nord"
 
     await c.async_shutdown()

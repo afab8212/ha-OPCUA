@@ -38,8 +38,8 @@ UNIQUE = {
     "variant_type": "Int16",
     "writable": False,
 }
-NORTH_NAME = "Pump_North · xEnable"
-SOUTH_NAME = "Pump_South · xEnable"
+NORTH_NAME = "Pump_North.xEnable"
+SOUTH_NAME = "Pump_South.xEnable"
 ALL = [NORTH, SOUTH, UNIQUE]
 
 

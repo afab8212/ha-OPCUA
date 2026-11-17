@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.11.0";
+const PANEL_VERSION = "1.12.0";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -24,7 +24,7 @@ const TEXT = {
     invalid_availability: "Impostazione di disponibilità non valida.",
     endpointNamePath: "Percorso PLC nei nomi",
     endpointNamePathHelp:
-      "Le nuove entità prendono il percorso completo nel nome (es. “SP · xError”). Per quelle esistenti usa «Rinomina campi duplicati».",
+      "Le nuove entità prendono il percorso completo nel nome (es. “SP.xError”). Per quelle esistenti usa «Rinomina campi duplicati».",
     endpointSubscription: "Auto-Subscription endpoint",
     endpointSubscriptionHelp:
       "Abilita le subscription per le entità selezionate di questo endpoint. Il polling rimane attivo.",
@@ -239,7 +239,7 @@ const TEXT = {
     invalid_name: "Il nome deve contenere al massimo 255 caratteri.",
     limits_outside_type:
       "I limiti numerici configurati superano quelli del nodo scelto.",
-    info: "Configura categoria e limiti da Modifica. Le impostazioni di connessione restano nelle opzioni dell’integrazione.",
+    info: "Clicca una riga per configurarne categoria e limiti. Le impostazioni di connessione restano nelle opzioni dell’integrazione.",
   },
   de: {
     version: "Integration",
@@ -264,7 +264,7 @@ const TEXT = {
     invalid_availability: "Ungültige Verfügbarkeitseinstellung.",
     endpointNamePath: "SPS-Pfad in Namen",
     endpointNamePathHelp:
-      "Neue Entitäten werden mit ihrem vollen Pfad benannt (z. B. „SP · xError“). Für bestehende „Doppelte Felder umbenennen“ verwenden.",
+      "Neue Entitäten werden mit ihrem vollen Pfad benannt (z. B. „SP.xError“). Für bestehende „Doppelte Felder umbenennen“ verwenden.",
     endpointSubscription: "Auto-Subscription",
     endpointSubscriptionHelp:
       "Subscriptions für die ausgewählten Entitäten dieses Endpoints aktivieren. Das Polling bleibt aktiv.",
@@ -484,7 +484,7 @@ const TEXT = {
     invalid_name: "Namen dürfen höchstens 255 Zeichen lang sein.",
     limits_outside_type:
       "Die numerischen Grenzen überschreiten den Wertebereich des gewählten Knotens.",
-    info: "Kategorien und Grenzen über Bearbeiten einstellen. Die Verbindungseinstellungen bleiben in den Integrationsoptionen.",
+    info: "Zeile anklicken, um Kategorie und Grenzen einzustellen. Die Verbindungseinstellungen bleiben in den Integrationsoptionen.",
   },
   en: {
     version: "Integration",
@@ -508,7 +508,7 @@ const TEXT = {
     invalid_availability: "Invalid availability setting.",
     endpointNamePath: "Include PLC path in names",
     endpointNamePathHelp:
-      "New entities are named with their full path (e.g. “SP · xError”). For existing ones use Rename duplicate fields.",
+      "New entities are named with their full path (e.g. “SP.xError”). For existing ones use Rename duplicate fields.",
     endpointSubscription: "Endpoint Auto-Subscription",
     endpointSubscriptionHelp:
       "Enable subscriptions for the selected entities on this endpoint. Polling remains active.",
@@ -718,7 +718,7 @@ const TEXT = {
     invalid_name: "Names must contain at most 255 characters.",
     limits_outside_type:
       "Configured numeric limits exceed the selected node’s range.",
-    info: "Configure categories and limits with Edit. Connection settings remain in the integration options.",
+    info: "Click a row to configure its category and limits. Connection settings remain in the integration options.",
   },
 };
 const LANGS = ["it", "de"];
@@ -730,7 +730,7 @@ const COLUMNS = [
   { key: "colEntity", width: 110, min: 70 },
   { key: "colValue", width: 140, min: 80 },
   { key: "colSettings", min: 200 },
-  { key: "", width: 120, min: 90 },
+  { key: "", width: 90, min: 60 },
 ];
 const GROUPINGS = {
   array: {
@@ -860,8 +860,9 @@ dialog{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;width:mi
 .pickList{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto;border:1px solid var(--divider-color,#dce2ea);border-radius:10px;padding:6px}.pickItem{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:7px;cursor:pointer}.pickItem:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 6%,transparent)}.pickItem input{width:18px;height:18px;min-width:18px;flex-shrink:0;accent-color:var(--primary-color,#008fac)}.pickInfo{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.pickName{font-weight:600;overflow-wrap:anywhere}.pickNodeId{font:11px ui-monospace,monospace;color:var(--secondary-text-color,#637487);overflow-wrap:anywhere}.pickState{font-size:12px;font-weight:600;color:var(--secondary-text-color,#637487);white-space:nowrap;flex-shrink:0}
 .pickArrow{font-size:12px;color:var(--secondary-text-color,#637487);text-align:right;max-width:180px;overflow-wrap:anywhere;flex-shrink:0}
 .entityForm{padding:0;gap:0;overflow:hidden;max-height:inherit;flex:0 1 auto}.editorBody{display:flex;flex-direction:column;gap:17px;padding:24px;overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1}.editorBody>*{flex-shrink:0}.entityForm footer{position:static;flex-shrink:0;flex-wrap:wrap;margin:0;padding:16px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color,#dce2ea)}.entityForm footer .error{flex-basis:100%;overflow-wrap:anywhere}.entityForm footer .error:empty{display:none}
-.entityEditor .editorHeading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px}.editorHeadingText{min-width:0;flex:1}.editorHeadingText h2{font-size:19px}.editorState.card{padding:0;border:0;background:transparent;max-width:40%;flex-shrink:0}.editorState .entityState{margin:0;min-height:36px}.editorState .stateValue{font-size:18px;max-height:3em}.editorState .retainedValue{max-width:160px}.entityEditor .editorSection{padding:14px 16px}.entityEditor .editorSection h3{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px}.editorSection h3 svg{width:18px;height:18px;flex-shrink:0}.entityEditor .editorFields{gap:12px 16px}.editorHelp{margin-top:4px}.editorHelp summary{display:flex;align-items:center;gap:5px;width:fit-content;min-height:28px;cursor:pointer;font-size:12px;color:var(--secondary-text-color,#637487);list-style:none}.editorHelp summary::-webkit-details-marker{display:none}.editorHelp summary:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:2px;border-radius:4px}.infoDot{display:inline-flex;justify-content:center;align-items:center;width:14px;height:14px;border:1px solid currentColor;border-radius:50%;font-size:10px;font-weight:600}.editorHelp[open] summary{color:var(--primary-color,#008fac)}.editorHelp .hint{padding:8px 10px;border-left:2px solid var(--primary-color,#008fac);background:var(--secondary-background-color,#f1f5f9);border-radius:0 6px 6px 0}.editorSwitch{justify-content:space-between;flex-direction:row-reverse;gap:16px;min-height:44px;padding:8px 0;cursor:pointer}.editorSwitch .switchCopy{flex:1;font-weight:500;line-height:1.4}.switchCopy small{display:block;margin-top:3px;font-size:12px;font-weight:400;color:var(--secondary-text-color,#637487)}.entityEditor .editorSwitch input{appearance:none;-webkit-appearance:none;position:relative;width:44px;height:26px;min-width:44px;min-height:26px;flex:0 0 44px;border:1px solid var(--secondary-text-color,#637487);border-radius:20px;background:var(--secondary-text-color,#637487);margin:0;padding:0;cursor:pointer;transition:background 160ms,border-color 160ms}.editorSwitch input::before{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--card-background-color,#fff);transition:transform 160ms}.entityEditor .editorSwitch input:checked{background:var(--primary-color,#008fac);border-color:var(--primary-color,#008fac)}.editorSwitch input:checked::before{transform:translateX(18px)}.editorSwitch input:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:3px}.editorSwitch input:disabled{opacity:.45;cursor:default}.entityEditor input[name=precision]{max-width:120px}.nodePicker .unitTrigger{overflow-wrap:anywhere;white-space:normal;gap:8px}.unitTrigger::after{flex-shrink:0}
-@media(max-width:650px){.entityEditor .editorHeading{padding:12px 16px;gap:8px;flex-wrap:wrap}.editorState.card{max-width:100%}.editorState .entityState{padding:4px 8px;min-height:28px}.editorState .stateValue{font-size:15px}.editorState .valueIcon{display:none}.editorState .stateLabel{display:none}.entityEditor .editorSection{padding:12px}.entityEditor .editorFields{gap:10px}.editorHelp summary{min-height:32px}}
+.entityEditor .editorHeading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px}.editorHeadingText{min-width:0;flex:1}.editorHeadingText h2{font-size:19px}.editorState.card{padding:0;border:0;background:transparent;max-width:40%;flex-shrink:0}.editorState .entityState{margin:0;min-height:36px}.editorState .stateValue{font-size:18px;max-height:3em}.editorState .retainedValue{max-width:160px}.entityEditor .editorSection{padding:14px 16px}.entityEditor .editorSection h3{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px}.editorSection h3 svg{width:18px;height:18px;flex-shrink:0}.entityEditor .editorFields{gap:12px 16px}.helpTip{position:relative;display:inline-flex;align-items:center;margin-left:6px;vertical-align:middle;color:var(--secondary-text-color,#637487);cursor:help;border-radius:50%}.helpTip:hover,.helpTip:focus-visible{color:var(--primary-color,#008fac)}.helpTip:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:2px}.helpTip .hint{display:none;position:absolute;top:calc(100% + 6px);left:-8px;z-index:30;width:max-content;max-width:min(320px,70vw);margin:0;padding:6px 10px;border-radius:7px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:12px;font-weight:400;line-height:1.4;text-align:left;white-space:normal;box-shadow:0 4px 14px rgba(0,0,0,.18)}.helpTip:hover .hint,.helpTip:focus .hint{display:block}
+.infoDot{display:inline-flex;justify-content:center;align-items:center;width:14px;height:14px;border:1px solid currentColor;border-radius:50%;font-size:10px;font-weight:600}.editorSwitch{justify-content:space-between;flex-direction:row-reverse;gap:16px;min-height:44px;padding:8px 0;cursor:pointer}.editorSwitch .switchCopy{flex:1;font-weight:500;line-height:1.4}.switchCopy small{display:block;margin-top:3px;font-size:12px;font-weight:400;color:var(--secondary-text-color,#637487)}.entityEditor .editorSwitch input{appearance:none;-webkit-appearance:none;position:relative;width:44px;height:26px;min-width:44px;min-height:26px;flex:0 0 44px;border:1px solid var(--secondary-text-color,#637487);border-radius:20px;background:var(--secondary-text-color,#637487);margin:0;padding:0;cursor:pointer;transition:background 160ms,border-color 160ms}.editorSwitch input::before{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--card-background-color,#fff);transition:transform 160ms}.entityEditor .editorSwitch input:checked{background:var(--primary-color,#008fac);border-color:var(--primary-color,#008fac)}.editorSwitch input:checked::before{transform:translateX(18px)}.editorSwitch input:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:3px}.editorSwitch input:disabled{opacity:.45;cursor:default}.entityEditor input[name=precision]{max-width:120px}.nodePicker .unitTrigger{overflow-wrap:anywhere;white-space:normal;gap:8px}.unitTrigger::after{flex-shrink:0}
+@media(max-width:650px){.entityEditor .editorHeading{padding:12px 16px;gap:8px;flex-wrap:wrap}.editorState.card{max-width:100%}.editorState .entityState{padding:4px 8px;min-height:28px}.editorState .stateValue{font-size:15px}.editorState .valueIcon{display:none}.editorState .stateLabel{display:none}.entityEditor .editorSection{padding:12px}.entityEditor .editorFields{gap:10px}}
 @media(prefers-reduced-motion:reduce){.editorSwitch input,.editorSwitch input::before{transition:none}}
 .entityEditor{width:min(820px,calc(100vw - 24px))}.editorHeading{padding:20px 24px 16px;border-bottom:1px solid var(--divider-color,#dce2ea);flex-shrink:0}.editorHeading .hint{margin-top:5px}.entityEditor .editorBody{gap:16px;background:var(--primary-background-color,#f5f7fa);padding:20px 24px}.editorSection{padding:18px;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#dce2ea);border-radius:12px;min-width:0}.editorSection h3{margin:0 0 16px;font-size:13px;font-weight:600;color:var(--primary-color,#008fac);letter-spacing:.02em}.editorFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.editorFieldGroup{min-width:0}.editorFieldGroup.wide{grid-column:1/-1}.editorFieldGroup .hint{margin:6px 0 0;font-size:12px;line-height:1.45}.entityEditor input,.entityEditor select{min-height:44px}.unitTrigger{width:100%;min-height:44px;text-align:left;display:flex;align-items:center;justify-content:space-between;font-weight:400}.unitTrigger::after{content:"⌄";margin-left:12px;color:var(--secondary-text-color,#637487)}.unitMenu{border:1px solid var(--primary-color,#008fac);border-radius:10px;padding:8px;margin-top:6px;background:var(--card-background-color,#fff)}.unitMenu input{width:100%;box-sizing:border-box}.pickerOptions{max-height:190px;overflow:auto;margin-top:6px;overscroll-behavior:contain}.pickerOptions [role=option]{padding:10px 12px;min-height:24px;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}.pickerOptions [aria-selected=true]{font-weight:600;color:var(--primary-color,#008fac);background:color-mix(in srgb,var(--primary-color,#008fac) 10%,transparent)}.pickerOptions .active,.pickerOptions [role=option]:hover{background:var(--secondary-background-color,#eaf0f7);outline:1px solid var(--primary-color,#008fac);outline-offset:-1px}.unitTrigger:focus-visible,.unitMenu input:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:2px}
 @media(max-width:650px){.entityEditor{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:14px}.editorHeading{padding:16px}.entityEditor .editorBody{padding:12px;gap:12px}.editorSection{padding:14px}.editorFields{grid-template-columns:1fr;gap:14px}.entityEditor .editorHeading h2{font-size:18px}.editorSection h3{margin-bottom:14px}}
@@ -911,7 +912,7 @@ nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-col
 .entityRow[data-tone="active"]{--value-accent:var(--primary-color,#008fac)}
 .entityRow[data-tone="alert"]{--value-accent:var(--error-color,#be3131)}
 .entityRow:not([data-state-kind="value"]){--value-accent:var(--secondary-text-color,#637487)}
-.entityRow.clickable{cursor:pointer}
+.entityRow.clickable{cursor:pointer}.entityRow.clickable:focus-visible{outline:2px solid var(--primary-color,#008fac);outline-offset:-2px}
 .entityRow:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 5%,transparent)}
 .nameLine{display:flex;align-items:center;gap:6px;min-width:0}
 .nameCell h3{margin:0;max-width:360px;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:600;line-height:1.4}
@@ -1374,7 +1375,15 @@ class OpcuaNodePanel extends HTMLElement {
         },
         this._filter === group ? "selected" : "",
       );
+      // A platform chip reads like the entity column ("sensor", "number");
+      // the translated name stays available as its hint.
+      if (group !== "all") {
+        button.textContent = group;
+        button.dataset.tip = this._t(group);
+      }
       button.textContent += ` · ${count}`;
+      // The hint is CSS generated content; keep it out of the name.
+      button.setAttribute("aria-label", button.textContent);
       button.setAttribute("aria-pressed", String(this._filter === group));
       nav.append(button);
     }
@@ -1444,7 +1453,6 @@ class OpcuaNodePanel extends HTMLElement {
       const th = element("th", column.key ? this._t(column.key) : "", {
         scope: "col",
       });
-      if (!column.key) th.setAttribute("aria-label", this._t("edit"));
       const resizer = element("span", undefined, {
         class: "colResizer",
         "aria-hidden": "true",
@@ -1687,10 +1695,8 @@ class OpcuaNodePanel extends HTMLElement {
         this._button("deleteEntity", () => this._removeOrphan(row), "danger"),
       );
     } else {
-      const edit = this._button("edit", () => this._edit(row));
-      edit.disabled = !row.editable;
-      if (!row.editable) edit.title = this._t("notReady");
-      actions.append(edit);
+      // No separate edit button: the whole row opens the editor.
+      if (!row.editable) tr.title = this._t("notReady");
       if (row.manual)
         actions.append(
           this._button("remove", () => this._remove(row), "danger"),
@@ -1707,11 +1713,22 @@ class OpcuaNodePanel extends HTMLElement {
       actionsCell,
     );
     // Like the other device panels a click anywhere on the row opens the
-    // editor; the buttons keep their own action.
+    // editor; the buttons keep their own action. The row is focusable, so
+    // the editor stays reachable from the keyboard (Enter or Space).
     if (open) {
       tr.classList.add("clickable");
+      tr.tabIndex = 0;
+      tr.setAttribute(
+        "aria-label",
+        `${this._t("edit")}: ${row.name || row.node_id}`,
+      );
       tr.addEventListener("click", (event) => {
         if (event.target.closest("button, a, input, select")) return;
+        open();
+      });
+      tr.addEventListener("keydown", (event) => {
+        if (event.target !== tr || !["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
         open();
       });
     }
@@ -3043,7 +3060,7 @@ class OpcuaNodePanel extends HTMLElement {
       }
       limitsHelp.hidden = !["number", "text"].includes(platform);
       categoryHelp.hidden = !!manual || platform === originalPlatform;
-      for (const [details, help] of helpPairs) details.hidden = help.hidden;
+      for (const [info, help] of helpPairs) info.hidden = help.hidden;
       for (const wrap of body.querySelectorAll(".editorFieldGroup"))
         wrap.hidden = [...wrap.children].every((child) => child.hidden);
       for (const section of body.querySelectorAll(".editorSection"))
@@ -3081,20 +3098,26 @@ class OpcuaNodePanel extends HTMLElement {
         grid.insertBefore(wrap, child);
         wrap.append(child);
         if (help) {
-          const details = element("details", undefined, {
-            class: "editorHelp",
+          // The help sits behind the field's own label as a small "i" and
+          // opens as a tooltip on hover or keyboard focus, so it costs no
+          // extra line below every field.
+          const labelText = child.querySelector("span");
+          const info = element("span", undefined, {
+            class: "helpTip",
+            tabindex: "0",
+            "aria-label": `${this._t("moreInfo")}: ${labelText?.firstChild?.textContent || this._t("valueSection")}`,
           });
-          const summary = element("summary", this._t("moreInfo"));
-          summary.prepend(
+          info.append(
             element("span", "i", { class: "infoDot", "aria-hidden": "true" }),
+            help,
           );
-          summary.setAttribute(
-            "aria-label",
-            `${this._t("moreInfo")}: ${child.querySelector("span")?.firstChild?.textContent || this._t("valueSection")}`,
-          );
-          details.append(summary, help);
-          wrap.append(details);
-          helpPairs.push([details, help]);
+          help.setAttribute("role", "tooltip");
+          // Inside a <label>, a click would otherwise focus the input or
+          // flip the switch the label belongs to.
+          info.addEventListener("click", (event) => event.preventDefault());
+          if (labelText?.firstChild) labelText.firstChild.after(info);
+          else wrap.append(info);
+          helpPairs.push([info, help]);
         }
         if (
           child.contains(name) ||

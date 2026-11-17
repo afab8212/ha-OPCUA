@@ -363,9 +363,9 @@ async def test_new_array_struct_field_gets_a_disambiguated_display_name(hass, en
 
     assert (
         c.node_settings[new_field["node_id"]]["display_name"]
-        == "astMeldungen 10 · xAktiv"
+        == "astMeldungen[10].xAktiv"
     )
-    assert c.nodes[new_field["node_id"]]["name"] == "astMeldungen 10 · xAktiv"
+    assert c.nodes[new_field["node_id"]]["name"] == "astMeldungen[10].xAktiv"
 
     await c.async_shutdown()
 
@@ -418,7 +418,7 @@ async def test_options_flow_preserves_the_generated_array_field_display_name(
             CONF_NODE_SETTINGS: {
                 field["node_id"]: {
                     "platform": "binary_sensor",
-                    "display_name": "astMeldungen 10 · xAktiv",
+                    "display_name": "astMeldungen[10].xAktiv",
                 }
             }
         },
@@ -430,7 +430,7 @@ async def test_options_flow_preserves_the_generated_array_field_display_name(
     saved = await flow.async_step_node({"platform": "binary_sensor"})
     assert (
         saved["data"][CONF_NODE_SETTINGS][field["node_id"]]["display_name"]
-        == "astMeldungen 10 · xAktiv"
+        == "astMeldungen[10].xAktiv"
     )
 
 

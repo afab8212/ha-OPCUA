@@ -204,7 +204,7 @@ def endpoint_snapshot(hass, entry):
                 "node_id": node_id,
                 "array_group": parsed_array["group_key"] if parsed_array else None,
                 "array_label": (
-                    f"{parsed_array['array']} {parsed_array['index']}"
+                    f"{parsed_array['array']}[{parsed_array['index']}]"
                     if parsed_array
                     else None
                 ),
