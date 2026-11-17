@@ -1111,6 +1111,11 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         )
         self._hub.on_connection_state_change = self._connection_state_changed
         self._hub.on_data_change = self._on_subscription_data
+        # Push updates of the current event loop iteration, see
+        # _on_subscription_data: (target NodeId -> node keys, data dict).
+        self._push_batch: tuple[dict[str, list[str]], dict[str, Any]] | None = None
+        self._push_flush_scheduled = False
+        self._push_changed = False
         if self.offline_nodes:
             # persist=False: this pre-connection pass only has offline/manual
             # nodes, not a real discovery snapshot - it must never seed or
@@ -1140,19 +1145,41 @@ class AsyncuaCoordinator(DataUpdateCoordinator):
         """
         if not self.enabled or not self.subscription_enabled:
             return
-        updated = dict(self.data or {})
-        changed = False
-        for node_id, node in self.nodes.items():
-            if (
-                self._node_uses_subscription(node_id)
-                and node["target_node_id"] == target_node_id
-            ):
-                updated[node_id] = value
-                changed = True
-        if changed:
-            self._hub.last_successful_read = dt_util.utcnow()
-            self.data = updated
-            self.last_update_success = True
+        # A server sends the initial value of every monitored item in one
+        # publish response, and asyncua calls this once per item in a single
+        # event loop iteration. Scanning all nodes and updating every entity
+        # per notification would cost O(items x entities) there, blocking the
+        # event loop for seconds with hundreds of nodes, long enough for other
+        # endpoints' sessions to time out. So index the nodes once per
+        # iteration, update the data right away and notify entities once,
+        # when the iteration's notifications are done.
+        batch = self._push_batch
+        if batch is None or batch[1] is not self.data:
+            index: dict[str, list[str]] = {}
+            for node_id, node in self.nodes.items():
+                if self._node_uses_subscription(node_id):
+                    index.setdefault(node["target_node_id"], []).append(node_id)
+            batch = self._push_batch = (index, dict(self.data or {}))
+            self.data = batch[1]
+            if not self._push_flush_scheduled:
+                self._push_flush_scheduled = True
+                asyncio.get_running_loop().call_soon(self._flush_subscription_data)
+        index, updated = batch
+        node_ids = index.get(target_node_id)
+        if not node_ids:
+            return
+        for node_id in node_ids:
+            updated[node_id] = value
+        self._hub.last_successful_read = dt_util.utcnow()
+        self.last_update_success = True
+        self._push_changed = True
+
+    def _flush_subscription_data(self) -> None:
+        """Notify entities once for all push updates of one event loop iteration."""
+        self._push_batch = None
+        self._push_flush_scheduled = False
+        if self._push_changed:
+            self._push_changed = False
             self.async_update_listeners()
 
     async def async_request_rediscovery(self) -> None:

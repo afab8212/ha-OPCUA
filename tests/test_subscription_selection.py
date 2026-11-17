@@ -84,6 +84,45 @@ async def test_manual_node_subscription_survives_coordinator_recreation(hass, en
         await c.async_shutdown()
 
 
+async def test_burst_of_push_updates_notifies_entities_once(hass):
+    """A publish response with every item's initial value must stay cheap."""
+    hub = Mock(ensure_subscription=AsyncMock(), disable_subscription=AsyncMock())
+    c = AsyncuaCoordinator(hass, "PLC", hub, subscription_enabled=True)
+    keys = [f"ns=2;i={index}" for index in range(800)]
+    c.node_settings = {key: {"update_mode": "subscription"} for key in keys}
+    listener = Mock()
+    try:
+        c.set_nodes(
+            [
+                {
+                    "name": key,
+                    "node_id": key,
+                    "variant_type": "Float",
+                    "writable": False,
+                }
+                for key in keys
+            ]
+        )
+        c.data = {}
+        remove = c.async_add_listener(listener)
+        listener.reset_mock()
+        for index, key in enumerate(keys):
+            c._on_subscription_data(key, index)
+        # Values are visible right away; entities are notified once.
+        assert c.data == {key: index for index, key in enumerate(keys)}
+        listener.assert_not_called()
+        await asyncio.sleep(0)
+        listener.assert_called_once()
+        # A later notification starts a new batch on top of the current data.
+        c._on_subscription_data(keys[0], -1)
+        await asyncio.sleep(0)
+        assert c.data[keys[0]] == -1 and c.data[keys[1]] == 1
+        assert listener.call_count == 2
+        remove()
+    finally:
+        await c.async_shutdown()
+
+
 async def test_shared_target_filters_push_recipients_and_uses_smallest_deadband(hass):
     hub = Mock(ensure_subscription=AsyncMock(), disable_subscription=AsyncMock())
     c = AsyncuaCoordinator(hass, "PLC", hub, subscription_enabled=True)
