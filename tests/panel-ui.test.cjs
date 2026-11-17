@@ -2699,7 +2699,7 @@ test("German texts, delayed NodeId hint on the name and NodeId in the editor", a
   const dialog = page.locator("dialog[open]");
   assert.match(
     await dialog.locator(".editorNodeId").textContent(),
-    /NodeId: ns=4;i=1/,
+    /^NodeId\s*ns=4;i=1$/,
   );
   await dialog.getByRole("button", { name: "Abbrechen", exact: true }).click();
   await page.close();

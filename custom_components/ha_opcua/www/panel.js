@@ -958,7 +958,7 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 .nodeTip{position:fixed;top:0;left:0;z-index:30;display:flex;flex-direction:column;gap:2px;max-width:min(560px,calc(100vw - 16px));padding:6px 10px;border-radius:7px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease}
 .nodeTip.visible{opacity:1;visibility:visible}
 .nodeTipId{font-family:ui-monospace,monospace;font-size:11px;opacity:.85;overflow-wrap:anywhere}
-.editorNodeId{margin:4px 0 0;font-family:ui-monospace,monospace;font-size:11px;overflow-wrap:anywhere;user-select:text}
+.field .editorNodeId{display:flex;gap:8px;align-items:baseline;min-width:0;margin-top:2px;font-size:12px;font-weight:400;color:var(--secondary-text-color,#637487);cursor:text}.editorNodeIdLabel{flex:none}.editorNodeId code{min-width:0;font-family:ui-monospace,monospace;font-size:11.5px;overflow-wrap:anywhere;user-select:all;color:var(--primary-text-color,#243346)}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
@@ -2600,18 +2600,23 @@ class OpcuaNodePanel extends HTMLElement {
     });
     name.value = row.custom_name ?? "";
     name.placeholder = row.name || "";
+    const nameField = this._field("name", name);
+    // The NodeId behind the entity, directly below the name input and
+    // selectable for copying; a manual entity picks its node further down.
+    if (!manual && row.node_id) {
+      const nodeLine = element("div", undefined, { class: "editorNodeId" });
+      nodeLine.append(
+        element("span", this._t("colNode"), { class: "editorNodeIdLabel" }),
+        element("code", row.node_id),
+      );
+      // Selecting the NodeId must not hand the click on to the name input.
+      nodeLine.addEventListener("click", (event) => event.preventDefault());
+      nameField.append(nodeLine);
+    }
     identitySection.append(
-      this._field("name", name),
+      nameField,
       element("p", this._t("nameHelp"), { class: "hint" }),
     );
-    // The NodeId behind the entity, right below its name and selectable for
-    // copying; a manual entity picks its node further down instead.
-    if (!manual && row.node_id)
-      identitySection.append(
-        element("p", `${this._t("colNode")}: ${row.node_id}`, {
-          class: "hint editorNodeId",
-        }),
-      );
     const area = element("select", undefined, { name: "area" });
     area.append(element("option", this._t("inherit"), { value: "" }));
     for (const item of this._data.areas)
