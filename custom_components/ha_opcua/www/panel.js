@@ -1,9 +1,9 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.15.0";
+const PANEL_VERSION = "1.15.1";
 // Build shown next to the version: date and running number of that day
 // (YYYYMMDD.N). Bump with every change to this file.
-const PANEL_BUILD = "20261117.2";
+const PANEL_BUILD = "20261117.3";
 // The build this code was loaded as: the hash Home Assistant put into the
 // module URL. Taken from the newest load of this file, so a tab that already
 // ran an older panel still reports the build it actually executes.
@@ -1119,7 +1119,7 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 .entityRow .valueIcon svg{width:15px;height:15px}
 .actionsCell .actions button{min-height:24px;padding:2px 9px}
 .entityTable thead th{position:sticky;overflow:visible}
-.entityTable thead th.sortable{cursor:pointer;user-select:none}.entityTable thead th.sortable:hover,.entityTable thead th[aria-sort=ascending],.entityTable thead th[aria-sort=descending]{color:var(--primary-text-color,#243346)}.sortArrow{display:inline-block;width:1em;margin-left:4px;color:var(--primary-color,#008fac)}.endpointActions button{position:relative}.endpointActions [data-tip]::after{left:0;right:auto;max-width:min(300px,calc(100vw - 64px))}.endpointActions [data-tip]:not(:hover):not(:focus-visible)::after{display:none}@media(hover:hover){.endpointActions [data-tip]:hover::after{animation:tipIn .12s ease .8s both}}.endpointActions [data-tip]:focus-visible::after{animation:tipIn .12s ease .3s both}@keyframes tipIn{from{opacity:0}to{opacity:1}}
+.entityTable thead th.sortable{cursor:pointer;user-select:none}.entityTable thead th.sortable:hover,.entityTable thead th[aria-sort=ascending],.entityTable thead th[aria-sort=descending]{color:var(--primary-text-color,#243346)}.sortArrow{display:inline-block;width:1em;margin-left:4px;color:var(--primary-color,#008fac)}.nodeTip.textTip{max-width:min(300px,calc(100vw - 16px))}
 .colResizer{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;touch-action:none;user-select:none}
 .colResizer:hover{background:color-mix(in srgb,var(--secondary-text-color,#637487) 25%,transparent)}
 .entityRow .stateValue{font-variant-numeric:tabular-nums}
@@ -1169,7 +1169,7 @@ class OpcuaNodePanel extends HTMLElement {
     // it floats above the scrolling table instead of being cut off by it.
     this._tip = element("div", "", { class: "nodeTip", role: "tooltip" });
     this.shadowRoot.addEventListener("pointerover", (event) => {
-      const target = event.target.closest?.("[data-node-tip]");
+      const target = event.target.closest?.("[data-node-tip], [data-float-tip]");
       if (!target || target === this._tipTarget) return;
       this._hideTip();
       this._tipTarget = target;
@@ -1180,6 +1180,17 @@ class OpcuaNodePanel extends HTMLElement {
         this._hideTip();
     });
     this.shadowRoot.addEventListener("scroll", () => this._hideTip(), true);
+    // Keyboard users get the button hints on focus, a bit sooner.
+    this.shadowRoot.addEventListener("focusin", (event) => {
+      const target = event.target.closest?.("[data-float-tip]");
+      if (!target || !target.matches(":focus-visible")) return;
+      this._hideTip();
+      this._tipTarget = target;
+      this._tipTimer = setTimeout(() => this._showTip(target), 300);
+    });
+    this.shadowRoot.addEventListener("focusout", () => this._hideTip());
+    // Pressing the button answers the question the hint explained.
+    this.shadowRoot.addEventListener("pointerdown", () => this._hideTip());
     try {
       const storedGroup = localStorage.getItem("ha-opcua-group-mode");
       if (storedGroup === "category" || storedGroup in GROUPINGS)
@@ -1284,12 +1295,14 @@ class OpcuaNodePanel extends HTMLElement {
   }
   _showTip(target) {
     if (!target.isConnected) return;
-    const name = target.textContent;
-    const nodeId = target.dataset.nodeTip;
-    this._tip.replaceChildren(
-      element("strong", name),
-      element("span", nodeId, { class: "nodeTipId" }),
-    );
+    const text = target.dataset.floatTip;
+    this._tip.classList.toggle("textTip", Boolean(text));
+    if (text) this._tip.replaceChildren(element("span", text));
+    else
+      this._tip.replaceChildren(
+        element("strong", target.textContent),
+        element("span", target.dataset.nodeTip, { class: "nodeTipId" }),
+      );
     this._tip.classList.add("visible");
     const box = target.getBoundingClientRect();
     const tip = this._tip.getBoundingClientRect();
@@ -1417,13 +1430,13 @@ class OpcuaNodePanel extends HTMLElement {
     meta.append(identity);
     const add = this._button("add", () => this._add(), "primary");
     add.disabled = !endpoint.loaded;
-    // The hint is CSS generated content; keep it out of the name.
-    add.dataset.tip = this._t("addHelp");
-    add.setAttribute("aria-label", add.textContent);
+    // The hint floats above the page and stays inside the window wherever
+    // the button sits (wide toolbar, full-width buttons on a phone).
+    add.dataset.floatTip = this._t("addHelp");
+    add.setAttribute("aria-description", this._t("addHelp"));
     const rediscover = this._button("rediscover", async () => {
       rediscover.disabled = true;
       rediscover.textContent = this._t("rediscovering");
-      rediscover.setAttribute("aria-label", rediscover.textContent);
       try {
         await this._hass.callWS({
           type: "ha_opcua/endpoint/rediscover",
@@ -1436,8 +1449,8 @@ class OpcuaNodePanel extends HTMLElement {
       await this._load();
     });
     rediscover.disabled = !endpoint.loaded;
-    rediscover.dataset.tip = this._t("rediscoverHelp");
-    rediscover.setAttribute("aria-label", rediscover.textContent);
+    rediscover.dataset.floatTip = this._t("rediscoverHelp");
+    rediscover.setAttribute("aria-description", this._t("rediscoverHelp"));
     endpointActions.append(add, rediscover);
     const switches = element("div", undefined, { class: "endpointSwitches" });
     const subscriptionControl = element("div", undefined, {

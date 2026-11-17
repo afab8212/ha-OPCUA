@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.15.0 · Build 20261117.2",
+    "Pannello 1.15.1 · Build 20261117.3",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1321,20 +1321,96 @@ test("a column header sorts the rows inside each group and the endpoint buttons 
   await page.mouse.up();
   assert.equal(await name.getAttribute("aria-sort"), "none");
 
-  // Both endpoint buttons carry a hint on what they do.
-  for (const label of ["Aggiungi entità", "Rileva di nuovo"]) {
-    const button = page.getByRole("button", { name: label, exact: true });
-    await button.hover();
-    await page.waitForTimeout(1200);
-    const tip = await button.evaluate((node) => {
-      const style = getComputedStyle(node, "::after");
-      return { text: style.content, opacity: style.opacity };
-    });
-    assert.equal(tip.opacity, "1");
-    assert.ok(tip.text.includes("PLC") || tip.text.includes("NodeId"));
-  }
   await shot(page, "sorted-table.png");
 });
+
+for (const width of [1920, 1440, 1280, 1024, 768, 650, 390, 320]) {
+  test(`endpoint button hints stay fully inside the window at ${width}px`, async () => {
+    const page = await pageFor(width);
+    const tip = page.locator(".nodeTip");
+    const inWindow = () =>
+      tip.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        return (
+          box.width > 0 &&
+          box.left >= 0 &&
+          box.top >= 0 &&
+          box.right <= window.innerWidth &&
+          box.bottom <= window.innerHeight
+        );
+      });
+    const visible = () =>
+      tip.evaluate((node) => getComputedStyle(node).visibility === "visible");
+    for (const [label, word] of [
+      ["Aggiungi entità", "NodeId"],
+      ["Rileva di nuovo", "PLC"],
+    ]) {
+      const button = page.getByRole("button", { name: label, exact: true });
+      // The name stays the button text; the hint is its description.
+      assert.ok((await button.getAttribute("aria-description")).includes(word));
+      await button.hover();
+      // No flash while the pointer only passes by ...
+      await page.waitForTimeout(150);
+      assert.equal(await visible(), false, `${label}: shown too early`);
+      // ... then the whole text, never cut off by the window or the panel.
+      await page.waitForTimeout(900);
+      assert.equal(await visible(), true, `${label}: not shown`);
+      assert.ok((await tip.textContent()).includes(word));
+      assert.equal(await inWindow(), true, `${label}: cut off at ${width}px`);
+      await shot(page, `button-hint-${label.split(" ")[0]}-${width}.png`);
+      // Leaving the button hides it again.
+      await page.mouse.move(1, 1);
+      await page.waitForTimeout(50);
+      assert.equal(await visible(), false, `${label}: still shown`);
+    }
+    // Keyboard: the hint follows the focus.
+    await page.getByRole("searchbox").focus();
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(500);
+    assert.equal(await visible(), true, "keyboard focus shows no hint");
+    assert.ok((await tip.textContent()).includes("NodeId"));
+    assert.equal(await inWindow(), true);
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(500);
+    assert.ok((await tip.textContent()).includes("PLC"));
+    assert.equal(await inWindow(), true);
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(50);
+    assert.equal(await visible(), false, "hint stays after focus moved on");
+    // Pressing a button closes its hint.
+    const rediscover = page.getByRole("button", {
+      name: "Rileva di nuovo",
+      exact: true,
+    });
+    await rediscover.hover();
+    await page.waitForTimeout(1000);
+    await page.mouse.down();
+    assert.equal(await visible(), false, "hint stays while pressing");
+    await page.mouse.up();
+    // A hint never widens the page.
+    assert.equal(
+      await page
+        .locator(".content")
+        .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+      false,
+    );
+    // While the endpoint is still loading both buttons are disabled; the
+    // hint still explains what they will do.
+    await page.evaluate(() => {
+      window.fixture.endpoints[0].loaded = false;
+    });
+    await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+    const disabled = page.getByRole("button", {
+      name: "Rileva di nuovo",
+      exact: true,
+    });
+    assert.equal(await disabled.isDisabled(), true);
+    await disabled.hover({ force: true });
+    await page.waitForTimeout(1000);
+    assert.equal(await visible(), true, "no hint on a disabled button");
+    assert.equal(await inWindow(), true);
+  });
+}
 
 test("path naming is switched on and off from the endpoint panel", async () => {
   const page = await pageFor(1280);
