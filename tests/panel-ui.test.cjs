@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.15.1 · Build 20261117.3",
+    "Pannello 1.16.0 · Build 20261117.4",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1750,6 +1750,38 @@ test("manual text limits and cancelled category edits on mobile", async () => {
     "text",
   );
   await page.close();
+});
+
+test("the automatic category names what it resolves to and follows a remap", async () => {
+  const page = await pageFor();
+  const dialog = page.locator("dialog[open]");
+  const category = () => dialog.getByLabel("Categoria", { exact: true });
+  const autoText = () =>
+    category()
+      .locator('option[value="auto"]')
+      .textContent();
+  // A writable Boolean maps to a switch.
+  await page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Marcia macchina" })
+    .locator("td.typeCell")
+    .click();
+  assert.equal(await autoText(), "Automatico (switch)");
+  // Other choices keep their plain names.
+  assert.equal(
+    await category().locator('option[value="sensor"]').textContent(),
+    "sensor",
+  );
+  assert.equal(
+    await category().locator('option[value="disabled"]').textContent(),
+    "Esclusi",
+  );
+  // Remapped to a read-only Float node, automatic means a sensor.
+  await category().selectOption("auto");
+  await selectNode(dialog, "ns=4;i=3");
+  assert.equal(await autoText(), "Automatico (sensor)");
+  assert.equal(await category().inputValue(), "auto");
+  await shot(page, "auto-category.png");
 });
 
 test("REAL precision can be saved, cleared and reset on a non-REAL remap", async () => {

@@ -1,9 +1,9 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.15.1";
+const PANEL_VERSION = "1.16.0";
 // Build shown next to the version: date and running number of that day
 // (YYYYMMDD.N). Bump with every change to this file.
-const PANEL_BUILD = "20261117.3";
+const PANEL_BUILD = "20261117.4";
 // The build this code was loaded as: the hash Home Assistant put into the
 // module URL. Taken from the newest load of this file, so a tab that already
 // ran an older panel still reports the build it actually executes.
@@ -3115,20 +3115,32 @@ class OpcuaNodePanel extends HTMLElement {
         ...(manual ? [] : ["disabled"]),
       ];
     };
+    // What "auto" stands for on a node, as the integration maps it: a
+    // writable Boolean is a switch, a writable DateTime a datetime, anything
+    // else a sensor.
+    const autoPlatform = (node) =>
+      node?.writable
+        ? { Boolean: "switch", DateTime: "datetime" }[node.variant_type] ||
+          "sensor"
+        : "sensor";
     const populateCategories = (
       chosen = category.value || row.settings?.platform || row.platform,
     ) => {
-      const allowed = choices(
-        selectedNode() || availableNodes.find((n) => n.node_id === row.node_id),
-      );
+      const node =
+        selectedNode() || availableNodes.find((n) => n.node_id === row.node_id);
+      const allowed = choices(node);
+      const label = (p) => {
+        // Platform IDs as in the group headings; only the pseudo choices
+        // "auto" and "disabled" keep a translated label. "Auto" also names
+        // the category it currently resolves to, e.g. "Automatic (sensor)".
+        if (p === "auto")
+          return node
+            ? `${this._t("auto")} (${autoPlatform(node)})`
+            : this._t("auto");
+        return p === "disabled" ? this._t(p) : p;
+      };
       category.replaceChildren(
-        // Platform IDs as in the group headings; only the pseudo
-        // choices "auto" and "disabled" keep a translated label.
-        ...allowed.map((p) =>
-          element("option", p === "auto" || p === "disabled" ? this._t(p) : p, {
-            value: p,
-          }),
-        ),
+        ...allowed.map((p) => element("option", label(p), { value: p })),
       );
       category.value = allowed.includes(chosen) ? chosen : allowed[0];
     };
@@ -3162,13 +3174,7 @@ class OpcuaNodePanel extends HTMLElement {
         element("p", this._t("nodeHelp"), { class: "hint" }),
       );
     const effective = () =>
-      category.value === "auto"
-        ? selectedNode()?.writable
-          ? { Boolean: "switch", DateTime: "datetime" }[
-              selectedNode().variant_type
-            ] || "sensor"
-          : "sensor"
-        : category.value;
+      category.value === "auto" ? autoPlatform(selectedNode()) : category.value;
     const limitInputs = {};
     const limitGroups = {};
     const initial = row.settings || {};
