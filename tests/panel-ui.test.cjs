@@ -190,7 +190,15 @@ async function pageFor(width = 1280, admin = true) {
       localize: () => "",
       callWS: async (msg) => {
         window.calls.push(structuredClone(msg));
-        if (msg.type.endsWith("/panel")) return structuredClone(window.fixture);
+        if (msg.type.endsWith("/panel")) {
+          // A reloading endpoint: unloaded and empty for a few requests.
+          const data = structuredClone(window.fixture);
+          if (window.reloadingPolls > 0) {
+            window.reloadingPolls--;
+            Object.assign(data.endpoints[0], { loaded: false, rows: [] });
+          }
+          return data;
+        }
         if (msg.type.endsWith("/inspect")) {
           if (window.inspectResult)
             return structuredClone(window.inspectResult);
@@ -271,7 +279,8 @@ async function pageFor(width = 1280, admin = true) {
               entry_id: msg.entry_id,
               revision: msg.revision,
             });
-          return { saved: true, reload: false, entity_ids: [] };
+          if (window.bulkReload) window.reloadingPolls = 3;
+          return { saved: true, reload: !!window.bulkReload, entity_ids: [] };
         }
         if (window.failSave) throw { code: "stale_configuration" };
         const endpoint = window.fixture.endpoints.find(
@@ -341,7 +350,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.18.0 · Build 20261117.10",
+    "Pannello 1.18.0 · Build 20261117.12",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -3583,5 +3592,51 @@ test("one select among numbers hides conversion, unit and device class", async (
       false,
       name,
     );
+  await page.close();
+});
+
+test("a confirmation floats over the page and fades out by itself", async () => {
+  const page = await bulkPage();
+  await modeRow(page, 11).locator("td.typeCell").click();
+  const dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("Modalità aggiornamento", { exact: true })
+    .selectOption("subscription");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  const toast = page.locator(".toast[role=status]");
+  await toast.filter({ hasText: "Configurazione salvata." }).waitFor();
+  // Not part of the page flow: fixed, outside the content.
+  assert.equal(await page.locator("main .toast, main .message").count(), 0);
+  assert.equal(
+    await toast.evaluate((t) => getComputedStyle(t).position),
+    "fixed",
+  );
+  await toast.waitFor({ state: "detached", timeout: 6000 });
+  await page.close();
+});
+
+test("after a slow reload the rows come back without pressing refresh", async () => {
+  const page = await bulkPage();
+  await page.evaluate(() => {
+    window.bulkReload = true;
+  });
+  await modeRow(page, 11)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await modeRow(page, 12)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await page.locator(".bulkEdit").click();
+  const dialog = page.locator("dialog[open]");
+  await dialog
+    .getByLabel("Modalità aggiornamento", { exact: true })
+    .selectOption("subscription");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  // Unloaded at first: no selection buttons without a selection.
+  await page.locator(".message.empty").waitFor();
+  assert.equal(await page.locator(".bulkTools button:visible").count(), 0);
+  // Three unloaded answers outlast the old single retry after 2.5 s.
+  await modeRow(page, 11).waitFor({ timeout: 12000 });
+  assert.equal(await page.locator(".message.empty").count(), 0);
   await page.close();
 });

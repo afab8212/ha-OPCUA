@@ -3,7 +3,7 @@
 const PANEL_VERSION = "1.18.0";
 // Build shown next to the version: date and running number of that day
 // (YYYYMMDD.N). Bump with every change to this file.
-const PANEL_BUILD = "20261117.10";
+const PANEL_BUILD = "20261117.12";
 // The build this code was loaded as: the hash Home Assistant put into the
 // module URL. Taken from the newest load of this file, so a tab that already
 // ran an older panel still reports the build it actually executes.
@@ -1037,6 +1037,8 @@ function compatible(row, node) {
     return node.variant_type === "Boolean" && node.writable;
   return true;
 }
+// How long a confirmation stays on screen.
+const TOAST_MS = 4000;
 const CSS = `
 :host{display:flex;flex-direction:column;height:100%;min-height:0;color:var(--primary-text-color,#243346);background:var(--primary-background-color,#f5f7fb);font:14px var(--paper-font-body1_-_font-family,Roboto,Arial,sans-serif);--accent-sensor:#0f9d8a;--accent-binary_sensor:#6366f1;--accent-switch:#d97a06;--accent-number:#7c4fd6;--accent-text:#e0447a;--accent-datetime:#0891b2;--accent-select:#2f7d32;--accent-button:#c2410c;--accent-disabled:var(--disabled-text-color,#9aa5b1);--speed:180ms}
 @media(prefers-reduced-motion:reduce){:host{--speed:0ms}}
@@ -1172,6 +1174,9 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 @media(min-width:651px){button{padding:5px 12px;min-height:32px}input,select{padding:5px 10px;min-height:32px}.endpointPanel{padding:12px 14px;margin-bottom:12px}.endpointMeta{gap:8px;margin-top:8px}.endpointSubscription .toggle{min-height:26px}.navRow{margin-top:8px;padding-top:8px}nav button{padding:3px 10px;min-height:28px}.viewToggle{padding:2px}.viewToggle button{padding:5px 9px;min-height:28px}.entityEditor .editorBody{padding:12px 16px;gap:10px}.entityEditor .editorSection{padding:10px 14px}.entityEditor .editorSection h3{margin-bottom:8px}.field{gap:4px}.entityForm footer{padding-top:10px;padding-bottom:10px}.entityForm footer button{min-height:32px}.entityEditor input:not([type=checkbox]),.entityEditor select{min-height:32px}}
 /* Only the table scrolls; the endpoint toolbar above stays in place. This holds for a low window too; only a phone scrolls the whole page. position:relative keeps the hidden hints of the toolbar inside, so they never make the Home Assistant page scroll. */
 @media(min-width:651px){:host{height:100vh;height:100dvh}.content{overflow:hidden;position:relative}.content>.tableWrap{flex:1 1 0;min-height:120px}}
+/* Confirmation toast: floats at the bottom centre, fades in and out. */
+.toast{position:fixed;left:50%;bottom:24px;z-index:30;max-width:min(560px,calc(100vw - 32px));padding:11px 18px;border-radius:10px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:14px;line-height:1.45;box-shadow:0 6px 20px rgb(0 0 0 / 30%);cursor:pointer;opacity:0;transform:translate(-50%,8px);transition:opacity .2s ease,transform .2s ease;pointer-events:none}.toast.visible{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
 /* Editing several entities together: selected rows, the selection buttons and the "//…//" marker of differing values. */
 .bulkTools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.bulkTools button{position:relative}
 .entityRow.selected,.entityRow.selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 14%,transparent)}.entityRow.selected>td:first-child{box-shadow:inset 3px 0 0 var(--primary-color,#008fac)}
@@ -1306,6 +1311,20 @@ class OpcuaNodePanel extends HTMLElement {
       ? `${this._t("error")} ${this._t("errorReason")} ${cause}`
       : this._t("error");
   }
+  // After a save that reloads the endpoint, ask again every 2 s until it
+  // is loaded again (at most about a minute), instead of once after a
+  // fixed delay that a slow reload outlasts.
+  _followReload(entryId = this._selected, tries = 30) {
+    clearTimeout(this._timer);
+    this._timer = setTimeout(async () => {
+      await this._load();
+      const endpoint = this._data?.endpoints.find(
+        (e) => e.entry_id === entryId,
+      );
+      if ((!endpoint?.loaded || !endpoint.rows.length) && tries > 1)
+        this._followReload(entryId, tries - 1);
+    }, 2000);
+  }
   _start() {
     if (this._started) return;
     this._started = true;
@@ -1375,7 +1394,12 @@ class OpcuaNodePanel extends HTMLElement {
     if (this._dialog?.open) return;
     const root = this.shadowRoot;
     this._hideTip();
-    root.replaceChildren(element("style", CSS), this._tip);
+    // The toast survives a re-render until it has faded out.
+    root.replaceChildren(
+      element("style", CSS),
+      this._tip,
+      ...(this._toast ? [this._toast] : []),
+    );
     const header = element("header");
     const menu = this._button(
       "☰",
@@ -1419,10 +1443,12 @@ class OpcuaNodePanel extends HTMLElement {
       main.append(
         element("div", this._error, { class: "message error", role: "alert" }),
       );
-    if (this._notice)
-      main.append(
-        element("div", this._notice, { class: "message", role: "status" }),
-      );
+    // A confirmation floats above the page and fades out by itself
+    // instead of taking a row at the top until the next action.
+    if (this._notice) {
+      this._showToast(this._notice);
+      this._notice = "";
+    }
     if (!this._data) {
       if (!this._error) main.append(element("p", this._t("loading")));
       return;
@@ -1733,6 +1759,7 @@ class OpcuaNodePanel extends HTMLElement {
       clear: clearSelection,
       mode: selectMode,
     };
+    this._updateSelection();
     navRow.append(navTools);
     endpointPanel.append(navRow);
     main.append(endpointPanel);
@@ -2063,6 +2090,29 @@ class OpcuaNodePanel extends HTMLElement {
       });
     }
     return tr;
+  }
+  _showToast(text) {
+    clearTimeout(this._toastTimer);
+    this._toast?.remove();
+    const toast = element("div", text, {
+      class: "toast",
+      role: "status",
+      "aria-live": "polite",
+    });
+    // A click dismisses it at once.
+    toast.addEventListener("click", () => hide());
+    const hide = () => {
+      clearTimeout(this._toastTimer);
+      toast.classList.remove("visible");
+      setTimeout(() => {
+        toast.remove();
+        if (this._toast === toast) this._toast = null;
+      }, 250);
+    };
+    this._toast = toast;
+    this.shadowRoot.append(toast);
+    requestAnimationFrame(() => toast.classList.add("visible"));
+    this._toastTimer = setTimeout(hide, TOAST_MS);
   }
   _selectableKeys() {
     // Rows in visible order; rows of a folded group are left out.
@@ -2925,8 +2975,7 @@ class OpcuaNodePanel extends HTMLElement {
         dialog.close();
         await this._load();
         if (result.reload) {
-          clearTimeout(this._timer);
-          this._timer = setTimeout(() => this._load(), 2500);
+          this._followReload();
         }
       } catch (err) {
         error.textContent = this._errorText(err);
@@ -3880,8 +3929,7 @@ class OpcuaNodePanel extends HTMLElement {
         dialog.close();
         await this._load();
         if (result.reload) {
-          clearTimeout(this._timer);
-          this._timer = setTimeout(() => this._load(), 2500);
+          this._followReload();
         }
       } catch (err) {
         error.textContent = this._errorText(err);
@@ -4543,8 +4591,7 @@ class OpcuaNodePanel extends HTMLElement {
         dialog.close();
         await this._load();
         if (result.reload) {
-          clearTimeout(this._timer);
-          this._timer = setTimeout(() => this._load(), 2500);
+          this._followReload();
         }
       } catch (err) {
         // "<key>: <code>" names the entity that failed.
