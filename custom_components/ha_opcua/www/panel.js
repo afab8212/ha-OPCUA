@@ -722,6 +722,16 @@ const TEXT = {
   },
 };
 const LANGS = ["it", "de"];
+// Table columns: default and smallest width in px. The settings column has
+// no default and takes the remaining space.
+const COLUMNS = [
+  { key: "colName", width: 300, min: 120 },
+  { key: "colType", width: 90, min: 60 },
+  { key: "colEntity", width: 110, min: 70 },
+  { key: "colValue", width: 140, min: 80 },
+  { key: "colSettings", min: 200 },
+  { key: "", width: 120, min: 90 },
+];
 const GROUPINGS = {
   array: {
     key: "array_group",
@@ -883,8 +893,8 @@ nav button{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;padd
 nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 12%,transparent);border-color:color-mix(in srgb,var(--primary-color,#008fac) 35%,transparent);color:var(--primary-text-color,#243346);font-weight:600}
 .tableInfo{font-size:12px;color:var(--secondary-text-color,#637487);margin:0 2px 8px}
 .tableWrap{flex:1 1 auto;min-height:240px;overflow:auto;border:1px solid var(--divider-color,#dce2ea);border-radius:12px;background:var(--card-background-color,#fff)}
-.entityTable{border-collapse:collapse;width:100%;min-width:1000px}
-.entityTable td.addressCell{max-width:0;width:100%;min-width:140px}
+.entityTable{border-collapse:collapse;width:100%;table-layout:fixed}
+.entityTable td{overflow:hidden;text-overflow:ellipsis}
 .entityTable th,.entityTable td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--divider-color,#e8edf3);white-space:nowrap;vertical-align:middle}
 .entityTable thead th{position:sticky;top:0;z-index:2;background:var(--card-background-color,#fff);font-size:12px;font-weight:600;color:var(--secondary-text-color,#637487)}
 .groupRow th{padding:0;background:color-mix(in srgb,var(--secondary-text-color,#637487) 6%,var(--card-background-color,#fff));box-shadow:inset 3px 0 0 var(--accent,var(--secondary-text-color,#637487))}
@@ -950,11 +960,18 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 .entityTable th,.entityTable td{padding:4px 10px}
 .entityTable thead th{padding-top:7px;padding-bottom:7px}
 .groupToggle{padding:4px 12px;font-size:12px}
-.nameCell h3{font-size:13px;line-height:1.35;max-width:420px;cursor:default}
+.nameCell h3{font-size:13px;line-height:1.35;max-width:100%;cursor:default}
 .entityRow .stateValue{font-size:13px;line-height:1.35}
 .entityRow .entityState .valueIcon{width:16px;height:16px;flex-basis:16px}
 .entityRow .valueIcon svg{width:15px;height:15px}
 .actionsCell .actions button{min-height:24px;padding:2px 9px}
+.entityTable thead th{position:sticky;overflow:visible}
+.colResizer{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;touch-action:none;user-select:none}
+.colResizer:hover{background:color-mix(in srgb,var(--secondary-text-color,#637487) 25%,transparent)}
+.entityRow .stateValue{font-variant-numeric:tabular-nums}
+.entityRow .stateContent,.entityRow .entityState{min-width:0}
+.entityRow .stateValue{overflow:hidden;text-overflow:ellipsis}
+.settingsCell .customizations{overflow:hidden}
 .nodeTip{position:fixed;top:0;left:0;z-index:30;display:flex;flex-direction:column;gap:2px;max-width:min(560px,calc(100vw - 16px));padding:6px 10px;border-radius:7px;background:var(--primary-text-color,#243346);color:var(--card-background-color,#fff);font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease}
 .nodeTip.visible{opacity:1;visibility:visible}
 .nodeTipId{font-family:ui-monospace,monospace;font-size:11px;opacity:.85;overflow-wrap:anywhere}
@@ -975,6 +992,21 @@ class OpcuaNodePanel extends HTMLElement {
     this._collapsed = new Set();
     this._subscriptionPending = new Set();
     this._subscriptionErrors = new Set();
+    this._colWidths = {};
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem("ha-opcua-column-widths") || "{}",
+      );
+      for (const [index, width] of Object.entries(stored))
+        if (
+          COLUMNS[index] &&
+          Number.isFinite(width) &&
+          width >= COLUMNS[index].min
+        )
+          this._colWidths[index] = width;
+    } catch {
+      /* private browsing / blocked storage or bad data: default widths */
+    }
     // One floating hint for the full name and NodeId of a row. It waits until
     // the pointer rests on a name, so moving across the table stays calm, and
     // it floats above the scrolling table instead of being cut off by it.
@@ -1399,27 +1431,79 @@ class OpcuaNodePanel extends HTMLElement {
     this._count = element("div", "", { class: "tableInfo" });
     const wrap = element("div", undefined, { class: "tableWrap" });
     const table = element("table", undefined, { class: "entityTable" });
+    // Fixed column widths: a changing value never pushes the columns next
+    // to it around. Each column can be widened or narrowed by dragging the
+    // edge of its header; the widths are remembered in this browser.
     const head = element("tr");
-    for (const key of [
-      "colName",
-      "colType",
-      "colEntity",
-      "colValue",
-      "colSettings",
-    ])
-      head.append(element("th", this._t(key), { scope: "col" }));
-    head.append(
-      element("th", "", { scope: "col", "aria-label": this._t("edit") }),
-    );
+    const colgroup = element("colgroup");
+    const cols = COLUMNS.map((column, index) => {
+      const col = element("col");
+      const width = this._colWidths[index] ?? column.width;
+      if (width) col.style.width = `${width}px`;
+      colgroup.append(col);
+      const th = element("th", column.key ? this._t(column.key) : "", {
+        scope: "col",
+      });
+      if (!column.key) th.setAttribute("aria-label", this._t("edit"));
+      const resizer = element("span", undefined, {
+        class: "colResizer",
+        "aria-hidden": "true",
+      });
+      resizer.addEventListener("pointerdown", (event) =>
+        this._startResize(event, index, th, col, table),
+      );
+      th.append(resizer);
+      head.append(th);
+      return col;
+    });
+    this._fitTable(table, cols);
     const thead = element("thead");
     thead.append(head);
-    table.append(thead);
+    table.append(colgroup, thead);
     wrap.append(table);
     this._rows = table;
     main.append(this._count, wrap);
     this._renderRows();
     main.append(element("p", this._t("info"), { class: "hint pageHint" }));
     this._paintStates();
+  }
+  _fitTable(table) {
+    // Below the sum of all widths the table scrolls in its frame instead of
+    // squeezing the columns.
+    const total = COLUMNS.reduce(
+      (sum, column, index) =>
+        sum + (this._colWidths[index] ?? column.width ?? column.min),
+      0,
+    );
+    table.style.minWidth = `${total}px`;
+  }
+  _startResize(event, index, th, col, table) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = th.getBoundingClientRect().width;
+    const onMove = (move) => {
+      const width = Math.round(
+        Math.max(COLUMNS[index].min, startWidth + move.clientX - startX),
+      );
+      this._colWidths[index] = width;
+      col.style.width = `${width}px`;
+      this._fitTable(table);
+    };
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      try {
+        localStorage.setItem(
+          "ha-opcua-column-widths",
+          JSON.stringify(this._colWidths),
+        );
+      } catch {
+        /* private browsing / blocked storage: kept for this page view */
+      }
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp, { once: true });
+    document.addEventListener("pointercancel", onUp, { once: true });
   }
   _customizations(row) {
     // Orphans may share settings with a replacement entity; do not attribute

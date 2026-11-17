@@ -2704,3 +2704,42 @@ test("German texts, delayed NodeId hint on the name and NodeId in the editor", a
   await dialog.getByRole("button", { name: "Abbrechen", exact: true }).click();
   await page.close();
 });
+
+test("columns keep their place when a value changes and can be resized", async () => {
+  const page = await pageFor(1280);
+  const settingsLeft = () =>
+    page
+      .locator("thead th")
+      .nth(4)
+      .evaluate((th) => Math.round(th.getBoundingClientRect().left));
+  const before = await settingsLeft();
+  await page.evaluate(() => {
+    const panel = document.querySelector("opcua-node-panel");
+    for (const id of Object.keys(window.testHass.states))
+      window.testHass.states[id] = {
+        ...window.testHass.states[id],
+        state: "123456789.123456",
+      };
+    panel.hass = { ...window.testHass };
+  });
+  assert.equal(await settingsLeft(), before, "a longer value moves nothing");
+  const name = page.locator("thead th").first();
+  const box = await name.boundingBox();
+  await page.mouse.move(box.x + box.width - 3, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width + 80, box.y + box.height / 2, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  const wider = (await name.boundingBox()).width;
+  assert.ok(Math.abs(wider - (box.width + 83)) <= 2, `dragged to ${wider}`);
+  // The width survives a re-render (storage is blocked in this test page).
+  await page.evaluate(() =>
+    document.querySelector("opcua-node-panel")._render(),
+  );
+  assert.ok(
+    Math.abs((await name.boundingBox()).width - wider) <= 1,
+    "width kept after re-render",
+  );
+  await page.close();
+});
