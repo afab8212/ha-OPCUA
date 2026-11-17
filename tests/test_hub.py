@@ -11,6 +11,30 @@ from custom_components.ha_opcua import OpcuaHub
 pytestmark = pytest.mark.asyncio
 
 
+def fake_read(values):
+    """Answer uaclient.read from {NodeId string: value or ua.StatusCode}.
+
+    Any other NodeId (such as the server's operation limits) is unknown.
+    """
+
+    async def read(params):
+        results = []
+        for read_id in params.NodesToRead:
+            value = values.get(
+                read_id.NodeId.to_string(),
+                ua.StatusCode(ua.StatusCodes.BadNodeIdUnknown),
+            )
+            if isinstance(value, ua.StatusCode):
+                results.append(Mock(StatusCode=value, Value=None))
+            else:
+                results.append(
+                    Mock(StatusCode=ua.StatusCode(), Value=ua.Variant(value))
+                )
+        return results
+
+    return AsyncMock(side_effect=read)
+
+
 def connected_hub():
     node = Mock()
     node.read_value_rank = AsyncMock(return_value=ua.ValueRank.Scalar)
@@ -91,9 +115,7 @@ async def test_timeout_never_replays_write_and_next_operation_reconnects(monkeyp
     hub, client, node = connected_hub()
     node.write_value.side_effect = asyncio.TimeoutError("ack lost")
     replacement = Mock(connect=AsyncMock(), disconnect=AsyncMock())
-    replacement.get_node.return_value = Mock(
-        read_value=AsyncMock(return_value="applied")
-    )
+    replacement.uaclient.read = fake_read({"ns=2;i=10": "applied"})
     factory = Mock(return_value=replacement)
     monkeypatch.setattr("custom_components.ha_opcua.Client", factory)
     with pytest.raises(asyncio.TimeoutError):
@@ -132,8 +154,8 @@ async def test_failed_connect_cleans_client_and_does_not_write(monkeypatch):
 
 async def test_node_error_does_not_close_healthy_session():
     hub, client, node = connected_hub()
-    node.read_value = AsyncMock(
-        side_effect=[ua.UaStatusCodeError(ua.StatusCodes.BadNodeIdUnknown), 42]
+    client.uaclient.read = fake_read(
+        {"ns=2;i=1": ua.StatusCode(ua.StatusCodes.BadNodeIdUnknown), "ns=2;i=2": 42}
     )
     assert await hub.get_values(["ns=2;i=1", "ns=2;i=2"]) == {"ns=2;i=2": 42}
     assert hub.is_connected
@@ -142,8 +164,8 @@ async def test_node_error_does_not_close_healthy_session():
 
 async def test_session_status_error_closes_client():
     hub, client, node = connected_hub()
-    node.read_value = AsyncMock(
-        side_effect=ua.UaStatusCodeError(ua.StatusCodes.BadSessionIdInvalid)
+    client.uaclient.read = fake_read(
+        {"ns=2;i=1": ua.StatusCode(ua.StatusCodes.BadSessionIdInvalid)}
     )
     with pytest.raises(ua.UaStatusCodeError):
         await hub.get_values(["ns=2;i=1"])
@@ -153,7 +175,7 @@ async def test_session_status_error_closes_client():
 
 async def test_cancellation_propagates_without_reconnecting():
     hub, client, node = connected_hub()
-    node.read_value = AsyncMock(side_effect=asyncio.CancelledError())
+    client.uaclient.read = AsyncMock(side_effect=asyncio.CancelledError())
     with pytest.raises(asyncio.CancelledError):
         await hub.get_values(["ns=2;i=1"])
     client.disconnect.assert_awaited_once()

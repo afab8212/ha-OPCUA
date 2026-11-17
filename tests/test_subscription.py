@@ -12,6 +12,8 @@ def connected_hub_with_client():
     client = Mock()
     client.connect = AsyncMock()
     client.disconnect = AsyncMock()
+    # No readable operation limits: the default block sizes apply.
+    client.uaclient.read = AsyncMock(return_value=[])
     hub = OpcuaHub("test", "opc.tcp://localhost:4840", "ns=2;i=1")
     hub.client = client
     hub._connected = True
@@ -45,7 +47,7 @@ async def test_next_ensure_call_creates_a_fresh_subscription_after_cleanup():
     failing.delete = AsyncMock()
     failing.subscribe_data_change = AsyncMock(side_effect=Exception("rejected"))
     working = Mock()
-    working.subscribe_data_change = AsyncMock(return_value="handle")
+    working.subscribe_data_change = AsyncMock(return_value=["handle"])
     client.create_subscription = AsyncMock(side_effect=[failing, working])
     client.get_node.return_value = Mock()
 

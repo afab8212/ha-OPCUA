@@ -11,6 +11,7 @@ from typing import Any
 
 import voluptuous as vol
 from asyncua import Client, ua
+from asyncua.common.ua_utils import data_type_to_variant_type
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -89,6 +90,68 @@ _PERMISSION_STATUS_CODES = {
     ua.StatusCodes.BadUserAccessDenied,
     ua.StatusCodes.BadNotReadable,
 }
+# The server rejected a batched request only because of its size; the same
+# operations in smaller blocks may succeed. See OpcuaHub._chunked.
+_REQUEST_SIZE_STATUS_CODES = {
+    ua.StatusCodes.BadResponseTooLarge,
+    ua.StatusCodes.BadTooManyOperations,
+    ua.StatusCodes.BadEncodingLimitsExceeded,
+    ua.StatusCodes.BadRequestTooLarge,
+}
+# Upper bounds for the operations sent in one request. A server advertising
+# a lower limit in its OperationLimits object is respected instead.
+_BLOCK_SIZES = {"read": 500, "browse": 100, "monitor": 500}
+_OPERATION_LIMIT_IDS = {
+    "read": ua.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxNodesPerRead,
+    "browse": ua.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxNodesPerBrowse,
+    "monitor": (
+        ua.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxMonitoredItemsPerCall
+    ),
+}
+# Node classes whose hierarchical children discovery follows.
+_BROWSED_NODE_CLASSES = {
+    ua.NodeClass.Object,
+    ua.NodeClass.ObjectType,
+    ua.NodeClass.VariableType,
+    ua.NodeClass.Variable,
+}
+# Attributes read per discovered variable, in evaluation order.
+_METADATA_ATTRIBUTES = (
+    ua.AttributeIds.DataType,
+    ua.AttributeIds.ValueRank,
+    ua.AttributeIds.Value,
+    ua.AttributeIds.AccessLevel,
+    ua.AttributeIds.UserAccessLevel,
+)
+
+
+def _read_value_id(node_id: ua.NodeId, attribute: ua.AttributeIds) -> ua.ReadValueId:
+    read_id = ua.ReadValueId()
+    read_id.NodeId = node_id
+    read_id.AttributeId = attribute
+    return read_id
+
+
+def _checked_value(data_value: ua.DataValue) -> Any:
+    """Return a read result's value, raising its status like Node.read_attribute."""
+    if data_value.StatusCode is None:
+        raise ua.UaError("No status code received")
+    data_value.StatusCode.check()
+    return None if data_value.Value is None else data_value.Value.Value
+
+
+def _builtin_variant_type(data_type: ua.NodeId) -> ua.VariantType | None:
+    """Map a built-in DataType like asyncua's data_type_to_variant_type, without I/O."""
+    if data_type.NamespaceIndex != 0 or not isinstance(data_type.Identifier, int):
+        return None
+    if data_type.Identifier >= 30:
+        return None
+    if data_type.Identifier == 29:
+        return ua.VariantType.Int32
+    if data_type.Identifier in (24, 26, 27, 28):
+        return ua.VariantType.Variant
+    return ua.VariantType(data_type.Identifier)
+
 
 SERVICE_SET_VALUE_SCHEMA = vol.Schema(
     {
@@ -317,6 +380,8 @@ class OpcuaHub:
         self._subscription = None
         self._subscribed_node_ids: set[str] = set()
         self._sub_handles: dict[str, Any] = {}
+        # Operations per request by kind, read once per session; see _chunked.
+        self._block_sizes: dict[str, int] | None = None
 
     def _set_connected(self, connected):
         if self._connected == connected:
@@ -341,6 +406,8 @@ class OpcuaHub:
         self._subscription = None
         self._subscribed_node_ids = set()
         self._sub_handles = {}
+        # The next session may reach a different server with other limits.
+        self._block_sizes = None
         if client is not None:
             try:
                 await client.disconnect()
@@ -451,29 +518,264 @@ class OpcuaHub:
         async with self._session() as client:
             return await self._read_node_metadata(client.get_node(parsed))
 
+    async def _session_block_sizes(self, client) -> dict[str, int]:
+        """Read the server's OperationLimits once per session, capped by our defaults.
+
+        A limit of 0 means "no limit" in OPC UA; a missing or unreadable limit
+        keeps the default as well.
+        """
+        if self._block_sizes is not None:
+            return self._block_sizes
+        sizes = dict(_BLOCK_SIZES)
+        params = ua.ReadParameters()
+        params.NodesToRead = [
+            _read_value_id(ua.NodeId(object_id), ua.AttributeIds.Value)
+            for object_id in _OPERATION_LIMIT_IDS.values()
+        ]
+        try:
+            results = await client.uaclient.read(params)
+        except ua.UaStatusCodeError as err:
+            if _connection_error(err):
+                raise
+            _LOGGER.debug("Cannot read OPC UA operation limits: %s", err)
+            results = []
+        if len(results) == len(_OPERATION_LIMIT_IDS):
+            for kind, data_value in zip(_OPERATION_LIMIT_IDS, results, strict=True):
+                status = data_value.StatusCode
+                limit = None if data_value.Value is None else data_value.Value.Value
+                if (
+                    (status is None or status.is_good())
+                    and isinstance(limit, int)
+                    and not isinstance(limit, bool)
+                    and limit > 0
+                ):
+                    sizes[kind] = min(limit, sizes[kind])
+        self._block_sizes = sizes
+        _LOGGER.debug("OPC UA block sizes for '%s': %s", self._hub_name, sizes)
+        return sizes
+
+    async def _chunked(self, client, kind: str, items: list, request) -> list:
+        """Send items in blocks the server accepts and return all results in order.
+
+        A block the server rejects only for its size is halved and resent, and
+        the smaller size is kept for the rest of the session. Only for
+        requests that change nothing on the server (Read, Browse).
+        """
+        sizes = await self._session_block_sizes(client)
+        results: list = []
+        start = 0
+        while start < len(items):
+            block = items[start : start + sizes[kind]]
+            try:
+                block_results = await request(block)
+            except ua.UaStatusCodeError as err:
+                if err.code not in _REQUEST_SIZE_STATUS_CODES or len(block) == 1:
+                    raise
+                sizes[kind] = max(1, len(block) // 2)
+                _LOGGER.debug(
+                    "OPC UA server for '%s' rejected %d %s operations (%s); "
+                    "retrying in blocks of %d",
+                    self._hub_name,
+                    len(block),
+                    kind,
+                    err,
+                    sizes[kind],
+                )
+                continue
+            if len(block_results) != len(block):
+                raise ua.UaError(
+                    f"OPC UA server returned {len(block_results)} results "
+                    f"for {len(block)} {kind} operations"
+                )
+            results.extend(block_results)
+            start += len(block)
+        return results
+
+    async def _read(self, client, read_ids: list[ua.ReadValueId]) -> list:
+        """Read many attributes with as few Read requests as the server allows."""
+
+        async def request(block):
+            params = ua.ReadParameters()
+            params.NodesToRead = block
+            return await client.uaclient.read(params)
+
+        return await self._chunked(client, "read", read_ids, request)
+
+    async def _browse_children(self, client, node_ids: list[ua.NodeId]) -> list:
+        """Return each node's forward hierarchical references, like Node.get_children.
+
+        A node whose browse fails yields no children, as with get_children,
+        which never checked the per-node browse status either.
+        """
+
+        def description(node_id):
+            desc = ua.BrowseDescription()
+            desc.NodeId = node_id
+            desc.BrowseDirection = ua.BrowseDirection.Forward
+            desc.ReferenceTypeId = ua.NodeId(ua.ObjectIds.HierarchicalReferences)
+            desc.IncludeSubtypes = True
+            desc.NodeClassMask = ua.NodeClass.Unspecified
+            desc.ResultMask = ua.BrowseResultMask.All
+            return desc
+
+        async def request(block):
+            params = ua.BrowseParameters()
+            params.View.Timestamp = ua.get_win_epoch()
+            params.NodesToBrowse = [description(node_id) for node_id in block]
+            params.RequestedMaxReferencesPerNode = 0
+            results = await client.uaclient.browse(params)
+            references = []
+            pending = {}
+            for index, result in enumerate(results):
+                if result.StatusCode is not None and not result.StatusCode.is_good():
+                    _LOGGER.debug(
+                        "Cannot browse node %s: %s", block[index], result.StatusCode
+                    )
+                references.append(list(result.References or []))
+                if result.ContinuationPoint:
+                    pending[index] = result.ContinuationPoint
+            while pending:
+                params = ua.BrowseNextParameters()
+                params.ContinuationPoints = list(pending.values())
+                params.ReleaseContinuationPoints = False
+                next_results = await client.uaclient.browse_next(params)
+                indexes, pending = list(pending), {}
+                for index, result in zip(indexes, next_results, strict=False):
+                    references[index].extend(result.References or [])
+                    if result.ContinuationPoint:
+                        pending[index] = result.ContinuationPoint
+            return references
+
+        return await self._chunked(client, "browse", node_ids, request)
+
+    async def _variant_types(self, client, data_types) -> dict[str, Any]:
+        """Map each distinct DataType to a VariantType, or to the error it raised."""
+        variant_types: dict[str, Any] = {}
+        for data_type in data_types:
+            key = data_type.to_string()
+            if key in variant_types:
+                continue
+            variant_type = _builtin_variant_type(data_type)
+            if variant_type is None:
+                try:
+                    variant_type = await data_type_to_variant_type(
+                        client.get_node(data_type)
+                    )
+                except ua.UaStatusCodeError as err:
+                    if _connection_error(err):
+                        raise
+                    variant_type = err
+                except (ua.UaError, ValueError) as err:
+                    variant_type = ValueError(f"unsupported data type: {err}")
+            variant_types[key] = variant_type
+        return variant_types
+
     async def discover_nodes(self) -> list[dict[str, Any]]:
-        """Discover each NodeId once and cache its entity classification."""
+        """Discover each NodeId once and cache its entity classification.
+
+        The address space is fetched level by level with one Browse request
+        per level and the variables' metadata with batched Read requests,
+        instead of several requests per node. Results, their order and the
+        browse paths match a depth-first walk that visits each NodeId once.
+        """
         discovered = []
         paths = {}
-        visited = set()
         self.discovery_complete = True
 
-        async def visit(node, parent_path):
-            node_id = node.nodeid.to_string()
-            if node_id in visited:
-                return
-            visited.add(node_id)
-            node_class = await node.read_node_class()
-            name = (await node.read_browse_name()).Name
-            path = [] if parent_path is None else [*parent_path, name]
-            if node_class == ua.NodeClass.Variable:
+        async with self._session() as client:
+            root_id = client.get_node(self.root_node_id).nodeid
+            root_class, root_name = await self._read(
+                client,
+                [
+                    _read_value_id(root_id, ua.AttributeIds.NodeClass),
+                    _read_value_id(root_id, ua.AttributeIds.BrowseName),
+                ],
+            )
+            root_key = root_id.to_string()
+            # NodeId string -> (NodeId, NodeClass, BrowseName), first seen wins.
+            nodes = {
+                root_key: (
+                    root_id,
+                    ua.NodeClass(_checked_value(root_class)),
+                    _checked_value(root_name).Name,
+                )
+            }
+            children: dict[str, list[str]] = {}
+            level = [root_key] if nodes[root_key][1] in _BROWSED_NODE_CLASSES else []
+            while level:
+                references = await self._browse_children(
+                    client, [nodes[key][0] for key in level]
+                )
+                next_level = []
+                for key, node_references in zip(level, references, strict=True):
+                    child_keys = []
+                    for reference in node_references:
+                        child_key = reference.NodeId.to_string()
+                        child_keys.append(child_key)
+                        if child_key not in nodes:
+                            nodes[child_key] = (
+                                reference.NodeId,
+                                reference.NodeClass,
+                                reference.BrowseName.Name,
+                            )
+                            if reference.NodeClass in _BROWSED_NODE_CLASSES:
+                                next_level.append(child_key)
+                    children[key] = child_keys
+                level = next_level
+
+            # Depth-first, each NodeId once at its first visit: the order and
+            # paths the previous recursive walk produced.
+            variables = []
+            seen = set()
+            stack: list[tuple[str, list[str] | None]] = [(root_key, None)]
+            while stack:
+                key, parent_path = stack.pop()
+                if key in seen:
+                    continue
+                seen.add(key)
+                _, node_class, name = nodes[key]
+                path = [] if parent_path is None else [*parent_path, name]
+                if node_class == ua.NodeClass.Variable:
+                    variables.append(key)
+                    paths[key] = path
+                stack.extend((child, path) for child in reversed(children.get(key, ())))
+
+            attributes = await self._read(
+                client,
+                [
+                    _read_value_id(nodes[key][0], attribute)
+                    for key in variables
+                    for attribute in _METADATA_ATTRIBUTES
+                ],
+            )
+            per_variable = [
+                attributes[index : index + len(_METADATA_ATTRIBUTES)]
+                for index in range(0, len(attributes), len(_METADATA_ATTRIBUTES))
+            ]
+            variant_types = await self._variant_types(
+                client,
+                [
+                    values[0].Value.Value
+                    for values in per_variable
+                    if values[0].StatusCode is not None
+                    and values[0].StatusCode.is_good()
+                    and values[0].Value is not None
+                    and isinstance(values[0].Value.Value, ua.NodeId)
+                ],
+            )
+
+            for key, values in zip(variables, per_variable, strict=True):
                 try:
-                    metadata = await self._read_node_metadata(node, name)
-                    discovered.append(metadata)
-                    paths[metadata["node_id"]] = path
+                    discovered.append(
+                        self._variable_metadata(
+                            key, nodes[key][2], values, variant_types
+                        )
+                    )
                 except ValueError:
-                    _LOGGER.debug("Skipping unsupported value on node %s", node_id)
+                    _LOGGER.debug("Skipping unsupported value on node %s", key)
+                    paths.pop(key)
                 except ua.UaStatusCodeError as err:
+                    paths.pop(key)
                     if _connection_error(err):
                         raise
                     if err.code in _PERMISSION_STATUS_CODES:
@@ -484,43 +786,57 @@ class OpcuaHub:
                         # otherwise one write-only variable would block
                         # orphan detection and baseline pruning forever.
                         _LOGGER.warning(
-                            "Skipping node %s without read permission: %s",
-                            node_id,
-                            err,
+                            "Skipping node %s without read permission: %s", key, err
                         )
                     else:
                         self.discovery_complete = False
-                        _LOGGER.warning("Skipping unreadable node %s: %s", node_id, err)
-
-            if node_class in (
-                ua.NodeClass.Object,
-                ua.NodeClass.ObjectType,
-                ua.NodeClass.VariableType,
-                ua.NodeClass.Variable,
-            ):
-                for child in await node.get_children():
-                    try:
-                        await visit(child, path)
-                    except ua.UaStatusCodeError as err:
-                        if _connection_error(err):
-                            raise
-                        self.discovery_complete = False
-                        _LOGGER.warning(
-                            "Skipping inaccessible child %s: %s", child, err
-                        )
-
-        async with self._session() as client:
-            await visit(client.get_node(self.root_node_id), None)
+                        _LOGGER.warning("Skipping unreadable node %s: %s", key, err)
         self.node_paths = relative_paths(paths)
         return discovered
+
+    @staticmethod
+    def _variable_metadata(node_id, name, values, variant_types):
+        """Classify one variable from its batched reads, like _read_node_metadata."""
+        data_type, rank, value, access, user_access = values
+        data_type_id = _checked_value(data_type)
+        if not isinstance(data_type_id, ua.NodeId):
+            raise ValueError("unsupported_node")
+        variant_type = variant_types[data_type_id.to_string()]
+        if isinstance(variant_type, Exception):
+            raise variant_type
+        rank = _checked_value(rank)
+        if variant_type.name not in SCALAR_TYPES or rank != ua.ValueRank.Scalar:
+            raise ValueError("unsupported_node")
+        _checked_value(value)
+        access = ua.AccessLevel.parse_bitfield(_checked_value(access))
+        user_access = ua.AccessLevel.parse_bitfield(_checked_value(user_access))
+        return {
+            "name": name,
+            "node_id": node_id,
+            "variant_type": variant_type.name,
+            "writable": (
+                ua.AccessLevel.CurrentWrite in access
+                and ua.AccessLevel.CurrentWrite in user_access
+            ),
+        }
 
     async def get_values(self, node_ids) -> dict[str, Any]:
         """Read values by NodeId; a single invalid node need not break the session."""
         result = {}
+        node_ids = list(node_ids)
         async with self._session() as client:
-            for node_id in node_ids:
+            data_values = await self._read(
+                client,
+                [
+                    _read_value_id(
+                        ua.NodeId.from_string(node_id), ua.AttributeIds.Value
+                    )
+                    for node_id in node_ids
+                ],
+            )
+            for node_id, data_value in zip(node_ids, data_values, strict=True):
                 try:
-                    result[node_id] = await client.get_node(node_id).read_value()
+                    result[node_id] = _checked_value(data_value)
                 except ua.UaStatusCodeError as err:
                     if _connection_error(err):
                         raise
@@ -580,30 +896,52 @@ class OpcuaHub:
                         await self._subscription.unsubscribe(handles)
                     self._subscribed_node_ids -= to_remove
                 to_add = target - self._subscribed_node_ids
-                for nid in to_add:
-                    node = client.get_node(nid)
+                unfiltered = []
+                for nid in sorted(to_add):
                     deadband = deadbands.get(nid)
-                    handle = None
-                    if deadband:
-                        try:
-                            handle = await self._subscription.deadband_monitor(
-                                node, deadband_val=deadband, deadbandtype=1
-                            )
-                        except asyncio.CancelledError:
-                            raise
-                        except Exception as err:
-                            _LOGGER.warning(
-                                "OPC UA server for '%s' rejected deadband %.6g on "
-                                "%s, subscribing without a filter instead: %s",
-                                self._hub_name,
-                                deadband,
-                                nid,
-                                err,
-                            )
-                    if handle is None:
-                        handle = await self._subscription.subscribe_data_change(node)
+                    if not deadband:
+                        unfiltered.append(nid)
+                        continue
+                    try:
+                        handle = await self._subscription.deadband_monitor(
+                            client.get_node(nid),
+                            deadband_val=deadband,
+                            deadbandtype=1,
+                        )
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "OPC UA server for '%s' rejected deadband %.6g on "
+                            "%s, subscribing without a filter instead: %s",
+                            self._hub_name,
+                            deadband,
+                            nid,
+                            err,
+                        )
+                        unfiltered.append(nid)
+                        continue
                     self._sub_handles[nid] = handle
                     self._subscribed_node_ids.add(nid)
+                # One CreateMonitoredItems request per block instead of one
+                # per node. A node the server rejects fails the whole call,
+                # as a single rejected node did before: polling takes over.
+                block_size = (await self._session_block_sizes(client))["monitor"]
+                for start in range(0, len(unfiltered), block_size):
+                    block = unfiltered[start : start + block_size]
+                    handles = await self._subscription.subscribe_data_change(
+                        [client.get_node(nid) for nid in block]
+                    )
+                    if len(handles) != len(block):
+                        raise ua.UaError(
+                            f"OPC UA server returned {len(handles)} results "
+                            f"for {len(block)} monitored items"
+                        )
+                    for nid, handle in zip(block, handles, strict=True):
+                        if isinstance(handle, ua.StatusCode):
+                            raise ua.UaStatusCodeError(handle.value)
+                        self._sub_handles[nid] = handle
+                        self._subscribed_node_ids.add(nid)
         except asyncio.CancelledError:
             raise
         except Exception as err:
