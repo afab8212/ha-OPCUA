@@ -1183,6 +1183,104 @@ test("view and grouping choices sit together as icons with a calm, delayed hint"
   assert.equal((await hint(pathButton)).opacity, "0");
 });
 
+test("a column header sorts the rows inside each group and the endpoint buttons explain themselves", async () => {
+  const page = await pageFor(1280);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    for (const [key, name, value] of [
+      ["sortb", "Pressione b", "12.5"],
+      ["sorta", "Pressione A", "3"],
+      ["sortc", "Pressione c", "unavailable"],
+    ]) {
+      endpoint.rows.push({
+        key,
+        node_id: `ns=4;s=${key}`,
+        name,
+        entity_id: `sensor.${key}`,
+        platform: "sensor",
+        variant_type: "Float",
+        reclassifiable: false,
+      });
+      window.testHass.states = {
+        ...window.testHass.states,
+        [`sensor.${key}`]: { state: value, attributes: {} },
+      };
+    }
+    document.querySelector("opcua-node-panel").hass = { ...window.testHass };
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  // The "x of y entities" line is gone.
+  assert.equal(await page.getByText(/di \d+ entità/).count(), 0);
+
+  const sensorNames = () =>
+    page
+      .locator('tbody[data-platform="sensor"] tr.entityRow h3')
+      .allTextContents();
+  const original = await sensorNames();
+  const name = page.locator("thead th", { hasText: "Nome" });
+  const value = page.locator("thead th", { hasText: "Valore" });
+  assert.equal(await name.getAttribute("aria-sort"), "none");
+
+  await name.click();
+  assert.equal(await name.getAttribute("aria-sort"), "ascending");
+  assert.deepEqual(await sensorNames(), [
+    "Pressione A",
+    "Pressione b",
+    "Pressione c",
+    "Velocità linea",
+  ]);
+  await name.click();
+  assert.equal(await name.getAttribute("aria-sort"), "descending");
+  assert.deepEqual(await sensorNames(), [
+    "Velocità linea",
+    "Pressione c",
+    "Pressione b",
+    "Pressione A",
+  ]);
+  await name.click();
+  assert.equal(await name.getAttribute("aria-sort"), "none");
+  assert.deepEqual(await sensorNames(), original);
+
+  // Numbers sort as numbers; an unavailable value stays last either way.
+  await value.click();
+  const ascending = await sensorNames();
+  assert.ok(
+    ascending.indexOf("Pressione A") < ascending.indexOf("Pressione b"),
+  );
+  assert.equal(ascending.at(-1), "Pressione c");
+  await value.click();
+  const descending = await sensorNames();
+  assert.ok(
+    descending.indexOf("Pressione b") < descending.indexOf("Pressione A"),
+  );
+  assert.equal(descending.at(-1), "Pressione c");
+  assert.equal(await name.getAttribute("aria-sort"), "none");
+
+  // Dragging a column edge does not sort.
+  await value.click();
+  assert.equal(await value.getAttribute("aria-sort"), "none");
+  const edge = await name.locator(".colResizer").boundingBox();
+  await page.mouse.move(edge.x + 4, edge.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 40, edge.y + 5);
+  await page.mouse.up();
+  assert.equal(await name.getAttribute("aria-sort"), "none");
+
+  // Both endpoint buttons carry a hint on what they do.
+  for (const label of ["Aggiungi entità", "Rileva di nuovo"]) {
+    const button = page.getByRole("button", { name: label, exact: true });
+    await button.hover();
+    await page.waitForTimeout(1200);
+    const tip = await button.evaluate((node) => {
+      const style = getComputedStyle(node, "::after");
+      return { text: style.content, opacity: style.opacity };
+    });
+    assert.equal(tip.opacity, "1");
+    assert.ok(tip.text.includes("PLC") || tip.text.includes("NodeId"));
+  }
+  await shot(page, "sorted-table.png");
+});
+
 test("path naming is switched on and off from the endpoint panel", async () => {
   const page = await pageFor(1280);
   const toggle = () => page.locator("[data-name-path-toggle]");

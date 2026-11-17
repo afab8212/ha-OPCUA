@@ -180,7 +180,11 @@ const TEXT = {
     colValue: "Valore",
     colSettings: "Impostazioni",
     colArea: "Area",
-    shownOf: "{shown} di {total} entità",
+    sortHint: "Clic per ordinare: crescente, decrescente, ordine originale",
+    addHelp:
+      "Aggiunge a mano un nodo tramite NodeId, per variabili che la rilevazione automatica non trova (es. fuori dal nodo di partenza della ricerca).",
+    rediscoverHelp:
+      "Cerca di nuovo i nodi sul PLC senza interrompere la connessione. La rilevazione avviene già all'avvio e a ogni riconnessione; serve dopo una modifica al programma PLC.",
     groupToggle: "Mostra o nascondi gruppo",
     rediscover: "Rileva di nuovo",
     rediscovering: "Rilevamento…",
@@ -451,7 +455,12 @@ const TEXT = {
     colValue: "Wert",
     colSettings: "Einstellungen",
     colArea: "Bereich",
-    shownOf: "{shown} von {total} Entitäten",
+    sortHint:
+      "Klicken zum Sortieren: aufsteigend, absteigend, ursprüngliche Reihenfolge",
+    addHelp:
+      "Einen Knoten von Hand per NodeId hinzufügen – für Variablen, die die automatische Erkennung nicht findet (z. B. außerhalb des Start-Knotens der Suche).",
+    rediscoverHelp:
+      "SPS-Knoten neu durchsuchen, ohne die Verbindung zu trennen. Läuft ohnehin bei jedem Start und jeder Neuverbindung; nötig nach einer Änderung am SPS-Programm.",
     groupToggle: "Gruppe ein- oder ausblenden",
     rediscover: "Neu erkennen",
     rediscovering: "Erkennen…",
@@ -717,7 +726,11 @@ const TEXT = {
     colValue: "Value",
     colSettings: "Settings",
     colArea: "Area",
-    shownOf: "{shown} of {total} entities",
+    sortHint: "Click to sort: ascending, descending, original order",
+    addHelp:
+      "Add a node by hand via its NodeId – for variables the automatic discovery does not find (e.g. outside the browse start node).",
+    rediscoverHelp:
+      "Browse the PLC nodes again without dropping the connection. Discovery already runs on every start and reconnect; use it after a change to the PLC program.",
     groupToggle: "Show or hide group",
     rediscover: "Rediscover",
     rediscovering: "Discovering…",
@@ -993,7 +1006,6 @@ input,select{padding:9px 11px;min-height:40px}
 nav{gap:6px}
 nav button{border:1px solid var(--divider-color,#dce2ea);border-radius:18px;padding:5px 12px;min-height:34px;color:var(--secondary-text-color,#637487)}
 nav .selected,nav .selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 12%,transparent);border-color:color-mix(in srgb,var(--primary-color,#008fac) 35%,transparent);color:var(--primary-text-color,#243346);font-weight:600}
-.tableInfo{font-size:12px;color:var(--secondary-text-color,#637487);margin:0 2px 8px}
 .tableWrap{flex:1 1 auto;min-height:240px;overflow:auto;border:1px solid var(--divider-color,#dce2ea);border-radius:12px;background:var(--card-background-color,#fff)}
 .entityTable{border-collapse:collapse;width:100%;table-layout:fixed}
 .entityTable td{overflow:hidden;text-overflow:ellipsis}
@@ -1068,6 +1080,7 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 .entityRow .valueIcon svg{width:15px;height:15px}
 .actionsCell .actions button{min-height:24px;padding:2px 9px}
 .entityTable thead th{position:sticky;overflow:visible}
+.entityTable thead th.sortable{cursor:pointer;user-select:none}.entityTable thead th.sortable:hover,.entityTable thead th[aria-sort=ascending],.entityTable thead th[aria-sort=descending]{color:var(--primary-text-color,#243346)}.sortArrow{display:inline-block;width:1em;margin-left:4px;color:var(--primary-color,#008fac)}.endpointActions button{position:relative}.endpointActions [data-tip]::after{left:0;right:auto;max-width:min(300px,calc(100vw - 64px))}
 .colResizer{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;touch-action:none;user-select:none}
 .colResizer:hover{background:color-mix(in srgb,var(--secondary-text-color,#637487) 25%,transparent)}
 .entityRow .stateValue{font-variant-numeric:tabular-nums}
@@ -1095,6 +1108,9 @@ class OpcuaNodePanel extends HTMLElement {
     this._subscriptionPending = new Set();
     this._subscriptionErrors = new Set();
     this._colWidths = {};
+    // Column sort like the file explorer: 1st click ascending, 2nd
+    // descending, 3rd back to the original order. Kept across re-renders.
+    this._sort = null;
     try {
       const stored = JSON.parse(
         localStorage.getItem("ha-opcua-column-widths") || "{}",
@@ -1342,9 +1358,13 @@ class OpcuaNodePanel extends HTMLElement {
     meta.append(identity);
     const add = this._button("add", () => this._add(), "primary");
     add.disabled = !endpoint.loaded;
+    // The hint is CSS generated content; keep it out of the name.
+    add.dataset.tip = this._t("addHelp");
+    add.setAttribute("aria-label", add.textContent);
     const rediscover = this._button("rediscover", async () => {
       rediscover.disabled = true;
       rediscover.textContent = this._t("rediscovering");
+      rediscover.setAttribute("aria-label", rediscover.textContent);
       try {
         await this._hass.callWS({
           type: "ha_opcua/endpoint/rediscover",
@@ -1357,6 +1377,8 @@ class OpcuaNodePanel extends HTMLElement {
       await this._load();
     });
     rediscover.disabled = !endpoint.loaded;
+    rediscover.dataset.tip = this._t("rediscoverHelp");
+    rediscover.setAttribute("aria-label", rediscover.textContent);
     endpointActions.append(add, rediscover);
     const switches = element("div", undefined, { class: "endpointSwitches" });
     const subscriptionControl = element("div", undefined, {
@@ -1548,7 +1570,6 @@ class OpcuaNodePanel extends HTMLElement {
     // One table for every entity of the endpoint, like the other device
     // panels: columns line up across all groups, the header stays visible
     // while the rows scroll.
-    this._count = element("div", "", { class: "tableInfo" });
     const wrap = element("div", undefined, { class: "tableWrap" });
     const table = element("table", undefined, { class: "entityTable" });
     // Fixed column widths: a changing value never pushes the columns next
@@ -1564,6 +1585,7 @@ class OpcuaNodePanel extends HTMLElement {
       const th = element("th", column.key ? this._t(column.key) : "", {
         scope: "col",
       });
+      if (column.key) this._sortableHeader(th, column.key);
       const resizer = element("span", undefined, {
         class: "colResizer",
         "aria-hidden": "true",
@@ -1581,7 +1603,7 @@ class OpcuaNodePanel extends HTMLElement {
     table.append(colgroup, thead);
     wrap.append(table);
     this._rows = table;
-    main.append(this._count, wrap);
+    main.append(wrap);
     this._renderRows();
     main.append(element("p", this._t("info"), { class: "hint pageHint" }));
     this._paintStates();
@@ -1611,6 +1633,9 @@ class OpcuaNodePanel extends HTMLElement {
     };
     const onUp = () => {
       document.removeEventListener("pointermove", onMove);
+      // The click that ends a drag on the header must not sort the column.
+      this._resized = true;
+      setTimeout(() => (this._resized = false));
       try {
         localStorage.setItem(
           "ha-opcua-column-widths",
@@ -1891,8 +1916,103 @@ class OpcuaNodePanel extends HTMLElement {
     cell.append(toggle);
     headRow.append(cell);
     body.append(headRow);
-    for (const row of items) body.append(this._buildRow(row));
+    for (const row of this._sorted(items)) body.append(this._buildRow(row));
     this._rows.append(body);
+  }
+  _sortableHeader(th, key) {
+    // Clicking a column header sorts the rows inside each group: ascending,
+    // descending, then back to the original order.
+    th.classList.add("sortable");
+    th.tabIndex = 0;
+    th.title = this._t("sortHint");
+    const dir = this._sort?.key === key ? this._sort.dir : 0;
+    th.setAttribute(
+      "aria-sort",
+      dir > 0 ? "ascending" : dir < 0 ? "descending" : "none",
+    );
+    th.append(
+      element("span", dir > 0 ? "▲" : dir < 0 ? "▼" : "", {
+        class: "sortArrow",
+        "aria-hidden": "true",
+      }),
+    );
+    const toggle = () => {
+      const current = this._sort?.key === key ? this._sort.dir : 0;
+      this._sort =
+        current === 0 ? { key, dir: 1 } : current > 0 ? { key, dir: -1 } : null;
+      for (const other of th.parentElement.querySelectorAll("th.sortable")) {
+        const own = other === th && this._sort;
+        other.setAttribute(
+          "aria-sort",
+          own ? (this._sort.dir > 0 ? "ascending" : "descending") : "none",
+        );
+        other.querySelector(".sortArrow").textContent = own
+          ? this._sort.dir > 0
+            ? "▲"
+            : "▼"
+          : "";
+      }
+      this._renderRows();
+    };
+    th.addEventListener("click", (event) => {
+      // Dragging a column edge must not sort.
+      if (event.target.closest(".colResizer") || this._resized) return;
+      toggle();
+    });
+    th.addEventListener("keydown", (event) => {
+      if (event.target !== th || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      toggle();
+    });
+  }
+  _sortValue(row, key) {
+    // Sort key per column: a number or text; empty cells always go last.
+    // The value column is sorted at the moment of the click, not on every
+    // new value, so rows do not jump around while the PLC updates.
+    switch (key) {
+      case "colName":
+        return row.name || row.node_id;
+      case "colType":
+        return row.variant_type;
+      case "colEntity":
+        return row.platform;
+      case "colValue": {
+        const entity = this._hass?.states?.[row.entity_id];
+        if (!entity || ["unavailable", "unknown"].includes(entity.state))
+          return null;
+        const number = Number(entity.state);
+        return entity.state !== "" && Number.isFinite(number)
+          ? number
+          : entity.state;
+      }
+      case "colSettings":
+        return this._customizations(row)?.textContent;
+    }
+    return null;
+  }
+  _sorted(rows) {
+    if (!this._sort) return rows;
+    const { key, dir } = this._sort;
+    const empty = (v) => v === null || v === undefined || v === "";
+    const compare = (a, b) => {
+      if (typeof a === "number" && typeof b === "number") return a - b;
+      // Mixed column (value): numbers before text such as "on"/"off".
+      if (typeof a === "number" || typeof b === "number")
+        return typeof a === "number" ? -1 : 1;
+      return String(a).localeCompare(String(b), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    };
+    return rows
+      .map((row, index) => ({ row, index, value: this._sortValue(row, key) }))
+      .sort((a, b) => {
+        const ea = empty(a.value);
+        const eb = empty(b.value);
+        if (ea || eb) return ea === eb ? a.index - b.index : ea ? 1 : -1;
+        return dir * compare(a.value, b.value) || a.index - b.index;
+      })
+      .map((item) => item.row);
   }
   _renderGroups(rows, grouping) {
     // Every field sharing a group key - one PLC array-of-struct element
@@ -1933,7 +2053,6 @@ class OpcuaNodePanel extends HTMLElement {
     const wrap = this._rows.parentElement;
     const showEmpty = (key) => {
       wrap.hidden = true;
-      this._count.textContent = "";
       wrap.after(emptyMessage(this._t(key)));
     };
     wrap.hidden = false;
@@ -1949,9 +2068,6 @@ class OpcuaNodePanel extends HTMLElement {
           .toLowerCase()
           .includes(query),
     );
-    this._count.textContent = this._t("shownOf")
-      .replace("{shown}", rows.length)
-      .replace("{total}", endpoint.rows.length);
     if (!rows.length) {
       showEmpty("empty");
       return;
