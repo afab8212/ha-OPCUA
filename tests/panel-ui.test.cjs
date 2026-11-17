@@ -308,7 +308,7 @@ async function pageFor(width = 1280, admin = true) {
   await page
     .getByRole("heading", { name: "OPC UA Connect", exact: true })
     .waitFor();
-  if (admin) await page.locator("article").first().waitFor();
+  if (admin) await page.locator("tr.entityRow").first().waitFor();
   return page;
 }
 async function shot(page, name) {
@@ -322,14 +322,14 @@ async function shot(page, name) {
 
 test("desktop categories, search, endpoint selection and safe text rendering", async () => {
   const page = await pageFor();
-  assert.equal(await page.locator("article").count(), 4);
+  assert.equal(await page.locator("tr.entityRow").count(), 4);
   assert.equal(
     await page.locator(".integrationVersion").textContent(),
     "Integrazione 2.1.0",
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.9.5",
+    "Pannello 1.10.0",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -350,12 +350,12 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   await page
     .getByRole("button", { name: "Sensori binari · 1", exact: true })
     .click();
-  assert.equal(await page.locator("article").count(), 1);
+  assert.equal(await page.locator("tr.entityRow").count(), 1);
   await page.getByRole("button", { name: "Tutte · 4", exact: true }).click();
   await page
     .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
     .fill("ns=4;i=4");
-  assert.equal(await page.locator("article").count(), 1);
+  assert.equal(await page.locator("tr.entityRow").count(), 1);
   await page
     .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
     .fill("");
@@ -368,7 +368,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
     .waitFor();
   assert.equal(await page.locator("img").count(), 0);
   await page.getByLabel("Endpoint", { exact: true }).selectOption("plc2");
-  assert.equal(await page.locator("article").count(), 0);
+  assert.equal(await page.locator("tr.entityRow").count(), 0);
   await page.getByText("Disconnesso", { exact: true }).waitFor();
   await page.close();
 });
@@ -376,7 +376,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
 test("editing saves correct fields and live hass updates preserve draft", async () => {
   const page = await pageFor();
   await page
-    .locator("article")
+    .locator("tr.entityRow")
     .filter({ hasText: "Porta protezione" })
     .getByRole("button", { name: "Modifica" })
     .click();
@@ -423,7 +423,7 @@ test("editing saves correct fields and live hass updates preserve draft", async 
 test("sensor device class is configurable and saved", async () => {
   const page = await pageFor();
   await page
-    .locator("article")
+    .locator("tr.entityRow")
     .filter({ hasText: "Velocità linea" })
     .getByRole("button", { name: "Modifica" })
     .click();
@@ -452,7 +452,7 @@ test("mobile dialog, cancel and rejected save keep data intact", async () => {
       ";--primary-background-color:#111827;--card-background-color:#1f2937;--primary-text-color:#eef2f7;--secondary-text-color:#9cabc0;--divider-color:#374151;--secondary-background-color:#283548;--primary-color:#0891b2";
   });
   await page
-    .locator("article")
+    .locator("tr.entityRow")
     .filter({ hasText: "Marcia macchina" })
     .getByRole("button", { name: "Modifica" })
     .click();
@@ -466,7 +466,7 @@ test("mobile dialog, cancel and rejected save keep data intact", async () => {
     0,
   );
   await page
-    .locator("article")
+    .locator("tr.entityRow")
     .filter({ hasText: "Marcia macchina" })
     .getByRole("button", { name: "Modifica" })
     .click();
@@ -660,7 +660,7 @@ test("datetime manual creation, category filter and compatible remapping", async
   await page
     .getByRole("button", { name: "Data e ora · 1", exact: true })
     .click();
-  assert.equal(await page.locator("article").count(), 1);
+  assert.equal(await page.locator("tr.entityRow").count(), 1);
   await page.getByRole("button", { name: "Modifica", exact: true }).click();
   const options = await dialog
     .locator("select[name=node_id]")
@@ -712,7 +712,7 @@ test("manual removal works offline with confirmation, cancel and dependency erro
   });
   await dialog.getByRole("button", { name: "Rimuovi", exact: true }).click();
   await dialog.getByRole("alert").filter({ hasText: "Altre entità" }).waitFor();
-  assert.equal(await page.locator("article").count(), 1);
+  assert.equal(await page.locator("tr.entityRow").count(), 1);
   const box = await dialog.boundingBox();
   assert.ok(box.x >= 0 && box.x + box.width <= 390);
   await shot(page, "remove-manual-mobile.png");
@@ -721,7 +721,7 @@ test("manual removal works offline with confirmation, cancel and dependency erro
   });
   await dialog.getByRole("button", { name: "Rimuovi", exact: true }).click();
   await page.getByText("Nodo manuale rimosso.", { exact: true }).waitFor();
-  assert.equal(await page.locator("article").count(), 0);
+  assert.equal(await page.locator("tr.entityRow").count(), 0);
   const removal = await page.evaluate(() =>
     window.calls.find((m) => m.type.endsWith("/remove")),
   );
@@ -738,7 +738,7 @@ test("live entity states update without requests, rebuilding cards or losing dra
   const page = await pageFor();
   const card = (name) =>
     page
-      .locator("article")
+      .locator("tr.entityRow")
       .filter({ has: page.getByRole("heading", { name, exact: true }) });
   const run = card("Marcia macchina");
   await page.evaluate(() => {
@@ -1035,7 +1035,10 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   // scattered under their own platform headings until the user opts in.
   assert.equal(await page.locator(".arrayGroup").count(), 0);
   assert.equal(
-    await page.locator("article").filter({ hasText: "astMeldungen" }).count(),
+    await page
+      .locator("tr.entityRow")
+      .filter({ hasText: "astMeldungen" })
+      .count(),
     3,
   );
   assert.deepEqual(await pressedState(categoryToggle()), {
@@ -1055,7 +1058,7 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
   assert.equal(await groups.count(), 2);
   const group1Card = groups.filter({ hasText: "astMeldungen 1" });
   assert.equal(
-    await group1Card.locator("article").count(),
+    await group1Card.locator("tr.entityRow").count(),
     2,
     "both fields of astMeldungen[1] appear under its own heading",
   );
@@ -1076,7 +1079,10 @@ test("array-of-struct fields are grouped and can be renamed selectively", async 
     .click();
   assert.equal(await page.locator(".arrayGroup").count(), 0);
   assert.equal(
-    await page.locator("article").filter({ hasText: "astMeldungen" }).count(),
+    await page
+      .locator("tr.entityRow")
+      .filter({ hasText: "astMeldungen" })
+      .count(),
     2,
   );
   await page.getByRole("button", { name: "Tutte · 7", exact: true }).click();
@@ -1149,9 +1155,9 @@ test("view and grouping choices sit together as icons with a calm, delayed hint"
   });
   await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
 
-  // Both toggles share one container, and the grouping choices are icons only.
+  // The grouping choices are icons only.
   const tools = page.locator(".navTools");
-  assert.equal(await tools.locator(".viewToggle").count(), 2);
+  assert.equal(await tools.locator(".viewToggle").count(), 1);
   const pathButton = page.getByRole("button", {
     name: "Per gruppo (GVL / struct)",
     exact: true,
@@ -1293,7 +1299,7 @@ test("a group's path can be found by searching when the names are short", async 
     .fill("tank");
   const groups = page.locator(".arrayGroup");
   assert.equal(await groups.count(), 1);
-  assert.equal(await groups.locator("article").count(), 2);
+  assert.equal(await groups.locator("tr.entityRow").count(), 2);
 });
 
 test("fields can be grouped by their PLC path as a third explicit choice", async () => {
@@ -1361,7 +1367,7 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
       .filter({
         has: page.locator(".arrayGroupTitle", { hasText: /^SP · 2$/ }),
       })
-      .locator("article")
+      .locator("tr.entityRow")
       .count(),
     2,
     "both SP fields appear under the SP heading",
@@ -1373,11 +1379,11 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
     1,
   );
   // Every group folds on its own: closing one leaves the other open.
-  await groups.first().locator("summary").click();
+  await groups.first().locator(".groupToggle").click();
   assert.equal(await groups.first().getAttribute("open"), null);
-  assert.equal(await page.locator(".arrayGroup[open]").count(), 1);
-  await groups.first().locator("summary").click();
-  assert.equal(await page.locator(".arrayGroup[open]").count(), 2);
+  assert.equal(await page.locator(".arrayGroup:not(.collapsed)").count(), 1);
+  await groups.first().locator(".groupToggle").click();
+  assert.equal(await page.locator(".arrayGroup:not(.collapsed)").count(), 2);
   assert.equal(await pressed(pathToggle()), "true");
   assert.equal(await pressed(categoryToggle()), "false");
 
@@ -1385,7 +1391,7 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
   // only what it still shows, and a search does too.
   await page.getByRole("button", { name: /^Sensori binari · \d+$/ }).click();
   assert.equal(await page.locator(".arrayGroup").count(), 1);
-  assert.equal(await page.locator(".arrayGroup article").count(), 2);
+  assert.equal(await page.locator(".arrayGroup tr.entityRow").count(), 2);
   await page.getByRole("button", { name: /^Sensori · \d+$/ }).click();
   assert.equal(await page.locator(".arrayGroup").count(), 1);
   await page.getByRole("button", { name: /^Tutte · \d+$/ }).click();
@@ -1394,7 +1400,7 @@ test("fields can be grouped by their PLC path as a third explicit choice", async
     .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
     .fill("xWarning");
   assert.equal(await page.locator(".arrayGroup").count(), 1);
-  assert.equal(await page.locator(".arrayGroup article").count(), 1);
+  assert.equal(await page.locator(".arrayGroup tr.entityRow").count(), 1);
   await page
     .getByRole("searchbox", { name: "Cerca nome o NodeId", exact: true })
     .fill("");
@@ -1415,7 +1421,9 @@ test("edit number limits, preserve draft, exclude and re-enable from the panel",
     row.settings = { platform: "number", min: -5, max: 80, step: 0.25 };
   });
   await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
-  const card = page.locator("article").filter({ hasText: "Velocità linea" });
+  const card = page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Velocità linea" });
   await card.getByRole("button", { name: "Modifica", exact: true }).click();
   let dialog = page.locator("dialog[open]");
   assert.equal(
@@ -1501,7 +1509,7 @@ test("manual text limits and cancelled category edits on mobile", async () => {
     window.calls.find((m) => m.type.endsWith("/create")),
   );
   assert.deepEqual(saved.limits, { min_length: 2, max_length: 64 });
-  const card = page.locator("article").filter({ hasText: "Nome ricetta" });
+  const card = page.locator("tr.entityRow").filter({ hasText: "Nome ricetta" });
   await card.getByRole("button", { name: "Modifica", exact: true }).click();
   dialog = page.locator("dialog[open]");
   await dialog.getByLabel("Categoria", { exact: true }).selectOption("sensor");
@@ -1519,7 +1527,9 @@ test("manual text limits and cancelled category edits on mobile", async () => {
 
 test("REAL precision can be saved, cleared and reset on a non-REAL remap", async () => {
   const page = await pageFor();
-  const card = page.locator("article").filter({ hasText: "Velocità linea" });
+  const card = page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Velocità linea" });
   const edit = () =>
     card.getByRole("button", { name: "Modifica", exact: true }).click();
   const dialog = page.locator("dialog[open]");
@@ -1582,7 +1592,9 @@ test("REAL precision can be saved, cleared and reset on a non-REAL remap", async
 
 test("a unit of measurement can be picked from a searchable list, set to a custom value, cleared and hidden for a non-numeric remap", async () => {
   const page = await pageFor();
-  const card = page.locator("article").filter({ hasText: "Velocità linea" });
+  const card = page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Velocità linea" });
   const edit = () =>
     card.getByRole("button", { name: "Modifica", exact: true }).click();
   const dialog = page.locator("dialog[open]");
@@ -1699,7 +1711,7 @@ for (const width of [1280, 390]) {
   test(`compact editor switches, node search and live header preserve draft at ${width}px`, async () => {
     const page = await pageFor(width);
     await page
-      .locator("article")
+      .locator("tr.entityRow")
       .filter({ hasText: "Marcia macchina" })
       .getByRole("button", { name: "Modifica", exact: true })
       .click();
@@ -1781,7 +1793,7 @@ for (const width of [1280, 390]) {
   test(`unit picker keyboard interaction and editor sections at ${width}px`, async () => {
     const page = await pageFor(width);
     await page
-      .locator("article")
+      .locator("tr.entityRow")
       .filter({ hasText: "Velocità linea" })
       .getByRole("button", { name: "Modifica", exact: true })
       .click();
@@ -1831,7 +1843,9 @@ for (const width of [1280, 390]) {
 
 test("always available is per entity, persists, clears and supports manual nodes", async () => {
   const page = await pageFor(390);
-  const card = page.locator("article").filter({ hasText: "Marcia macchina" });
+  const card = page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Marcia macchina" });
   const edit = () =>
     card.getByRole("button", { name: "Modifica", exact: true }).click();
   const dialog = page.locator("dialog[open]");
@@ -1898,7 +1912,9 @@ test("always available is per entity, persists, clears and supports manual nodes
 for (const width of [390, 1280]) {
   test(`subscription selection persists and keeps deadband while polling at ${width}px`, async () => {
     const page = await pageFor(width);
-    const card = page.locator("article").filter({ hasText: "Velocità linea" });
+    const card = page
+      .locator("tr.entityRow")
+      .filter({ hasText: "Velocità linea" });
     const edit = () =>
       card.getByRole("button", { name: "Modifica", exact: true }).click();
     const dialog = page.locator("dialog[open]");
@@ -2004,7 +2020,7 @@ for (const width of [390, 1280]) {
     assert.ok(box.x >= 0 && box.x + box.width <= width);
     await shot(page, `endpoint-subscription-${width}.png`);
     await page
-      .locator("article")
+      .locator("tr.entityRow")
       .filter({ hasText: "Marcia macchina" })
       .getByRole("button", { name: "Modifica", exact: true })
       .click();
@@ -2174,42 +2190,48 @@ for (const [width, dark] of [
       panel.hass = { ...window.testHass };
       await panel._load();
     }, dark);
-    for (const mode of ["Vista a riquadri", "Vista a elenco"]) {
-      await page.getByRole("button", { name: mode, exact: true }).click();
-      await page.locator(".content").evaluate((el) => {
-        el.scrollTop = 0;
-      });
-      const overflow = await page
-        .locator(".content")
-        .evaluate((el) => el.scrollWidth > el.clientWidth + 1);
-      assert.equal(overflow, false, "panel must not overflow horizontally");
-      const card = page
-        .locator("article")
-        .filter({ hasText: "Descrizione_articolo_in_lavorazione" });
-      const value = card.locator(".stateValue");
-      assert.match(await value.textContent(), /1800MM \/ riferimento/);
-      assert.equal(
-        await card.evaluate((el) => el.scrollWidth > el.clientWidth + 1),
-        false,
+    await page.locator(".content").evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    // The page itself never scrolls sideways; a narrow screen scrolls the
+    // table inside its own frame.
+    const overflow = await page
+      .locator(".content")
+      .evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    assert.equal(overflow, false, "panel must not overflow horizontally");
+    const card = page
+      .locator("tr.entityRow")
+      .filter({ hasText: "Descrizione_articolo_in_lavorazione" });
+    const value = card.locator(".stateValue");
+    assert.match(await value.textContent(), /1800MM \/ riferimento/);
+    const title = await card.locator(".nameCell").boundingBox();
+    const state = await value.boundingBox();
+    const actions = await card.locator(".actionsCell").boundingBox();
+    assert.ok(
+      title.x + title.width <= state.x,
+      "state occupies its own column",
+    );
+    assert.ok(
+      state.x + state.width <= actions.x,
+      "actions occupy their own column",
+    );
+    // Every column starts at the same left edge in every row and group.
+    const edges = await page
+      .locator("tr.entityRow")
+      .evaluateAll((rows) =>
+        [".nameCell", ".addressCell", ".valueCell", ".settingsCell"].map(
+          (cell) =>
+            new Set(
+              rows.map((row) =>
+                Math.round(
+                  row.querySelector(cell).getBoundingClientRect().left,
+                ),
+              ),
+            ).size,
+        ),
       );
-      if (mode === "Vista a elenco" && width >= 768) {
-        const title = await card.locator(".cardTop").boundingBox();
-        const state = await value.boundingBox();
-        const actions = await card.locator(".cardBottom").boundingBox();
-        assert.ok(
-          title.x + title.width <= state.x,
-          "state occupies its own column",
-        );
-        assert.ok(
-          state.x + state.width <= actions.x,
-          "actions occupy their own column",
-        );
-      }
-      await shot(
-        page,
-        `polish-${width}-${dark ? "dark" : "light"}-${mode.endsWith("elenco") ? "list" : "grid"}.png`,
-      );
-    }
+    assert.deepEqual(edges, [1, 1, 1, 1], "columns line up in every row");
+    await shot(page, `polish-${width}-${dark ? "dark" : "light"}.png`);
     await page.close();
   });
 }
@@ -2224,7 +2246,7 @@ for (const width of [1280, 390, 320]) {
       await document.querySelector("opcua-node-panel")._load();
     });
     await page
-      .locator("article")
+      .locator("tr.entityRow")
       .filter({ hasText: "Velocità linea" })
       .getByRole("button", { name: "Modifica" })
       .click();
@@ -2333,7 +2355,7 @@ for (const [width, dark] of [
     }, dark);
     const card = (name) =>
       page
-        .locator("article")
+        .locator("tr.entityRow")
         .filter({ has: page.getByRole("heading", { name, exact: true }) });
     assert.equal(await card("Int2").getAttribute("data-value-type"), "numeric");
     assert.equal(await card("String2").getAttribute("data-value-type"), "text");
@@ -2367,47 +2389,25 @@ for (const [width, dark] of [
       await card("Real2").locator(".stateValue").textContent(),
       "11.1000003814697",
     );
-    for (const [mode, label] of [
-      ["grid", "Vista a riquadri"],
-      ["list", "Vista a elenco"],
-    ]) {
-      await page.getByRole("button", { name: label, exact: true }).click();
-      await page.locator(".content").evaluate((el) => {
-        el.scrollTop +=
-          el.querySelector(".group").getBoundingClientRect().top -
-          el.getBoundingClientRect().top;
-      });
-      assert.equal(
-        await page
-          .locator(".content")
-          .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
-        false,
-      );
-      for (const c of await page.locator("article").all())
-        assert.equal(
-          await c.evaluate((el) => el.scrollWidth > el.clientWidth + 1),
-          false,
-        );
-      if (width === 1440 && mode === "grid")
-        assert.ok(
-          (await card("Int2").boundingBox()).height < 180,
-          "simple cards stay compact",
-        );
-      await shot(
-        page,
-        `typed-states-${width}-${dark ? "dark" : "light"}-${mode}.png`,
-      );
-      await page.locator(".content").evaluate((el) => {
-        el.scrollTop +=
-          el
-            .querySelector('.group[data-platform="binary_sensor"]')
-            .getBoundingClientRect().top - el.getBoundingClientRect().top;
-      });
-      await shot(
-        page,
-        `boolean-states-${width}-${dark ? "dark" : "light"}-${mode}.png`,
-      );
-    }
+    assert.equal(
+      await page
+        .locator(".content")
+        .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+      false,
+    );
+    // A simple value keeps its row one line high.
+    assert.ok(
+      (await card("Int2").boundingBox()).height < 48,
+      "simple rows stay compact",
+    );
+    await shot(page, `typed-states-${width}-${dark ? "dark" : "light"}.png`);
+    await page.locator(".tableWrap").evaluate((el) => {
+      el.scrollTop +=
+        el
+          .querySelector('.rowGroup[data-platform="binary_sensor"]')
+          .getBoundingClientRect().top - el.getBoundingClientRect().top;
+    });
+    await shot(page, `boolean-states-${width}-${dark ? "dark" : "light"}.png`);
     // A live update clears both stale and active/alarm visuals without rebuilding the card.
     await page.evaluate(() => {
       window.testHass.states["sensor.sample2"] = {
@@ -2473,7 +2473,7 @@ for (const width of [1280, 390]) {
     });
     const card = (name) =>
       page
-        .locator("article")
+        .locator("tr.entityRow")
         .filter({ has: page.getByRole("heading", { name, exact: true }) });
     const number = card("Velocità linea");
     assert.equal(
@@ -2516,45 +2516,27 @@ for (const width of [1280, 390]) {
         .textContent(),
       "Caratteri: 0 – 64",
     );
-    for (const mode of ["Vista a riquadri", "Vista a elenco"]) {
-      await page.getByRole("button", { name: mode, exact: true }).click();
-      assert.equal(
-        await page
-          .locator(".content")
-          .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
-        false,
-      );
-      assert.equal(
-        await number.evaluate((el) => el.scrollWidth > el.clientWidth + 1),
-        false,
-      );
-      const state = await number.locator(".entityState").boundingBox();
-      const badges = await number.locator(".customizations").boundingBox();
-      // The grid puts them below the live state; a wide list row puts them
-      // in their own column to the right, so the row stays one line high.
-      const listRow = mode.endsWith("elenco") && width > 650;
-      assert.ok(
-        listRow
-          ? badges.x >= state.x + state.width
-          : badges.y >= state.y + state.height,
-        "saved settings are separate from live state",
-      );
-      if (listRow) {
-        // One row: only the tallest part (here the wrapped badges) sets the
-        // height, nothing is stacked below it.
-        const row = await number.boundingBox();
-        const tallest = Math.max(state.height, badges.height);
-        assert.ok(
-          row.height <= tallest + 16,
-          `a wide list row stays one line high (${row.height}px)`,
-        );
-      }
-      await number.scrollIntoViewIfNeeded();
-      await shot(
-        page,
-        `customizations-${width}-${mode.endsWith("elenco") ? "list" : "grid"}.png`,
-      );
-    }
+    assert.equal(
+      await page
+        .locator(".content")
+        .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
+      false,
+    );
+    // The saved settings have their own column to the right of the live
+    // value, so the row stays one line high.
+    const state = await number.locator(".entityState").boundingBox();
+    const badges = await number.locator(".customizations").boundingBox();
+    assert.ok(
+      badges.x >= state.x + state.width,
+      "saved settings are separate from live state",
+    );
+    const rowBox = await number.boundingBox();
+    assert.ok(
+      rowBox.height <= Math.max(state.height, badges.height) + 24,
+      `a row stays one line high (${rowBox.height}px)`,
+    );
+    await number.scrollIntoViewIfNeeded();
+    await shot(page, `customizations-${width}.png`);
     // Use the real save handler: clearing an override must remove its badge.
     await card("Porta protezione")
       .getByRole("button", { name: "Modifica", exact: true })
@@ -2601,7 +2583,9 @@ for (const width of [1280, 390]) {
 for (const width of [1280, 390]) {
   test(`numeric conversions persist, switch mode and clear at ${width}px`, async () => {
     const page = await pageFor(width);
-    const card = page.locator("article").filter({ hasText: "Velocità linea" });
+    const card = page
+      .locator("tr.entityRow")
+      .filter({ hasText: "Velocità linea" });
     await card.getByRole("button", { name: "Modifica", exact: true }).click();
     let dialog = page.locator("dialog[open]");
     const selector = () =>
