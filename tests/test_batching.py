@@ -1,5 +1,6 @@
 """Batched OPC UA requests: same discovery result, far fewer round trips."""
 
+import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -204,7 +205,7 @@ async def test_block_is_halved_when_the_server_rejects_its_size():
         node_id: index for index, node_id in enumerate(node_ids)
     }
     # 10 rejected, 5 rejected, then blocks of 2 kept for the session.
-    assert sizes[1:] == [10, 5, 2, 2, 2, 2, 2]
+    assert sizes[1:] == [10, 5, 2, 2, 1, 2, 2, 1]
     assert hub._block_sizes["read"] == 2
     client.disconnect.assert_not_awaited()
 
@@ -243,11 +244,13 @@ async def test_subscription_creates_monitored_items_in_one_request(unused_tcp_po
                 return await original(params)
 
             session.create_monitored_items = counted
-            await hub.ensure_subscription(node_ids, {node_ids[0]: 1.0})
+            deadbands = {node_id: 1.0 for node_id in node_ids[:50]}
+            deadbands[node_ids[50]] = 0.5
+            await hub.ensure_subscription(node_ids, deadbands)
             assert hub.subscription_active
             assert hub._subscribed_node_ids == set(node_ids)
-            # One deadband item on its own, all others in a single request.
-            assert sorted(calls) == [1, len(node_ids) - 1]
+            # One request per deadband value, one for the unfiltered rest.
+            assert sorted(calls) == [1, 50, len(node_ids) - 51]
         finally:
             await hub.disconnect(permanent=True)
 
@@ -264,3 +267,49 @@ async def test_rejected_monitored_item_falls_back_to_polling():
     subscription.delete.assert_awaited_once()
     assert not hub.subscription_active
     assert hub._subscribed_node_ids == set()
+
+
+async def test_rejected_deadband_filter_only_drops_that_nodes_filter():
+    hub, client = _mock_hub(AsyncMock(return_value=[]))
+    hub.on_data_change = Mock()
+    subscription = Mock(delete=AsyncMock())
+    subscription.deadband_monitor = AsyncMock(
+        return_value=[11, ua.StatusCode(ua.StatusCodes.BadFilterNotAllowed), 13]
+    )
+    subscription.subscribe_data_change = AsyncMock(return_value=[22])
+    client.create_subscription = AsyncMock(return_value=subscription)
+    node_ids = ["ns=2;i=1", "ns=2;i=2", "ns=2;i=3"]
+    await hub.ensure_subscription(node_ids, dict.fromkeys(node_ids, 0.5))
+    subscription.deadband_monitor.assert_awaited_once()
+    assert subscription.subscribe_data_change.await_args.args[0] == [
+        client.get_node.return_value
+    ]
+    assert hub._sub_handles == {"ns=2;i=1": 11, "ns=2;i=2": 22, "ns=2;i=3": 13}
+    assert hub.subscription_active
+
+
+async def test_read_blocks_are_sent_in_parallel():
+    in_flight = {"now": 0, "max": 0, "requests": 0}
+
+    async def read(params):
+        if params.NodesToRead[0].NodeId.NamespaceIndex == 0:
+            return []
+        in_flight["now"] += 1
+        in_flight["requests"] += 1
+        in_flight["max"] = max(in_flight["max"], in_flight["now"])
+        await asyncio.sleep(0.01)
+        in_flight["now"] -= 1
+        return [
+            Mock(StatusCode=ua.StatusCode(), Value=ua.Variant(item.NodeId.Identifier))
+            for item in params.NodesToRead
+        ]
+
+    hub, _ = _mock_hub(read)
+    hub._block_sizes = {"read": 10, "browse": 10, "monitor": 10}
+    node_ids = [f"ns=2;i={index}" for index in range(95)]
+    values = await hub.get_values(node_ids)
+    # Results stay in request order across parallel blocks.
+    assert list(values) == node_ids
+    assert values == {node_id: index for index, node_id in enumerate(node_ids)}
+    assert in_flight["requests"] == 10
+    assert in_flight["max"] == 4

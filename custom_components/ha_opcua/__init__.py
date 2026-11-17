@@ -101,6 +101,8 @@ _REQUEST_SIZE_STATUS_CODES = {
 # Upper bounds for the operations sent in one request. A server advertising
 # a lower limit in its OperationLimits object is respected instead.
 _BLOCK_SIZES = {"read": 500, "browse": 100, "monitor": 500}
+# Read or Browse requests of one pass sent at the same time.
+_PARALLEL_REQUESTS = 4
 _OPERATION_LIMIT_IDS = {
     "read": ua.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxNodesPerRead,
     "browse": ua.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxNodesPerBrowse,
@@ -557,21 +559,31 @@ class OpcuaHub:
     async def _chunked(self, client, kind: str, items: list, request) -> list:
         """Send items in blocks the server accepts and return all results in order.
 
+        Up to _PARALLEL_REQUESTS blocks are in flight at once, so a server
+        with a low per-request limit costs fewer round trips in sequence.
         A block the server rejects only for its size is halved and resent, and
         the smaller size is kept for the rest of the session. Only for
         requests that change nothing on the server (Read, Browse).
         """
         sizes = await self._session_block_sizes(client)
-        results: list = []
-        start = 0
-        while start < len(items):
-            block = items[start : start + sizes[kind]]
+
+        def split(part):
+            size = sizes[kind]
+            return [part[start : start + size] for start in range(0, len(part), size)]
+
+        async def send(block):
+            if len(block) > sizes[kind]:
+                # Another block of this pass already found the limit lower.
+                results = []
+                for part in split(block):
+                    results.extend(await send(part))
+                return results
             try:
                 block_results = await request(block)
             except ua.UaStatusCodeError as err:
                 if err.code not in _REQUEST_SIZE_STATUS_CODES or len(block) == 1:
                     raise
-                sizes[kind] = max(1, len(block) // 2)
+                sizes[kind] = min(sizes[kind], max(1, len(block) // 2))
                 _LOGGER.debug(
                     "OPC UA server for '%s' rejected %d %s operations (%s); "
                     "retrying in blocks of %d",
@@ -581,14 +593,27 @@ class OpcuaHub:
                     err,
                     sizes[kind],
                 )
-                continue
+                return await send(block)
             if len(block_results) != len(block):
                 raise ua.UaError(
                     f"OPC UA server returned {len(block_results)} results "
                     f"for {len(block)} {kind} operations"
                 )
-            results.extend(block_results)
-            start += len(block)
+            return list(block_results)
+
+        blocks = split(items)
+        results: list = []
+        for start in range(0, len(blocks), _PARALLEL_REQUESTS):
+            # Wait for every request of the group before raising, so none is
+            # still running once the caller leaves the session.
+            outcomes = await asyncio.gather(
+                *(send(block) for block in blocks[start : start + _PARALLEL_REQUESTS]),
+                return_exceptions=True,
+            )
+            for outcome in outcomes:
+                if isinstance(outcome, BaseException):
+                    raise outcome
+                results.extend(outcome)
         return results
 
     async def _read(self, client, read_ids: list[ua.ReadValueId]) -> list:
@@ -896,37 +921,57 @@ class OpcuaHub:
                         await self._subscription.unsubscribe(handles)
                     self._subscribed_node_ids -= to_remove
                 to_add = target - self._subscribed_node_ids
+                block_size = (await self._session_block_sizes(client))["monitor"]
                 unfiltered = []
+                by_deadband: dict[float, list[str]] = {}
                 for nid in sorted(to_add):
                     deadband = deadbands.get(nid)
-                    if not deadband:
+                    if deadband:
+                        by_deadband.setdefault(deadband, []).append(nid)
+                    else:
                         unfiltered.append(nid)
-                        continue
-                    try:
-                        handle = await self._subscription.deadband_monitor(
-                            client.get_node(nid),
-                            deadband_val=deadband,
-                            deadbandtype=1,
-                        )
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception as err:
-                        _LOGGER.warning(
-                            "OPC UA server for '%s' rejected deadband %.6g on "
-                            "%s, subscribing without a filter instead: %s",
-                            self._hub_name,
-                            deadband,
-                            nid,
-                            err,
-                        )
-                        unfiltered.append(nid)
-                        continue
-                    self._sub_handles[nid] = handle
-                    self._subscribed_node_ids.add(nid)
+                # Nodes sharing a deadband go in one CreateMonitoredItems
+                # request per block. A node whose filter the server rejects is
+                # subscribed without it instead, as before, without losing
+                # push updates for the others.
+                for deadband, nids in by_deadband.items():
+                    for start in range(0, len(nids), block_size):
+                        block = nids[start : start + block_size]
+                        try:
+                            handles = await self._subscription.deadband_monitor(
+                                [client.get_node(nid) for nid in block],
+                                deadband_val=deadband,
+                                deadbandtype=1,
+                            )
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as err:
+                            if _connection_error(err):
+                                raise
+                            handles = [err] * len(block)
+                        if len(handles) != len(block):
+                            raise ua.UaError(
+                                f"OPC UA server returned {len(handles)} results "
+                                f"for {len(block)} monitored items"
+                            )
+                        for nid, handle in zip(block, handles, strict=True):
+                            if isinstance(handle, (ua.StatusCode, Exception)):
+                                _LOGGER.warning(
+                                    "OPC UA server for '%s' rejected deadband "
+                                    "%.6g on %s, subscribing without a filter "
+                                    "instead: %s",
+                                    self._hub_name,
+                                    deadband,
+                                    nid,
+                                    handle,
+                                )
+                                unfiltered.append(nid)
+                                continue
+                            self._sub_handles[nid] = handle
+                            self._subscribed_node_ids.add(nid)
                 # One CreateMonitoredItems request per block instead of one
                 # per node. A node the server rejects fails the whole call,
                 # as a single rejected node did before: polling takes over.
-                block_size = (await self._session_block_sizes(client))["monitor"]
                 for start in range(0, len(unfiltered), block_size):
                     block = unfiltered[start : start + block_size]
                     handles = await self._subscription.subscribe_data_change(
