@@ -261,6 +261,18 @@ async function pageFor(width = 1280, admin = true) {
           endpoint.revision = "renamed";
           return { renamed };
         }
+        if (msg.type.endsWith("/update_many")) {
+          if (window.failBulk) throw structuredClone(window.failBulk);
+          // Applied like single updates, which the test calls ignore.
+          for (const update of msg.updates)
+            await window.testHass.callWS({
+              ...update,
+              type: "ha_opcua/entity/update",
+              entry_id: msg.entry_id,
+              revision: msg.revision,
+            });
+          return { saved: true, reload: false, entity_ids: [] };
+        }
         if (window.failSave) throw { code: "stale_configuration" };
         const endpoint = window.fixture.endpoints.find(
           (e) => e.entry_id === msg.entry_id,
@@ -329,7 +341,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.17.2 · Build 20261117.7",
+    "Pannello 1.18.0 · Build 20261117.10",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1209,7 +1221,9 @@ test("a low desktop window still scrolls only the table", async () => {
   const scrolls = (selector) =>
     page.evaluate((selector) => {
       const el = selector
-        ? document.querySelector("opcua-node-panel").shadowRoot.querySelector(selector)
+        ? document
+            .querySelector("opcua-node-panel")
+            .shadowRoot.querySelector(selector)
         : document.scrollingElement;
       return el.scrollHeight > el.clientHeight + 1;
     }, selector);
@@ -1888,9 +1902,7 @@ test("the automatic category names what it resolves to and follows a remap", asy
   const dialog = page.locator("dialog[open]");
   const category = () => dialog.getByLabel("Categoria", { exact: true });
   const autoText = () =>
-    category()
-      .locator('option[value="auto"]')
-      .textContent();
+    category().locator('option[value="auto"]').textContent();
   // A writable Boolean maps to a switch.
   await page
     .locator("tr.entityRow")
@@ -3226,5 +3238,350 @@ test("integer select with a value table and a Boolean push button", async () => 
     headings.every((h) => !h.includes("·")),
     headings.join(", "),
   );
+  await page.close();
+});
+
+// Three writable integer selects: two share their texts, one has none.
+async function bulkPage(width = 1280) {
+  const page = await pageFor(width);
+  await page.evaluate(() => {
+    const endpoint = window.fixture.endpoints[0];
+    const labels = [
+      // Key order as Home Assistant sends it (sorted), unlike the form.
+      { label: "Off", value: 0 },
+      { label: "Auto", value: 1 },
+    ];
+    for (const [i, list, area] of [
+      [11, labels, "workshop"],
+      [12, [], null],
+      [13, labels, null],
+    ]) {
+      const node_id = `ns=4;i=${i}`;
+      endpoint.nodes.push({
+        name: `Modo ${i}`,
+        node_id,
+        variant_type: "Int16",
+        writable: true,
+      });
+      endpoint.rows.push({
+        key: node_id,
+        name: `Modo ${i}`,
+        entity_id: `select.modo_${i}`,
+        node_id,
+        platform: "select",
+        variant_type: "Int16",
+        invert_state: false,
+        device_class: null,
+        editable: true,
+        custom_name: null,
+        area_id: area,
+        settings: { platform: "select", value_labels: list },
+      });
+    }
+  });
+  await page.getByRole("button", { name: "Aggiorna", exact: true }).click();
+  await page.locator("tr.entityRow").filter({ hasText: "Modo 13" }).waitFor();
+  return page;
+}
+const modeRow = (page, i) =>
+  page.locator("tr.entityRow").filter({ hasText: `Modo ${i}` });
+
+test("Ctrl and Shift click select rows, a plain click still opens one entity", async () => {
+  const page = await bulkPage();
+  const bulk = page.locator(".bulkEdit");
+  const clear = page.getByRole("button", { name: "Deseleziona", exact: true });
+  assert.equal(await bulk.isVisible(), false);
+  // The phone-only "Select" button stays out of the desktop toolbar.
+  assert.equal(await page.locator(".selectMode").isVisible(), false);
+  await modeRow(page, 11)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  assert.equal(await page.locator("dialog[open]").count(), 0);
+  assert.equal(await bulk.textContent(), "Modifica insieme (1)");
+  assert.equal(await clear.isVisible(), true);
+  // The buttons sit next to the grouping choice, not next to "rediscover".
+  assert.equal(await page.locator(".navTools .bulkTools").count(), 1);
+  await modeRow(page, 13)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Shift"] });
+  assert.equal(await bulk.textContent(), "Modifica insieme (3)");
+  assert.equal(
+    await page.locator("tr.entityRow.selected[aria-selected=true]").count(),
+    3,
+  );
+  await modeRow(page, 12)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  assert.equal(await bulk.textContent(), "Modifica insieme (2)");
+  assert.equal(await modeRow(page, 12).getAttribute("aria-selected"), "false");
+  // Keyboard: Ctrl+Space toggles the focused row.
+  await modeRow(page, 12).focus();
+  await page.keyboard.press("Control+Space");
+  assert.equal(await bulk.textContent(), "Modifica insieme (3)");
+  // A plain click opens the single editor and keeps the selection.
+  await modeRow(page, 12).locator("td.typeCell").click();
+  const dialog = page.locator("dialog[open]");
+  assert.equal(await dialog.locator("[name=name]").count(), 1);
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  assert.equal(await bulk.textContent(), "Modifica insieme (3)");
+  await clear.click();
+  assert.equal(await bulk.isVisible(), false);
+  assert.equal(await page.locator("tr.entityRow.selected").count(), 0);
+  await page.close();
+});
+
+test("editing together shows differing values as //…// and saves only what changed", async () => {
+  const page = await bulkPage();
+  await modeRow(page, 11)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await modeRow(page, 13)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Shift"] });
+  await page.locator(".bulkEdit").click();
+  const dialog = page.locator("dialog[open]");
+  assert.match(
+    await dialog.locator("#entity-editor-title").textContent(),
+    /Modifica insieme · 3 entità/,
+  );
+  // No name and no NodeId in the shared editor.
+  assert.equal(await dialog.locator("[name=name], .editorNodeId").count(), 0);
+  const area = dialog.getByLabel("Area", { exact: true });
+  assert.equal(await area.inputValue(), "__mixed__");
+  assert.equal(
+    await area.locator("option:checked").textContent(),
+    "//…// (diversi)",
+  );
+  assert.equal(
+    await dialog.getByLabel("Categoria", { exact: true }).inputValue(),
+    "select",
+  );
+  // Nothing changed: no request.
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await dialog.getByText("Nessuna modifica.", { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(
+      () => window.calls.filter((m) => m.type.endsWith("/update_many")).length,
+    ),
+    0,
+  );
+  // Different text lists: set one list for all.
+  assert.equal(await dialog.locator("[name=value_label_text]").count(), 0);
+  await dialog
+    .getByRole("button", { name: "Imposta per tutte", exact: true })
+    .click();
+  const texts = dialog.locator("[name=value_label_text]");
+  assert.deepEqual(
+    await texts.evaluateAll((inputs) => inputs.map((i) => i.value)),
+    ["Off", "Auto"],
+  );
+  await dialog
+    .getByRole("button", { name: "Aggiungi riga", exact: true })
+    .click();
+  await texts.nth(2).fill("Hand");
+  await dialog
+    .getByLabel("Modalità aggiornamento", { exact: true })
+    .selectOption("subscription");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  const sent = await page.evaluate(() =>
+    window.calls.findLast((m) => m.type.endsWith("/update_many")),
+  );
+  assert.equal(sent.revision, "rev1");
+  assert.deepEqual(
+    sent.updates.map((u) => u.key),
+    ["ns=4;i=11", "ns=4;i=12", "ns=4;i=13"],
+  );
+  for (const update of sent.updates) {
+    assert.deepEqual(update.value_labels, [
+      { value: 0, label: "Off" },
+      { value: 1, label: "Auto" },
+      { value: 2, label: "Hand" },
+    ]);
+    assert.equal(update.update_mode, "subscription");
+    // Unchanged fields keep each entity's own value or are left out.
+    assert.equal(update.name, "");
+    assert.equal(update.node_id, update.key);
+    for (const field of ["platform", "unit_of_measurement", "limits"])
+      assert.equal(Object.hasOwn(update, field), false, field);
+  }
+  assert.deepEqual(
+    sent.updates.map((u) => u.area_id),
+    ["workshop", null, null],
+  );
+  // The selection is gone after saving.
+  assert.equal(await page.locator(".bulkEdit").isVisible(), false);
+  await page.close();
+});
+
+test("a failed shared save names the entity and its cause and keeps the dialog", async () => {
+  const page = await bulkPage();
+  await modeRow(page, 11)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await modeRow(page, 12)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await page.evaluate(() => {
+    window.failBulk = {
+      code: "area_not_found",
+      message: "ns=4;i=12: area_not_found",
+    };
+  });
+  await page.locator(".bulkEdit").click();
+  const dialog = page.locator("dialog[open]");
+  await dialog.getByLabel("Area", { exact: true }).selectOption("workshop");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await dialog
+    .getByText("Modo 12: L’area non esiste più. Aggiorna l’elenco.", {
+      exact: true,
+    })
+    .waitFor();
+  assert.equal(
+    await dialog
+      .getByRole("button", { name: "Salva", exact: true })
+      .isEnabled(),
+    true,
+  );
+  // An unknown code still shows its cause.
+  await page.evaluate(() => {
+    window.failBulk = {
+      code: "invalid_min",
+      message: "ns=4;i=11: invalid_min",
+    };
+  });
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await dialog
+    .getByText(
+      "Modo 11: Operazione non riuscita. Riprova. Causa: invalid_min",
+      { exact: true },
+    )
+    .waitFor();
+  await page.close();
+});
+
+test("the shared category offers only what fits every selected entity", async () => {
+  const page = await pageFor();
+  // A writable Boolean switch and a read-only REAL sensor.
+  await page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Marcia macchina" })
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Velocità linea" })
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await page.locator(".bulkEdit").click();
+  const dialog = page.locator("dialog[open]");
+  const category = dialog.getByLabel("Categoria", { exact: true });
+  assert.deepEqual(
+    await category
+      .locator("option")
+      .evaluateAll((options) => options.map((o) => o.value)),
+    ["__mixed__", "auto", "sensor", "disabled"],
+  );
+  // Inversion only fits Booleans, decimals only REAL: neither is offered.
+  assert.equal(
+    await dialog.getByText("Inverti stato booleano").isVisible(),
+    false,
+  );
+  assert.equal(
+    await dialog.getByLabel("Decimali", { exact: true }).isVisible(),
+    false,
+  );
+  await category.selectOption("sensor");
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await page.getByText("Configurazione salvata.", { exact: true }).waitFor();
+  const sent = await page.evaluate(() =>
+    window.calls.findLast((m) => m.type.endsWith("/update_many")),
+  );
+  assert.deepEqual(
+    sent.updates.map((u) => [u.platform, u.device_class]),
+    [
+      ["sensor", null],
+      ["sensor", null],
+    ],
+  );
+  await page.close();
+});
+
+test("on a phone the Select button turns a tap into selecting", async () => {
+  const page = await bulkPage(390);
+  const mode = page.locator(".selectMode");
+  assert.equal(await mode.isVisible(), true);
+  assert.equal(await mode.textContent(), "Seleziona");
+  await mode.click();
+  assert.equal(await mode.getAttribute("aria-pressed"), "true");
+  await modeRow(page, 11).locator("td.typeCell").click();
+  await modeRow(page, 12).locator("td.typeCell").click();
+  assert.equal(await page.locator("dialog[open]").count(), 0);
+  assert.equal(
+    await page.locator(".bulkEdit").textContent(),
+    "Modifica insieme (2)",
+  );
+  // The bulk buttons fit the phone width.
+  const fits = await page
+    .locator(".bulkTools button:visible")
+    .evaluateAll((buttons) =>
+      buttons.every((b) => b.getBoundingClientRect().right <= innerWidth),
+    );
+  assert.equal(fits, true);
+  await page.locator(".bulkEdit").click();
+  const dialog = page.locator("dialog[open]");
+  const box = await dialog.boundingBox();
+  assert.ok(box.width <= 390, String(box.width));
+  await dialog.getByRole("button", { name: "Annulla", exact: true }).click();
+  await mode.click();
+  assert.equal(await mode.textContent(), "Seleziona");
+  await page.close();
+});
+
+test("equal texts in another key order count as unchanged", async () => {
+  const page = await bulkPage();
+  await modeRow(page, 11)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await modeRow(page, 13)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await page.locator(".bulkEdit").click();
+  const dialog = page.locator("dialog[open]");
+  assert.deepEqual(
+    await dialog
+      .locator("[name=value_label_text]")
+      .evaluateAll((inputs) => inputs.map((i) => i.value)),
+    ["Off", "Auto"],
+  );
+  await dialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await dialog.getByText("Nessuna modifica.", { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(
+      () => window.calls.filter((m) => m.type.endsWith("/update_many")).length,
+    ),
+    0,
+  );
+  await page.close();
+});
+
+test("one select among numbers hides conversion, unit and device class", async () => {
+  const page = await bulkPage();
+  await modeRow(page, 11)
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await page
+    .locator("tr.entityRow")
+    .filter({ hasText: "Velocità linea" })
+    .locator("td.typeCell")
+    .click({ modifiers: ["Control"] });
+  await page.locator(".bulkEdit").click();
+  const dialog = page.locator("dialog[open]");
+  for (const name of ["conversion", "unit_of_measurement", "device_class"])
+    assert.equal(
+      await dialog.locator(`select[name=${name}]`).isVisible(),
+      false,
+      name,
+    );
   await page.close();
 });

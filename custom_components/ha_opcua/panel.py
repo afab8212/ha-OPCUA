@@ -106,6 +106,7 @@ async def async_setup_panel(hass):
     )
     websocket_api.async_register_command(hass, ws_snapshot)
     websocket_api.async_register_command(hass, ws_save)
+    websocket_api.async_register_command(hass, ws_save_many)
     websocket_api.async_register_command(hass, ws_inspect)
     websocket_api.async_register_command(hass, ws_create)
     websocket_api.async_register_command(hass, ws_remove)
@@ -392,6 +393,92 @@ def _migrate_entity_registry(
     return selected.entity_id if selected else None
 
 
+class EntityUpdateError(ValueError):
+    """A bulk update failed for one entity; names it beside the cause."""
+
+    def __init__(self, key, code):
+        super().__init__(code)
+        self.key = key
+        self.code = code
+
+
+def _prepare_entity_update(hass, entry, c, snapshot, msg):
+    """Validate one entity update without changing anything yet."""
+    row = next((item for item in snapshot["rows"] if item["key"] == msg["key"]), None)
+    if row is None or not row["editable"]:
+        raise ValueError("entity_not_ready")
+    target = _panel_nodes(c).get(msg["node_id"])
+    if target is None:
+        raise ValueError("node_not_found")
+    saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(msg["key"], {})
+    # A reassignment must preserve the entity's current domain, including Auto.
+    if "platform" not in msg and effective_platform(target, saved) != row["platform"]:
+        raise ValueError("incompatible_platform")
+    settings = _entity_settings(target, msg, saved)
+    area_id = msg["area_id"]
+    if area_id is not None and ar.async_get(hass).async_get_area(area_id) is None:
+        raise ValueError("area_not_found")
+    name = msg["name"].strip() or None
+    if name is not None and len(name) > 255:
+        raise ValueError("invalid_name")
+    return {
+        "key": msg["key"],
+        "row": row,
+        "target": target,
+        "settings": settings,
+        "area_id": area_id,
+        "name": name,
+    }
+
+
+def _apply_entity_updates(hass, entry, c, prepared):
+    """Write validated updates: registry first, then one options update."""
+    registry = er.async_get(hass)
+    entity_ids = []
+    # The new entity exists before the options name its platform.
+    with orphan_sync_suspended(hass, entry):
+        options = deepcopy(dict(entry.options))
+        for item in prepared:
+            key, row, settings = item["key"], item["row"], item["settings"]
+            platform = effective_platform(item["target"], settings)
+            unique_id = f"{entry.entry_id}:{key}"
+            related = [
+                e
+                for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+                if e.platform == DOMAIN and e.unique_id == unique_id
+            ]
+            entity_ids.append(
+                _migrate_entity_registry(
+                    hass,
+                    entry,
+                    c.nodes[key],
+                    key,
+                    platform,
+                    related,
+                    name=item["name"],
+                    area_id=item["area_id"],
+                    suggested_object_id=(
+                        row["entity_id"].split(".", 1)[1]
+                        if row["entity_id"]
+                        else item["name"] or row["name"]
+                    ),
+                )
+            )
+            if platform != row["platform"]:
+                # Prevent old controls from writing while the new domain loads.
+                c._platforms[key] = "disabled"
+            options.setdefault(CONF_NODE_SETTINGS, {})[key] = settings
+            update_offline_node(options, key, item["target"], settings)
+        changed = options != dict(entry.options)
+        reload_needed = changed and c.live_entity_options(options) is None
+        if changed:
+            if not reload_needed:
+                c.apply_entity_options(options)
+            hass.config_entries.async_update_entry(entry, options=options)
+    async_sync_orphan_repairs(hass, entry)
+    return entity_ids, reload_needed
+
+
 async def async_save_entity(hass, msg):
     entry = hass.config_entries.async_get_entry(msg["entry_id"])
     if entry is None or entry.domain != DOMAIN:
@@ -406,71 +493,49 @@ async def async_save_entity(hass, msg):
         c = _coordinator(hass, entry)
         if c is None:
             raise ValueError("endpoint_not_loaded")
-        row = next(
-            (item for item in snapshot["rows"] if item["key"] == msg["key"]), None
-        )
-        if row is None or not row["editable"]:
-            raise ValueError("entity_not_ready")
-        target = _panel_nodes(c).get(msg["node_id"])
-        if target is None:
-            raise ValueError("node_not_found")
-        saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(msg["key"], {})
-        # A reassignment must preserve the entity's current domain, including Auto.
-        if (
-            "platform" not in msg
-            and effective_platform(target, saved) != row["platform"]
-        ):
-            raise ValueError("incompatible_platform")
-        settings = _entity_settings(target, msg, saved)
-        area_id = msg["area_id"]
-        if area_id is not None and ar.async_get(hass).async_get_area(area_id) is None:
-            raise ValueError("area_not_found")
-        name = msg["name"].strip() or None
-        if name is not None and len(name) > 255:
-            raise ValueError("invalid_name")
-        registry = er.async_get(hass)
-        platform = effective_platform(target, settings)
-        unique_id = f"{entry.entry_id}:{msg['key']}"
-        related = [
-            e
-            for e in er.async_entries_for_config_entry(registry, entry.entry_id)
-            if e.platform == DOMAIN and e.unique_id == unique_id
-        ]
-        # The new entity exists before the options name its platform.
-        with orphan_sync_suspended(hass, entry):
-            selected_entity_id = _migrate_entity_registry(
-                hass,
-                entry,
-                c.nodes[msg["key"]],
-                msg["key"],
-                platform,
-                related,
-                name=name,
-                area_id=area_id,
-                suggested_object_id=(
-                    row["entity_id"].split(".", 1)[1]
-                    if row["entity_id"]
-                    else name or row["name"]
-                ),
-            )
-            if platform != row["platform"]:
-                # Prevent old controls from writing while the new domain loads.
-                c._platforms[msg["key"]] = "disabled"
-            options = deepcopy(dict(entry.options))
-            options.setdefault(CONF_NODE_SETTINGS, {})[msg["key"]] = settings
-            update_offline_node(options, msg["key"], target, settings)
-            changed = options != dict(entry.options)
-            reload_needed = changed and c.live_entity_options(options) is None
-            if changed:
-                if not reload_needed:
-                    c.apply_entity_options(options)
-                hass.config_entries.async_update_entry(entry, options=options)
-        async_sync_orphan_repairs(hass, entry)
+        prepared = _prepare_entity_update(hass, entry, c, snapshot, msg)
+        entity_ids, reload_needed = _apply_entity_updates(hass, entry, c, [prepared])
         return {
             "saved": True,
             "reload": reload_needed,
-            "entity_id": selected_entity_id,
+            "entity_id": entity_ids[0],
         }
+
+
+async def async_save_entities(hass, msg):
+    """Save several entities of one endpoint together, all or none.
+
+    Every update is validated against the same revision first; only when all
+    pass are they written, with a single options update (and at most one
+    reload). Saving them one by one would fail after the first: each save
+    changes the revision, and a reload unloads the coordinator meanwhile.
+    """
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN:
+        raise ValueError("endpoint_not_found")
+    keys = [update["key"] for update in msg["updates"]]
+    if not keys or len(set(keys)) != len(keys):
+        raise ValueError("invalid_selection")
+    lock = hass.data.setdefault(PANEL_DATA, {"locks": {}})["locks"].setdefault(
+        entry.entry_id, asyncio.Lock()
+    )
+    async with lock:
+        snapshot = endpoint_snapshot(hass, entry)
+        if snapshot["revision"] != msg["revision"]:
+            raise ValueError("stale_configuration")
+        c = _coordinator(hass, entry)
+        if c is None:
+            raise ValueError("endpoint_not_loaded")
+        prepared = []
+        for update in msg["updates"]:
+            try:
+                prepared.append(
+                    _prepare_entity_update(hass, entry, c, snapshot, update)
+                )
+            except ValueError as err:
+                raise EntityUpdateError(update["key"], str(err)) from err
+        entity_ids, reload_needed = _apply_entity_updates(hass, entry, c, prepared)
+        return {"saved": True, "reload": reload_needed, "entity_ids": entity_ids}
 
 
 def _entity_settings(node, msg, saved=None):
@@ -1119,27 +1184,32 @@ async def ws_snapshot(hass, connection, msg):
     connection.send_result(msg["id"], panel_snapshot(hass))
 
 
+ENTITY_UPDATE_FIELDS = {
+    vol.Optional("value_labels"): vol.Any(list, None),
+    vol.Optional("pulse_ms"): vol.Any(int, None),
+    vol.Required("key"): str,
+    vol.Optional("platform"): str,
+    vol.Optional("limits"): dict,
+    vol.Optional("conversion"): vol.Any(dict, None),
+    vol.Optional("precision"): vol.Any(int, None),
+    vol.Optional("deadband"): vol.Any(int, float, None),
+    vol.Optional("always_available"): bool,
+    vol.Optional("update_mode"): vol.In(("polling", "subscription")),
+    vol.Optional("unit_of_measurement"): vol.Any(str, None),
+    vol.Required("name"): str,
+    vol.Required("area_id"): vol.Any(str, None),
+    vol.Required("node_id"): str,
+    vol.Required("device_class"): vol.Any(str, None),
+    vol.Required("invert_state"): bool,
+}
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/entity/update",
-        vol.Optional("value_labels"): vol.Any(list, None),
-        vol.Optional("pulse_ms"): vol.Any(int, None),
         vol.Required("entry_id"): str,
         vol.Required("revision"): str,
-        vol.Required("key"): str,
-        vol.Optional("platform"): str,
-        vol.Optional("limits"): dict,
-        vol.Optional("conversion"): vol.Any(dict, None),
-        vol.Optional("precision"): vol.Any(int, None),
-        vol.Optional("deadband"): vol.Any(int, float, None),
-        vol.Optional("always_available"): bool,
-        vol.Optional("update_mode"): vol.In(("polling", "subscription")),
-        vol.Optional("unit_of_measurement"): vol.Any(str, None),
-        vol.Required("name"): str,
-        vol.Required("area_id"): vol.Any(str, None),
-        vol.Required("node_id"): str,
-        vol.Required("device_class"): vol.Any(str, None),
-        vol.Required("invert_state"): bool,
+        **ENTITY_UPDATE_FIELDS,
     }
 )
 @websocket_api.require_admin
@@ -1147,6 +1217,30 @@ async def ws_snapshot(hass, connection, msg):
 async def ws_save(hass, connection, msg):
     try:
         result = await async_save_entity(hass, msg)
+    except ValueError as err:
+        connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
+    else:
+        connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/entity/update_many",
+        vol.Required("entry_id"): str,
+        vol.Required("revision"): str,
+        vol.Required("updates"): [vol.Schema(ENTITY_UPDATE_FIELDS)],
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_save_many(hass, connection, msg):
+    try:
+        result = await async_save_entities(hass, msg)
+    except EntityUpdateError as err:
+        # "<key>: <code>" lets the panel name the entity next to the cause.
+        connection.send_error(msg["id"], err.code, f"{err.key}: {err.code}")
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
     except Exception as err:  # noqa: BLE001 - report the cause to the panel

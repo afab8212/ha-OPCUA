@@ -1,9 +1,9 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.17.2";
+const PANEL_VERSION = "1.18.0";
 // Build shown next to the version: date and running number of that day
 // (YYYYMMDD.N). Bump with every change to this file.
-const PANEL_BUILD = "20261117.7";
+const PANEL_BUILD = "20261117.10";
 // The build this code was loaded as: the hash Home Assistant put into the
 // module URL. Taken from the newest load of this file, so a tab that already
 // ran an older panel still reports the build it actually executes.
@@ -245,6 +245,19 @@ const TEXT = {
     connected: "Connesso",
     disconnected: "Disconnesso",
     edit: "Modifica",
+    bulkEdit: "Modifica insieme",
+    bulkTip:
+      "Ctrl+clic (Mac: Cmd+clic) seleziona righe, Maiusc+clic un intervallo.",
+    clearSelection: "Deseleziona",
+    selectMode: "Seleziona",
+    selectModeDone: "Fine",
+    entitiesCount: "entità",
+    mixed: "//…// (diversi)",
+    bulkHelp:
+      "I campi con //…// hanno valori diversi. Lasciandoli invariati ogni entità mantiene il proprio valore; un valore modificato vale per tutte. Sono mostrati solo i campi adatti a tutte le entità selezionate.",
+    replaceValueLabels: "Imposta per tutte",
+    noChanges: "Nessuna modifica.",
+    invalid_selection: "Selezione non valida.",
     name: "Nome",
     area: "Area",
     inherit: "Eredita dal dispositivo",
@@ -289,7 +302,7 @@ const TEXT = {
     invalid_name: "Il nome deve contenere al massimo 255 caratteri.",
     limits_outside_type:
       "I limiti numerici configurati superano quelli del nodo scelto.",
-    info: "Clicca una riga per configurarne categoria e limiti. Le impostazioni di connessione restano nelle opzioni dell’integrazione.",
+    info: "Clicca una riga per configurarne categoria e limiti; Ctrl+clic o Maiusc+clic seleziona più righe da modificare insieme. Le impostazioni di connessione restano nelle opzioni dell’integrazione.",
   },
   de: {
     version: "Integration",
@@ -521,6 +534,19 @@ const TEXT = {
     connected: "Verbunden",
     disconnected: "Getrennt",
     edit: "Bearbeiten",
+    bulkEdit: "Gemeinsam bearbeiten",
+    bulkTip:
+      "Strg+Klick (Mac: Cmd+Klick) wählt Zeilen aus, Shift+Klick einen Bereich.",
+    clearSelection: "Auswahl aufheben",
+    selectMode: "Auswählen",
+    selectModeDone: "Fertig",
+    entitiesCount: "Entitäten",
+    mixed: "//…// (unterschiedlich)",
+    bulkHelp:
+      "Felder mit //…// haben unterschiedliche Werte. Unverändert gelassen behält jede Entität ihren Wert; ein geänderter Wert gilt für alle. Angezeigt werden nur Felder, die für alle ausgewählten Entitäten passen.",
+    replaceValueLabels: "Für alle festlegen",
+    noChanges: "Nichts geändert.",
+    invalid_selection: "Auswahl ungültig.",
     name: "Name",
     area: "Bereich",
     inherit: "Vom Gerät übernehmen",
@@ -567,7 +593,7 @@ const TEXT = {
     invalid_name: "Namen dürfen höchstens 255 Zeichen lang sein.",
     limits_outside_type:
       "Die numerischen Grenzen überschreiten den Wertebereich des gewählten Knotens.",
-    info: "Zeile anklicken, um Kategorie und Grenzen einzustellen. Die Verbindungseinstellungen bleiben in den Integrationsoptionen.",
+    info: "Zeile anklicken, um Kategorie und Grenzen einzustellen; Strg+Klick oder Shift+Klick wählt mehrere Zeilen zum gemeinsamen Bearbeiten. Die Verbindungseinstellungen bleiben in den Integrationsoptionen.",
   },
   en: {
     version: "Integration",
@@ -790,6 +816,18 @@ const TEXT = {
     connected: "Connected",
     disconnected: "Disconnected",
     edit: "Edit",
+    bulkEdit: "Edit together",
+    bulkTip: "Ctrl+click (Mac: Cmd+click) selects rows, Shift+click a range.",
+    clearSelection: "Clear selection",
+    selectMode: "Select",
+    selectModeDone: "Done",
+    entitiesCount: "entities",
+    mixed: "//…// (different)",
+    bulkHelp:
+      "Fields showing //…// have different values. Left unchanged, every entity keeps its own value; a changed value applies to all. Only fields that fit all selected entities are shown.",
+    replaceValueLabels: "Set for all",
+    noChanges: "Nothing changed.",
+    invalid_selection: "Invalid selection.",
     name: "Name",
     area: "Area",
     inherit: "Inherit from device",
@@ -832,7 +870,7 @@ const TEXT = {
     invalid_name: "Names must contain at most 255 characters.",
     limits_outside_type:
       "Configured numeric limits exceed the selected node’s range.",
-    info: "Click a row to configure its category and limits. Connection settings remain in the integration options.",
+    info: "Click a row to configure its category and limits; Ctrl+click or Shift+click selects several rows to edit together. Connection settings remain in the integration options.",
   },
 };
 const LANGS = ["it", "de"];
@@ -1134,6 +1172,13 @@ input[type=checkbox][role=switch]:disabled{opacity:.5;cursor:default}
 @media(min-width:651px){button{padding:5px 12px;min-height:32px}input,select{padding:5px 10px;min-height:32px}.endpointPanel{padding:12px 14px;margin-bottom:12px}.endpointMeta{gap:8px;margin-top:8px}.endpointSubscription .toggle{min-height:26px}.navRow{margin-top:8px;padding-top:8px}nav button{padding:3px 10px;min-height:28px}.viewToggle{padding:2px}.viewToggle button{padding:5px 9px;min-height:28px}.entityEditor .editorBody{padding:12px 16px;gap:10px}.entityEditor .editorSection{padding:10px 14px}.entityEditor .editorSection h3{margin-bottom:8px}.field{gap:4px}.entityForm footer{padding-top:10px;padding-bottom:10px}.entityForm footer button{min-height:32px}.entityEditor input:not([type=checkbox]),.entityEditor select{min-height:32px}}
 /* Only the table scrolls; the endpoint toolbar above stays in place. This holds for a low window too; only a phone scrolls the whole page. position:relative keeps the hidden hints of the toolbar inside, so they never make the Home Assistant page scroll. */
 @media(min-width:651px){:host{height:100vh;height:100dvh}.content{overflow:hidden;position:relative}.content>.tableWrap{flex:1 1 0;min-height:120px}}
+/* Editing several entities together: selected rows, the selection buttons and the "//…//" marker of differing values. */
+.bulkTools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.bulkTools button{position:relative}
+.entityRow.selected,.entityRow.selected:hover{background:color-mix(in srgb,var(--primary-color,#008fac) 14%,transparent)}.entityRow.selected>td:first-child{box-shadow:inset 3px 0 0 var(--primary-color,#008fac)}
+.selecting .entityRow.clickable .nameLine::before{content:"";flex:0 0 16px;height:16px;box-sizing:border-box;border:2px solid var(--secondary-text-color,#637487);border-radius:4px}.selecting .entityRow.selected .nameLine::before{border-color:var(--primary-color,#008fac);background:var(--primary-color,#008fac);box-shadow:inset 0 0 0 2px var(--card-background-color,#fff)}
+@media(min-width:651px){.bulkTools .selectMode{display:none}}
+@media(max-width:650px){.bulkTools{width:100%}.bulkTools button{flex:1;min-height:42px}}
+.mixedValue{font-style:italic;color:var(--secondary-text-color,#637487)}.bulkSummary{margin:0}.bulkNames{margin:4px 0 0;font-size:12px;color:var(--secondary-text-color,#637487);overflow-wrap:anywhere;max-height:4.5em;overflow:auto}
 `;
 class OpcuaNodePanel extends HTMLElement {
   constructor() {
@@ -1154,6 +1199,11 @@ class OpcuaNodePanel extends HTMLElement {
     // Column sort like the file explorer: 1st click ascending, 2nd
     // descending, 3rd back to the original order. Kept across re-renders.
     this._sort = null;
+    // Entities selected for editing together (row keys of one endpoint).
+    this._selection = new Set();
+    this._selectAnchor = null;
+    this._selectMode = false;
+    this._bulkTools = null;
     try {
       const stored = JSON.parse(
         localStorage.getItem("ha-opcua-column-widths") || "{}",
@@ -1173,7 +1223,9 @@ class OpcuaNodePanel extends HTMLElement {
     // it floats above the scrolling table instead of being cut off by it.
     this._tip = element("div", "", { class: "nodeTip", role: "tooltip" });
     this.shadowRoot.addEventListener("pointerover", (event) => {
-      const target = event.target.closest?.("[data-node-tip], [data-float-tip]");
+      const target = event.target.closest?.(
+        "[data-node-tip], [data-float-tip]",
+      );
       if (!target || target === this._tipTarget) return;
       this._hideTip();
       this._tipTarget = target;
@@ -1392,6 +1444,9 @@ class OpcuaNodePanel extends HTMLElement {
       this._selected = endpoints.value;
       this._notice = "";
       this._filter = "all";
+      // A selection never spans endpoints.
+      this._selection.clear();
+      this._selectAnchor = null;
       this._render();
     });
     const search = element("input", undefined, {
@@ -1640,6 +1695,44 @@ class OpcuaNodePanel extends HTMLElement {
       }
       navTools.append(groupToggle);
     }
+    // Editing several entities together: the selection is made with
+    // Ctrl/Cmd+click and Shift+click in the table, on a phone after
+    // "Select". Keys that no longer name an editable row are dropped.
+    const editable = new Set(
+      endpoint.rows.filter((r) => r.editable && !r.orphan).map((r) => r.key),
+    );
+    for (const key of [...this._selection])
+      if (!editable.has(key)) this._selection.delete(key);
+    const bulkTools = element("div", undefined, { class: "bulkTools" });
+    const bulkEdit = element("button", "", {
+      type: "button",
+      class: "primary bulkEdit",
+      "data-tip": this._t("bulkTip"),
+    });
+    bulkEdit.addEventListener("click", () => {
+      const rows = this._selectedRows(endpoint);
+      if (rows.length === 1) this._edit(rows[0]);
+      else if (rows.length) this._bulkEdit(rows, endpoint);
+    });
+    const clearSelection = this._button("clearSelection", () =>
+      this._clearSelection(),
+    );
+    clearSelection.classList.add("clearSelection");
+    const selectMode = element("button", "", {
+      type: "button",
+      class: "selectMode",
+    });
+    selectMode.addEventListener("click", () => {
+      this._selectMode = !this._selectMode;
+      this._updateSelection();
+    });
+    bulkTools.append(bulkEdit, clearSelection, selectMode);
+    navTools.prepend(bulkTools);
+    this._bulkTools = {
+      edit: bulkEdit,
+      clear: clearSelection,
+      mode: selectMode,
+    };
     navRow.append(navTools);
     endpointPanel.append(navRow);
     main.append(endpointPanel);
@@ -1935,24 +2028,92 @@ class OpcuaNodePanel extends HTMLElement {
     // Like the other device panels a click anywhere on the row opens the
     // editor; the buttons keep their own action. The row is focusable, so
     // the editor stays reachable from the keyboard (Enter or Space).
+    // Ctrl/Cmd+click toggles the row in the selection for editing several
+    // entities together, Shift+click selects a range; the same with Enter
+    // or Space from the keyboard. In selection mode (phones) a plain click
+    // toggles.
     if (open) {
       tr.classList.add("clickable");
       tr.tabIndex = 0;
+      tr.dataset.key = row.key;
       tr.setAttribute(
         "aria-label",
         `${this._t("edit")}: ${row.name || row.node_id}`,
       );
+      const activate = (event) => {
+        if (event.shiftKey)
+          this._selectRange(row.key, event.ctrlKey || event.metaKey);
+        else if (event.ctrlKey || event.metaKey || this._selectMode)
+          this._toggleSelected(row.key);
+        else open();
+      };
+      // A Shift/Ctrl click must not select the text of the rows.
+      tr.addEventListener("mousedown", (event) => {
+        if (event.shiftKey || event.ctrlKey || event.metaKey)
+          event.preventDefault();
+      });
       tr.addEventListener("click", (event) => {
         if (event.target.closest("button, a, input, select")) return;
-        open();
+        activate(event);
       });
       tr.addEventListener("keydown", (event) => {
         if (event.target !== tr || !["Enter", " "].includes(event.key)) return;
         event.preventDefault();
-        open();
+        activate(event);
       });
     }
     return tr;
+  }
+  _selectableKeys() {
+    // Rows in visible order; rows of a folded group are left out.
+    return [...(this._rows?.querySelectorAll("tr.entityRow.clickable") || [])]
+      .filter((tr) => !tr.closest("tbody.collapsed"))
+      .map((tr) => tr.dataset.key);
+  }
+  _toggleSelected(key) {
+    if (this._selection.has(key)) this._selection.delete(key);
+    else this._selection.add(key);
+    this._selectAnchor = key;
+    this._updateSelection();
+  }
+  _selectRange(key, add = false) {
+    const keys = this._selectableKeys();
+    const anchor = keys.includes(this._selectAnchor) ? this._selectAnchor : key;
+    const [from, to] = [keys.indexOf(anchor), keys.indexOf(key)].sort(
+      (a, b) => a - b,
+    );
+    if (!add) this._selection.clear();
+    for (const item of keys.slice(from, to + 1)) this._selection.add(item);
+    this._selectAnchor = anchor;
+    this._updateSelection();
+  }
+  _clearSelection() {
+    this._selection.clear();
+    this._selectAnchor = null;
+    this._updateSelection();
+  }
+  _selectedRows(endpoint = this._endpoint()) {
+    return (endpoint?.rows || []).filter(
+      (row) => this._selection.has(row.key) && row.editable && !row.orphan,
+    );
+  }
+  _updateSelection() {
+    const count = this._selection.size;
+    for (const tr of this._rows?.querySelectorAll("tr.entityRow.clickable") ||
+      []) {
+      const selected = this._selection.has(tr.dataset.key);
+      tr.classList.toggle("selected", selected);
+      tr.setAttribute("aria-selected", String(selected));
+    }
+    this._rows?.classList.toggle("selecting", this._selectMode);
+    const tools = this._bulkTools;
+    if (!tools) return;
+    tools.edit.hidden = tools.clear.hidden = count === 0;
+    tools.edit.textContent = `${this._t("bulkEdit")} (${count})`;
+    tools.mode.textContent = this._t(
+      this._selectMode ? "selectModeDone" : "selectMode",
+    );
+    tools.mode.setAttribute("aria-pressed", String(this._selectMode));
   }
   _activeGroupMode(endpoint) {
     // A stored preference only applies to an endpoint that has something
@@ -2171,6 +2332,7 @@ class OpcuaNodePanel extends HTMLElement {
       });
     }
     if (groupedRows.length) this._renderGroups(groupedRows, grouping);
+    this._updateSelection();
     this._alignSettings();
     this._paintStates();
   }
@@ -3733,6 +3895,680 @@ class OpcuaNodePanel extends HTMLElement {
     dialog.showModal();
     this._paintStates();
     name.focus();
+  }
+  _bulkEdit(rows, endpoint = this._endpoint()) {
+    // The entity editor for several entities at once, without name and
+    // NodeId. A field whose value is the same everywhere shows it; differing
+    // values show "//…//". A field left as it was keeps every entity's own
+    // value, a changed one applies to all. Only fields that fit every
+    // selected entity are offered.
+    const revision = endpoint.revision;
+    const MIXED = "__mixed__";
+    const mixedText = "//…//";
+    const nodeOf = (row) =>
+      endpoint.nodes.find((n) => n.node_id === row.node_id) || {
+        node_id: row.node_id,
+        variant_type: row.variant_type,
+        writable: false,
+      };
+    const items = rows.map((row) => ({ row, node: nodeOf(row) }));
+    const key = (value) => JSON.stringify(value ?? null);
+    const same = (values) => values.every((v) => key(v) === key(values[0]));
+    const all = (test) => items.every(test);
+    const setting = (name) => items.map(({ row }) => row.settings?.[name]);
+    const dialog = element("dialog", undefined, {
+      class: "entityEditor bulkEditor",
+      "aria-labelledby": "entity-editor-title",
+    });
+    this._dialog = dialog;
+    const form = element("form", undefined, { class: "entityForm" });
+    const body = element("div", undefined, { class: "editorBody" });
+    const heading = element("div", undefined, { class: "editorHeading" });
+    const headingText = element("div", undefined, {
+      class: "editorHeadingText",
+    });
+    headingText.append(
+      element(
+        "h2",
+        `${this._t("bulkEdit")} · ${rows.length} ${this._t("entitiesCount")}`,
+        { id: "entity-editor-title" },
+      ),
+      element("div", endpoint.title || endpoint.name || "", { class: "hint" }),
+      element("p", rows.map((row) => row.name || row.node_id).join(", "), {
+        class: "bulkNames",
+      }),
+    );
+    heading.append(headingText);
+    form.append(heading, body);
+    dialog.append(form);
+    body.append(
+      element("p", this._t("bulkHelp"), { class: "hint bulkSummary" }),
+    );
+    const section = (titleKey, icon) => {
+      const part = element("section", undefined, { class: "editorSection" });
+      const title = element("h3", this._t(titleKey));
+      title.prepend(valueIcon(icon));
+      const grid = element("div", undefined, { class: "editorFields" });
+      part.append(title, grid);
+      body.append(part);
+      return grid;
+    };
+    const identity = section("identitySection", "text");
+    const value = section("valueSection", "datetime");
+    const updates = section("updatesSection", "on");
+    // One field: a label with the input, wrapped like in the entity editor.
+    const fields = [];
+    const add = (grid, labelKey, input, { wide = false, check } = {}) => {
+      const wrap = element("div", undefined, {
+        class: `editorFieldGroup${wide ? " wide" : ""}`,
+      });
+      // A switch already sits in its label, the value table in its own box.
+      wrap.append(
+        input.closest("label") ||
+          (input.matches("input, select")
+            ? this._field(labelKey, input)
+            : input),
+      );
+      grid.append(wrap);
+      fields.push({ wrap, check });
+      return wrap;
+    };
+    // Select: the common value, or "//…//" as its own option while the
+    // values differ. Choosing "//…//" again means "leave unchanged".
+    const select = (name, values, options) => {
+      const input = element("select", undefined, { name });
+      for (const [optionValue, label] of options)
+        input.append(element("option", label, { value: optionValue }));
+      const known = options.map(([v]) => v);
+      if (same(values) && known.includes(values[0] ?? "")) {
+        input.value = values[0] ?? "";
+      } else {
+        input.prepend(
+          element("option", this._t("mixed"), {
+            value: MIXED,
+            class: "mixedValue",
+          }),
+        );
+        input.value = MIXED;
+      }
+      input.dataset.initial = input.value;
+      return input;
+    };
+    // Number: the common value, or empty with "//…//" as placeholder.
+    const number = (name, values, attributes = {}) => {
+      const input = element("input", undefined, {
+        type: "number",
+        step: "any",
+        name,
+        ...attributes,
+      });
+      if (same(values)) input.value = values[0] ?? "";
+      else input.placeholder = mixedText;
+      input.dataset.initial = input.value;
+      return input;
+    };
+    // Switch: a mixed state shows as indeterminate until it is clicked.
+    const toggle = (name, labelKey, values) => {
+      const input = element("input", undefined, {
+        type: "checkbox",
+        name,
+        role: "switch",
+        "aria-label": this._t(labelKey),
+      });
+      const label = element("label", undefined, {
+        class: "toggle editorSwitch",
+      });
+      const text = element("span", this._t(labelKey));
+      label.append(input, text);
+      if (same(values)) input.checked = !!values[0];
+      else {
+        input.indeterminate = true;
+        text.append(element("small", ` ${mixedText}`, { class: "mixedValue" }));
+      }
+      input.dataset.initial = input.indeterminate
+        ? MIXED
+        : String(input.checked);
+      input.addEventListener("change", () =>
+        text.querySelector(".mixedValue")?.remove(),
+      );
+      return input;
+    };
+    const changed = (input) =>
+      input.type === "checkbox"
+        ? !input.indeterminate &&
+          String(input.checked) !== input.dataset.initial
+        : input.value !== input.dataset.initial &&
+          !(input.value === MIXED || (input.value === "" && input.placeholder));
+    // Area.
+    const area = select(
+      "area",
+      items.map(({ row }) => row.area_id || ""),
+      [
+        ["", this._t("inherit")],
+        ...this._data.areas.map((item) => [item.id, item.name]),
+      ],
+    );
+    add(identity, "area", area);
+    // Category: only what fits every selected node.
+    const autoPlatform = (node) =>
+      node?.writable
+        ? { Boolean: "switch", DateTime: "datetime" }[node.variant_type] ||
+          "sensor"
+        : "sensor";
+    const choicesFor = (item) => [
+      ...(item.row.manual ? [] : ["auto"]),
+      "sensor",
+      ...[
+        "binary_sensor",
+        "switch",
+        "button",
+        "number",
+        "select",
+        "text",
+        "datetime",
+      ].filter((platform) => compatible({ platform }, item.node)),
+      ...(item.row.manual ? [] : ["disabled"]),
+    ];
+    const allowed = choicesFor(items[0]).filter((p) =>
+      items.every((item) => choicesFor(item).includes(p)),
+    );
+    // "Automatic" names what it resolves to when that is one for all.
+    const autos = new Set(items.map(({ node }) => autoPlatform(node)));
+    const autoLabel =
+      autos.size === 1
+        ? `${this._t("auto")} (${[...autos][0]})`
+        : this._t("auto");
+    const category = select(
+      "category",
+      items.map(({ row }) => row.settings?.platform || row.platform),
+      allowed.map((p) => [
+        p,
+        p === "auto" ? autoLabel : p === "disabled" ? this._t(p) : p,
+      ]),
+    );
+    add(identity, "category", category);
+    // The platform each entity would have after saving.
+    const platformOf = (item) =>
+      !changed(category)
+        ? item.row.platform
+        : category.value === "auto"
+          ? autoPlatform(item.node)
+          : category.value;
+    const onePlatform = () => {
+      const platforms = new Set(items.map(platformOf));
+      return platforms.size === 1 ? [...platforms][0] : null;
+    };
+    const variant = (set) => all(({ node }) => set.has(node.variant_type));
+    // Value table (raw integer -> text) for selects and integer sensors.
+    // Compared as text below, so every entry gets the same key order.
+    const labelLists = setting("value_labels").map((list) =>
+      (list || []).map(({ value, label }) => ({ value, label })),
+    );
+    const labelsSame = same(labelLists);
+    const tableRows = element("div", undefined, { class: "valueTable" });
+    let labelsReplaced = false;
+    const readTable = () =>
+      [...tableRows.querySelectorAll(".valueTableRow")].map((line) => ({
+        value: Number(line.querySelector("[name=value_label_value]").value),
+        label: line.querySelector("[name=value_label_text]").value,
+      }));
+    const addTableRow = (entry = {}) => {
+      const line = element("div", undefined, { class: "valueTableRow" });
+      const raw = element("input", undefined, {
+        type: "number",
+        step: "1",
+        name: "value_label_value",
+        required: "",
+        "aria-label": this._t("rawValue"),
+      });
+      raw.value = entry.value ?? "";
+      const text = element("input", undefined, {
+        type: "text",
+        name: "value_label_text",
+        maxlength: "64",
+        required: "",
+        "aria-label": this._t("labelText"),
+      });
+      text.value = entry.label ?? "";
+      const remove = element("button", "✕", {
+        type: "button",
+        class: "danger",
+        title: this._t("removeValueLabel"),
+        "aria-label": this._t("removeValueLabel"),
+      });
+      remove.addEventListener("click", () => {
+        line.remove();
+        update();
+      });
+      line.append(
+        this._field("rawValue", raw),
+        this._field("labelText", text),
+        remove,
+      );
+      tableRows.append(line);
+      return line;
+    };
+    const tableLabel = element("div", undefined, { class: "field tableLabel" });
+    const tableBox = element("div", undefined, { class: "valueTable" });
+    const addLabel = element("button", this._t("addValueLabel"), {
+      type: "button",
+    });
+    addLabel.addEventListener("click", () => {
+      const used = readTable()
+        .map((r) => r.value)
+        .filter(Number.isFinite);
+      const line = addTableRow({
+        value: used.length ? Math.max(...used) + 1 : 0,
+      });
+      update();
+      line.querySelector("[name=value_label_text]").focus();
+    });
+    const mixedLabels = element("p", this._t("mixed"), { class: "mixedValue" });
+    const replaceLabels = element("button", this._t("replaceValueLabels"), {
+      type: "button",
+    });
+    replaceLabels.addEventListener("click", () => {
+      // Start from the first non-empty list; it then applies to all.
+      labelsReplaced = true;
+      for (const entry of labelLists.find((list) => list.length) || [])
+        addTableRow(entry);
+      update();
+      (tableRows.querySelector("input") || addLabel).focus();
+    });
+    if (labelsSame) for (const entry of labelLists[0]) addTableRow(entry);
+    tableBox.append(mixedLabels, replaceLabels, tableRows, addLabel);
+    tableLabel.append(element("span", this._t("valueLabels")), tableBox);
+    const labelsChanged = () =>
+      labelsSame ? key(readTable()) !== key(labelLists[0]) : labelsReplaced;
+    const tableVisible = () =>
+      ["select", "sensor"].includes(onePlatform()) && variant(INTEGER);
+    const tableWrap = add(value, "valueLabels", tableLabel, {
+      wide: true,
+      check: tableVisible,
+    });
+    // Texts replace the number: no conversion, unit or device class. Asked
+    // per entity, so one select among other numbers already hides them.
+    const labelled = () =>
+      items.some((item, index) => {
+        const platform = platformOf(item);
+        if (!INTEGER.has(item.node.variant_type)) return false;
+        if (platform === "select") return true;
+        if (platform !== "sensor") return false;
+        return tableVisible() && labelsChanged()
+          ? readTable().length > 0
+          : labelLists[index].length > 0;
+      });
+    // Limits of a number or text entity.
+    const limitInputs = {};
+    for (const [platform, keys] of Object.entries({
+      number: ["min", "max", "step"],
+      text: ["min_length", "max_length"],
+    })) {
+      const group = element("div", undefined, { class: "limits" });
+      for (const name of keys) {
+        const input = number(
+          name,
+          setting(name),
+          platform === "text" ? { step: "1", min: "0", max: "255" } : {},
+        );
+        limitInputs[name] = input;
+        group.append(this._field(name, input));
+      }
+      const wrap = element("div", undefined, {
+        class: "editorFieldGroup wide",
+      });
+      wrap.append(group);
+      value.append(wrap);
+      fields.push({ wrap, check: () => onePlatform() === platform });
+    }
+    const pulse = number("pulse_ms", setting("pulse_ms"), {
+      min: "50",
+      max: "10000",
+      step: "1",
+    });
+    add(value, "pulseMs", pulse, { check: () => onePlatform() === "button" });
+    // Conversion: its values can only be edited while the type is one.
+    const conversions = setting("conversion");
+    const conversion = select(
+      "conversion",
+      conversions.map((c) => c?.type || "none"),
+      ["none", "multiplier", "linear_scale"].map((kind) => [
+        kind,
+        this._t(kind === "none" ? "conversionNone" : kind),
+      ]),
+    );
+    const conversionVisible = () => !labelled() && variant(NUMERIC);
+    add(value, "conversion", conversion, { check: conversionVisible });
+    const conversionDefaults = {
+      factor: 1,
+      plc_min: 0,
+      plc_max: 100,
+      ha_min: 0,
+      ha_max: 100,
+    };
+    const conversionInputs = {};
+    const conversionGroup = element("div", undefined, { class: "limits" });
+    for (const name of Object.keys(conversionDefaults)) {
+      const input = number(
+        name,
+        conversions.map((c) => c?.[name]),
+      );
+      conversionInputs[name] = input;
+      conversionGroup.append(this._field(name, input));
+    }
+    const conversionWrap = element("div", undefined, {
+      class: "editorFieldGroup wide",
+    });
+    conversionWrap.append(conversionGroup);
+    value.append(conversionWrap);
+    fields.push({
+      wrap: conversionWrap,
+      check: () =>
+        conversionVisible() && ![MIXED, "none"].includes(conversion.value),
+    });
+    const precision = number("precision", setting("precision"), {
+      min: "0",
+      max: "10",
+      step: "1",
+    });
+    add(value, "precision", precision, {
+      check: () =>
+        variant(new Set(["Float", "Double"])) ||
+        (conversionVisible() && ![MIXED, "none"].includes(conversion.value)),
+    });
+    // Unit: the standard units plus any other unit already in use.
+    const units = setting("unit_of_measurement");
+    const unit = select(
+      "unit_of_measurement",
+      units.map((u) => u || ""),
+      [
+        ["", this._t("none")],
+        ...[...new Set([...this._data.units, ...units.filter(Boolean)])].map(
+          (u) => [u, u],
+        ),
+      ],
+    );
+    add(value, "unit", unit, {
+      check: () =>
+        !labelled() &&
+        ["number", "sensor"].includes(onePlatform()) &&
+        variant(NUMERIC),
+    });
+    const classesFor = (platform) => {
+      const classes = this._data.device_classes[platform] || [];
+      return platform === "sensor" && variant(new Set(["DateTime"]))
+        ? classes.filter((cls) => cls === "timestamp")
+        : classes;
+    };
+    const deviceClass = element("select", undefined, { name: "device_class" });
+    const classValues = items.map(({ row }) => row.device_class || "");
+    let classShownFor = null;
+    const fillClasses = () => {
+      // Rebuilt when the category changes the platform.
+      const platform = onePlatform();
+      if (platform === classShownFor) return;
+      classShownFor = platform;
+      const chosen = deviceClass.value;
+      deviceClass.replaceChildren(
+        element("option", this._t("none"), { value: "" }),
+        ...classesFor(platform).map((cls) =>
+          element(
+            "option",
+            this._hass.localize?.(
+              `component.${platform}.entity_component.${cls}.name`,
+            ) || cls,
+            { value: cls },
+          ),
+        ),
+      );
+      const options = [...deviceClass.options].map((o) => o.value);
+      if (
+        !changed(category) &&
+        same(classValues) &&
+        options.includes(classValues[0])
+      ) {
+        deviceClass.value = classValues[0];
+      } else if (!changed(category) && !same(classValues)) {
+        deviceClass.prepend(
+          element("option", this._t("mixed"), { value: MIXED }),
+        );
+        deviceClass.value = MIXED;
+      } else {
+        deviceClass.value = options.includes(chosen) ? chosen : "";
+      }
+      if (deviceClass.dataset.initial === undefined)
+        deviceClass.dataset.initial = deviceClass.value;
+    };
+    fillClasses();
+    add(value, "deviceClass", deviceClass, {
+      check: () =>
+        !labelled() && onePlatform() && classesFor(onePlatform()).length > 0,
+    });
+    const invert = toggle(
+      "invert",
+      "invert",
+      items.map(({ row }) => row.invert_state),
+    );
+    add(value, "invert", invert, {
+      wide: true,
+      check: () => variant(new Set(["Boolean"])),
+    });
+    // Updates.
+    const updateMode = select(
+      "update_mode",
+      setting("update_mode").map((mode) => mode || "polling"),
+      ["polling", "subscription"].map((mode) => [mode, this._t(mode)]),
+    );
+    add(updates, "updateMode", updateMode, { wide: true });
+    const alwaysAvailable = toggle(
+      "always_available",
+      "alwaysAvailable",
+      setting("always_available").map((v) => v === true),
+    );
+    add(updates, "alwaysAvailable", alwaysAvailable, { wide: true });
+    const deadband = number("deadband", setting("deadband"), {
+      min: "0",
+    });
+    add(updates, "deadband", deadband, {
+      check: () =>
+        (changed(updateMode)
+          ? updateMode.value === "subscription"
+          : setting("update_mode").every((mode) => mode === "subscription")) &&
+        ["number", "sensor"].includes(onePlatform()) &&
+        variant(NUMERIC),
+    });
+    const update = () => {
+      fillClasses();
+      mixedLabels.hidden = replaceLabels.hidden = labelsSame || labelsReplaced;
+      tableRows.hidden = addLabel.hidden = !mixedLabels.hidden;
+      for (const { wrap, check } of fields) {
+        wrap.hidden = check ? !check() : false;
+        for (const input of wrap.querySelectorAll("input, select"))
+          input.disabled = wrap.hidden;
+      }
+      for (const part of body.querySelectorAll(".editorSection"))
+        part.hidden = [...part.querySelector(".editorFields").children].every(
+          (child) => child.hidden,
+        );
+      for (const [name, input] of Object.entries(conversionInputs)) {
+        const visible =
+          conversion.value === "multiplier"
+            ? name === "factor"
+            : name !== "factor";
+        input.parentElement.hidden = !visible;
+        input.disabled = input.disabled || !visible;
+      }
+    };
+    for (const input of [category, conversion, updateMode])
+      input.addEventListener("change", update);
+    update();
+    const error = element("div", "", { class: "error", role: "alert" });
+    const footer = element("footer");
+    const cancel = this._button("cancel", () => dialog.close());
+    const save = element("button", this._t("save"), {
+      type: "submit",
+      class: "primary",
+    });
+    footer.append(error, cancel, save);
+    form.append(footer);
+    // One update per entity: its own current values, overridden by every
+    // field that was changed.
+    const used = (input) => !input.disabled && changed(input);
+    // A limit, pulse or conversion value needs a number; emptied it stays.
+    const filled = (input) => used(input) && input.value !== "";
+    const payload = (item) => {
+      const { row } = item;
+      const own = row.settings || {};
+      const platform = platformOf(item);
+      const platformChanged = platform !== row.platform;
+      const message = {
+        key: row.key,
+        name: row.custom_name ?? "",
+        area_id: row.area_id || null,
+        node_id: row.node_id,
+        device_class: platformChanged ? null : row.device_class || null,
+        invert_state: !!row.invert_state,
+      };
+      if (used(area)) message.area_id = area.value || null;
+      if (used(category)) message.platform = category.value;
+      if (used(deviceClass)) message.device_class = deviceClass.value || null;
+      if (used(invert)) message.invert_state = invert.checked;
+      if (used(updateMode)) message.update_mode = updateMode.value;
+      if (used(alwaysAvailable))
+        message.always_available = alwaysAvailable.checked;
+      if (filled(pulse)) message.pulse_ms = Number(pulse.value);
+      if (used(precision))
+        message.precision =
+          precision.value === "" ? null : Number(precision.value);
+      if (used(deadband))
+        message.deadband =
+          deadband.value === "" ? null : Number(deadband.value);
+      if (used(unit)) message.unit_of_measurement = unit.value || null;
+      if (!tableWrap.hidden && !tableRows.hidden && labelsChanged())
+        message.value_labels = readTable();
+      // Limits: changed ones, or all of them when the entity becomes a
+      // number or text entity and needs a full set.
+      const limitKeys = {
+        number: ["min", "max", "step"],
+        text: ["min_length", "max_length"],
+      }[platform];
+      if (limitKeys) {
+        const float = ["Float", "Double"].includes(item.node.variant_type);
+        const fallback = {
+          min: 0,
+          max: 100,
+          step: float ? 0.1 : 1,
+          min_length: 0,
+          max_length: 255,
+        };
+        const limits = {};
+        for (const name of limitKeys) {
+          const input = limitInputs[name];
+          if (filled(input)) limits[name] = Number(input.value);
+          else if (platformChanged) limits[name] = own[name] ?? fallback[name];
+        }
+        if (Object.keys(limits).length) message.limits = limits;
+      }
+      const conversionTouched =
+        used(conversion) ||
+        Object.values(conversionInputs).some((input) => filled(input));
+      if (conversionTouched && !conversion.disabled) {
+        const type =
+          conversion.value === MIXED ? own.conversion?.type : conversion.value;
+        message.conversion =
+          !type || type === "none"
+            ? null
+            : {
+                type,
+                ...Object.fromEntries(
+                  (type === "multiplier"
+                    ? ["factor"]
+                    : ["plc_min", "plc_max", "ha_min", "ha_max"]
+                  ).map((name) => [
+                    name,
+                    filled(conversionInputs[name])
+                      ? Number(conversionInputs[name].value)
+                      : own.conversion?.type === type
+                        ? own.conversion[name]
+                        : conversionDefaults[name],
+                  ]),
+                ),
+              };
+      }
+      return message;
+    };
+    let saving = false;
+    dialog.addEventListener("cancel", (event) => {
+      if (saving) event.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (this._dialog === dialog) this._dialog = null;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (saving) return;
+      const updatesToSend = items.map(payload);
+      const untouched = updatesToSend.every((message, index) => {
+        const row = items[index].row;
+        const base = {
+          key: row.key,
+          name: row.custom_name ?? "",
+          area_id: row.area_id || null,
+          node_id: row.node_id,
+          device_class: row.device_class || null,
+          invert_state: !!row.invert_state,
+        };
+        return key(message) === key(base);
+      });
+      if (untouched) {
+        error.textContent = this._t("noChanges");
+        return;
+      }
+      saving = true;
+      save.disabled = cancel.disabled = true;
+      save.textContent = this._t("saving");
+      error.textContent = "";
+      try {
+        const result = await this._hass.callWS({
+          type: "ha_opcua/entity/update_many",
+          entry_id: endpoint.entry_id,
+          revision,
+          updates: updatesToSend,
+        });
+        this._notice = this._t(result.reload ? "reloading" : "saved");
+        this._selection.clear();
+        this._selectAnchor = null;
+        this._selectMode = false;
+        dialog.close();
+        await this._load();
+        if (result.reload) {
+          clearTimeout(this._timer);
+          this._timer = setTimeout(() => this._load(), 2500);
+        }
+      } catch (err) {
+        // "<key>: <code>" names the entity that failed.
+        const failed = rows.find((row) =>
+          String(err?.message || "").startsWith(`${row.key}: `),
+        );
+        error.textContent = failed
+          ? `${failed.name || failed.node_id}: ${this._errorText({
+              code: err.code,
+              message: err.code,
+            })}`
+          : this._errorText(err);
+      } finally {
+        saving = false;
+        save.disabled = cancel.disabled = false;
+        save.textContent = this._t("save");
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+    (
+      body.querySelector("select:not([disabled]), input:not([disabled])") ||
+      cancel
+    ).focus();
   }
 }
 if (!customElements.get("opcua-node-panel"))

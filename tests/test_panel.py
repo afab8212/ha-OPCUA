@@ -22,6 +22,8 @@ from custom_components.ha_opcua.config_flow import AsyncUAOptionsFlow
 from custom_components.ha_opcua.const import CONF_NODE_SETTINGS, DOMAIN
 from custom_components.ha_opcua.number import AsyncuaNumber
 from custom_components.ha_opcua.panel import (
+    EntityUpdateError,
+    async_save_entities,
     async_save_entity,
     async_setup_panel,
     endpoint_snapshot,
@@ -30,6 +32,7 @@ from custom_components.ha_opcua.panel import (
     ws_inspect,
     ws_remove,
     ws_save,
+    ws_save_many,
     ws_snapshot,
 )
 from custom_components.ha_opcua.switch import AsyncuaSwitch
@@ -124,6 +127,71 @@ async def test_invalid_save_is_atomic(hass, entry, changes, error):
     await c.async_shutdown()
 
 
+def _bulk(msg, *updates):
+    base = {k: v for k, v in msg.items() if k not in ("entry_id", "revision")}
+    return {
+        "entry_id": msg["entry_id"],
+        "revision": msg["revision"],
+        "updates": [{**base, **update} for update in updates],
+    }
+
+
+async def test_bulk_save_writes_all_entities_with_one_revision(hass, entry):
+    c, registered, msg = await prepare(hass, entry)
+    result = await async_save_entities(
+        hass,
+        _bulk(
+            msg,
+            {"key": "ns=2;i=1", "node_id": "ns=2;i=1", "name": "", "invert_state": True},
+            {"key": "ns=2;i=2", "node_id": "ns=2;i=2", "name": "", "invert_state": True},
+        ),
+    )
+    assert result["saved"] and len(result["entity_ids"]) == 2
+    settings = entry.options[CONF_NODE_SETTINGS]
+    assert settings["ns=2;i=1"]["invert_state"] and settings["ns=2;i=2"]["invert_state"]
+    registry = er.async_get(hass)
+    for entity_id in result["entity_ids"]:
+        assert registry.async_get(entity_id).area_id == msg["area_id"]
+    await c.async_shutdown()
+
+
+@pytest.mark.parametrize(
+    ("second", "error"),
+    [
+        ({"area_id": "missing"}, "area_not_found"),
+        ({"node_id": "ns=2;i=99"}, "node_not_found"),
+    ],
+)
+async def test_bulk_save_is_atomic_and_names_the_failing_entity(
+    hass, entry, second, error
+):
+    c, registered, msg = await prepare(hass, entry)
+    before = deepcopy(dict(entry.options))
+    with pytest.raises(EntityUpdateError) as caught:
+        await async_save_entities(
+            hass,
+            _bulk(
+                msg,
+                {"key": "ns=2;i=1", "node_id": "ns=2;i=1"},
+                {"key": "ns=2;i=2", "node_id": "ns=2;i=2", **second},
+            ),
+        )
+    assert caught.value.key == "ns=2;i=2" and caught.value.code == error
+    assert dict(entry.options) == before
+    assert er.async_get(hass).async_get(registered.entity_id) == registered
+    await c.async_shutdown()
+
+
+@pytest.mark.parametrize("keys", [[], ["ns=2;i=1", "ns=2;i=1"]])
+async def test_bulk_save_rejects_empty_or_duplicate_selection(hass, entry, keys):
+    c, _, msg = await prepare(hass, entry)
+    with pytest.raises(ValueError, match="invalid_selection"):
+        await async_save_entities(
+            hass, _bulk(msg, *({"key": k, "node_id": k} for k in keys))
+        )
+    await c.async_shutdown()
+
+
 async def test_two_editors_cannot_overwrite_and_snapshot_contains_no_credentials(
     hass, entry
 ):
@@ -169,7 +237,14 @@ async def test_binary_device_class_inversion_and_options_flow_preserve_panel_fie
 
 async def test_websocket_endpoints_require_admin(hass):
     connection = Mock(user=SimpleNamespace(is_admin=False))
-    for handler in (ws_snapshot, ws_save, ws_create, ws_inspect, ws_remove):
+    for handler in (
+        ws_snapshot,
+        ws_save,
+        ws_save_many,
+        ws_create,
+        ws_inspect,
+        ws_remove,
+    ):
         with pytest.raises(Unauthorized):
             handler(hass, connection, {"id": 1})
     connection.send_result.assert_not_called()
@@ -204,7 +279,7 @@ async def test_panel_registration_is_once_and_versioned(hass):
     assert register.call_args.kwargs["config"] == {"build": digest}
     static = hass.http.async_register_static_paths.call_args.args[0][0]
     assert static.cache_headers is False
-    assert commands.call_count == 11
+    assert commands.call_count == 12
     assert panel_snapshot(hass)["version"] == "1.4.0"
 
 
