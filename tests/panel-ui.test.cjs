@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.17.0 · Build 20261117.5",
+    "Pannello 1.17.1 · Build 20261117.6",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
@@ -1225,6 +1225,17 @@ for (const width of [1920, 1280, 768, 390]) {
         await content.evaluate((el) => el.scrollHeight > el.clientHeight + 1),
         false,
         "page scrolls",
+      );
+      // Nor does the surrounding Home Assistant page: no hidden hint of the
+      // toolbar may reach below the window.
+      assert.equal(
+        await page.evaluate(
+          () =>
+            document.scrollingElement.scrollHeight >
+            document.scrollingElement.clientHeight,
+        ),
+        false,
+        "Home Assistant page scrolls",
       );
       await table.evaluate((el) => (el.scrollTop = 600));
       assert.ok((await table.evaluate((el) => el.scrollTop)) > 0);
