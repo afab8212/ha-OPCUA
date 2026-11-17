@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 from collections import Counter
 from copy import deepcopy
 from pathlib import Path
@@ -46,7 +47,10 @@ from .orphans import (
     async_remove_orphan,
     async_sync_orphan_repairs,
     is_orphan,
+    orphan_sync_suspended,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 SNAPSHOT_SETTINGS = (
     "platform",
@@ -422,33 +426,35 @@ async def async_save_entity(hass, msg):
             for e in er.async_entries_for_config_entry(registry, entry.entry_id)
             if e.platform == DOMAIN and e.unique_id == unique_id
         ]
-        selected_entity_id = _migrate_entity_registry(
-            hass,
-            entry,
-            c.nodes[msg["key"]],
-            msg["key"],
-            platform,
-            related,
-            name=name,
-            area_id=area_id,
-            suggested_object_id=(
-                row["entity_id"].split(".", 1)[1]
-                if row["entity_id"]
-                else name or row["name"]
-            ),
-        )
-        if platform != row["platform"]:
-            # Prevent old controls from writing while the new domain loads.
-            c._platforms[msg["key"]] = "disabled"
-        options = deepcopy(dict(entry.options))
-        options.setdefault(CONF_NODE_SETTINGS, {})[msg["key"]] = settings
-        update_offline_node(options, msg["key"], target, settings)
-        changed = options != dict(entry.options)
-        reload_needed = changed and c.live_entity_options(options) is None
-        if changed:
-            if not reload_needed:
-                c.apply_entity_options(options)
-            hass.config_entries.async_update_entry(entry, options=options)
+        # The new entity exists before the options name its platform.
+        with orphan_sync_suspended(hass, entry):
+            selected_entity_id = _migrate_entity_registry(
+                hass,
+                entry,
+                c.nodes[msg["key"]],
+                msg["key"],
+                platform,
+                related,
+                name=name,
+                area_id=area_id,
+                suggested_object_id=(
+                    row["entity_id"].split(".", 1)[1]
+                    if row["entity_id"]
+                    else name or row["name"]
+                ),
+            )
+            if platform != row["platform"]:
+                # Prevent old controls from writing while the new domain loads.
+                c._platforms[msg["key"]] = "disabled"
+            options = deepcopy(dict(entry.options))
+            options.setdefault(CONF_NODE_SETTINGS, {})[msg["key"]] = settings
+            update_offline_node(options, msg["key"], target, settings)
+            changed = options != dict(entry.options)
+            reload_needed = changed and c.live_entity_options(options) is None
+            if changed:
+                if not reload_needed:
+                    c.apply_entity_options(options)
+                hass.config_entries.async_update_entry(entry, options=options)
         async_sync_orphan_repairs(hass, entry)
         return {
             "saved": True,
@@ -783,47 +789,51 @@ async def async_reclassify_boolean_sensors(hass, msg):
         options = deepcopy(dict(entry.options))
         node_settings_opt = options.setdefault(CONF_NODE_SETTINGS, {})
         reclassified = []
-        for key in dict.fromkeys(msg["keys"]):
-            node = c.nodes.get(key)
-            if node is None:
-                continue
-            saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
-            if not _is_auto_readonly_boolean(node, saved):
-                continue
-            settings = validate_settings(node, {**saved, "platform": "binary_sensor"})
-            node_settings_opt[key] = settings
-            c.node_settings[key] = settings
-            c._platforms[key] = "binary_sensor"
-            reclassified.append(key)
-            unique_id = f"{entry.entry_id}:{key}"
-            related = [
-                e
-                for e in er.async_entries_for_config_entry(registry, entry.entry_id)
-                if e.platform == DOMAIN and e.unique_id == unique_id
-            ]
-            _migrate_entity_registry(
-                hass,
-                entry,
-                node,
-                key,
-                "binary_sensor",
-                related,
-                name=next((e.name for e in related if e.name is not None), None),
-                area_id=next(
-                    (e.area_id for e in related if e.area_id is not None), None
-                ),
-                suggested_object_id=(
-                    related[0].entity_id.split(".", 1)[1] if related else None
-                ),
-            )
-        if not reclassified:
-            return {"reclassified": []}
-        # Already applied above; sync so async_options_updated takes its
-        # "apply live, don't reload" branch instead of racing a reload
-        # against the live change just made (same reasoning as
-        # _persist_discovery_state in __init__.py).
-        c.reload_options = _reload_options(options)
-        hass.config_entries.async_update_entry(entry, options=options)
+        # Each new binary_sensor exists before the options name its platform.
+        with orphan_sync_suspended(hass, entry):
+            for key in dict.fromkeys(msg["keys"]):
+                node = c.nodes.get(key)
+                if node is None:
+                    continue
+                saved = entry.options.get(CONF_NODE_SETTINGS, {}).get(key, {})
+                if not _is_auto_readonly_boolean(node, saved):
+                    continue
+                settings = validate_settings(
+                    node, {**saved, "platform": "binary_sensor"}
+                )
+                node_settings_opt[key] = settings
+                c.node_settings[key] = settings
+                c._platforms[key] = "binary_sensor"
+                reclassified.append(key)
+                unique_id = f"{entry.entry_id}:{key}"
+                related = [
+                    e
+                    for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+                    if e.platform == DOMAIN and e.unique_id == unique_id
+                ]
+                _migrate_entity_registry(
+                    hass,
+                    entry,
+                    node,
+                    key,
+                    "binary_sensor",
+                    related,
+                    name=next((e.name for e in related if e.name is not None), None),
+                    area_id=next(
+                        (e.area_id for e in related if e.area_id is not None), None
+                    ),
+                    suggested_object_id=(
+                        related[0].entity_id.split(".", 1)[1] if related else None
+                    ),
+                )
+            if not reclassified:
+                return {"reclassified": []}
+            # Already applied above; sync so async_options_updated takes its
+            # "apply live, don't reload" branch instead of racing a reload
+            # against the live change just made (same reasoning as
+            # _persist_discovery_state in __init__.py).
+            c.reload_options = _reload_options(options)
+            hass.config_entries.async_update_entry(entry, options=options)
         c.async_update_listeners()
         async_sync_orphan_repairs(hass, entry)
         return {"reclassified": reclassified}
@@ -888,6 +898,12 @@ async def async_rename_array_fields(hass, msg):
         return {"renamed": renamed}
 
 
+def _send_unexpected_error(connection, msg, err):
+    """Log an unexpected failure and give the panel its cause, not just "failed"."""
+    _LOGGER.exception("Panel request %s failed", msg.get("type"))
+    connection.send_error(msg["id"], "unexpected_error", f"{type(err).__name__}: {err}")
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/node/remove",
@@ -903,6 +919,8 @@ async def ws_remove(hass, connection, msg):
         result = await async_remove_manual_node(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -920,6 +938,8 @@ async def ws_rediscover(hass, connection, msg):
         result = await async_rediscover(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -938,6 +958,8 @@ async def ws_set_name_with_path(hass, connection, msg):
         result = await async_set_name_with_path(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -957,6 +979,8 @@ async def ws_remove_orphan(hass, connection, msg):
         result = await async_remove_orphan_entity(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -975,6 +999,8 @@ async def ws_remove_orphans(hass, connection, msg):
         result = await async_remove_all_orphans(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -994,6 +1020,8 @@ async def ws_reclassify_boolean_sensors(hass, connection, msg):
         result = await async_reclassify_boolean_sensors(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -1013,6 +1041,8 @@ async def ws_rename_array_fields(hass, connection, msg):
         result = await async_rename_array_fields(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -1031,6 +1061,8 @@ async def ws_inspect(hass, connection, msg):
         result = await async_inspect_node(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -1064,6 +1096,8 @@ async def ws_create(hass, connection, msg):
         result = await async_create_entity(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)
 
@@ -1105,5 +1139,7 @@ async def ws_save(hass, connection, msg):
         result = await async_save_entity(hass, msg)
     except ValueError as err:
         connection.send_error(msg["id"], str(err), str(err))
+    except Exception as err:  # noqa: BLE001 - report the cause to the panel
+        _send_unexpected_error(connection, msg, err)
     else:
         connection.send_result(msg["id"], result)

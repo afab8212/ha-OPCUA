@@ -1,6 +1,6 @@
 /* Native Home Assistant configuration panel. No external scripts or styles. */
 // Bump for every frontend change; displayed from the loaded JavaScript bundle.
-const PANEL_VERSION = "1.13.1";
+const PANEL_VERSION = "1.13.2";
 const TEXT = {
   it: {
     version: "Integrazione",
@@ -252,6 +252,7 @@ const TEXT = {
       "L’identità dell’entità rimane invariata. Scegli un nodo compatibile scoperto su questo endpoint.",
     admin: "Pannello riservato agli amministratori.",
     error: "Operazione non riuscita. Riprova.",
+    errorReason: "Causa:",
     stale_configuration:
       "La configurazione è cambiata. Annulla, aggiorna l’elenco e riprova.",
     node_not_found: "NodeId non presente tra i nodi scoperti.",
@@ -522,6 +523,7 @@ const TEXT = {
       "Die Identität der Entität bleibt erhalten. Einen passenden, auf diesem Endpoint erkannten Knoten wählen.",
     admin: "Dieses Panel erfordert Administratorrechte.",
     error: "Vorgang fehlgeschlagen. Bitte erneut versuchen.",
+    errorReason: "Ursache:",
     stale_configuration:
       "Die Konfiguration hat sich geändert. Abbrechen, die Liste aktualisieren und erneut versuchen.",
     node_not_found: "Die NodeId ist nicht unter den erkannten Knoten.",
@@ -784,6 +786,7 @@ const TEXT = {
       "Entity identity is preserved. Choose a compatible node discovered on this endpoint.",
     admin: "This panel requires administrator access.",
     error: "Operation failed. Please try again.",
+    errorReason: "Cause:",
     stale_configuration:
       "Configuration changed. Cancel, refresh the list and try again.",
     node_not_found: "NodeId is not among the discovered nodes.",
@@ -1153,6 +1156,16 @@ class OpcuaNodePanel extends HTMLElement {
       ] || key
     );
   }
+  // A known error code has its own text; anything else says what failed
+  // instead of only "failed" (HA's own "Unknown error" says nothing).
+  _errorText(err) {
+    if (err?.code in TEXT.en) return this._t(err.code);
+    const cause =
+      err?.message && err.message !== "Unknown error" ? err.message : "";
+    return cause
+      ? `${this._t("error")} ${this._t("errorReason")} ${cause}`
+      : this._t("error");
+  }
   _start() {
     if (this._started) return;
     this._started = true;
@@ -1192,7 +1205,7 @@ class OpcuaNodePanel extends HTMLElement {
       this._render();
     } catch (error) {
       if (generation !== this._generation) return;
-      this._error = this._t(error.code in TEXT.en ? error.code : "error");
+      this._error = this._errorText(error);
       this._render();
     }
   }
@@ -1339,7 +1352,7 @@ class OpcuaNodePanel extends HTMLElement {
         });
         this._notice = this._t("rediscovered");
       } catch (err) {
-        this._error = this._t(err.code in TEXT.en ? err.code : "error");
+        this._error = this._errorText(err);
       }
       await this._load();
     });
@@ -1979,7 +1992,7 @@ class OpcuaNodePanel extends HTMLElement {
       });
     } catch (err) {
       failed = true;
-      this._error = this._t(err.code in TEXT.en ? err.code : "error");
+      this._error = this._errorText(err);
     }
     // Reloading re-reads the saved state, which puts the switch back after a
     // failed save; the failure message has to survive that reload.
@@ -2176,7 +2189,7 @@ class OpcuaNodePanel extends HTMLElement {
         dialog.close();
         await this._load();
       } catch (err) {
-        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        error.textContent = this._errorText(err);
         busy = false;
         remove.disabled = cancel.disabled = false;
         remove.textContent = `${this._t("deleteAll")} (${count})`;
@@ -2281,7 +2294,7 @@ class OpcuaNodePanel extends HTMLElement {
         dialog.close();
         await this._load();
       } catch (err) {
-        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        error.textContent = this._errorText(err);
         busy = false;
         cancel.disabled = selectAll.disabled = false;
         for (const checkbox of checkboxes) checkbox.disabled = false;
@@ -2396,7 +2409,7 @@ class OpcuaNodePanel extends HTMLElement {
         dialog.close();
         await this._load();
       } catch (err) {
-        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        error.textContent = this._errorText(err);
         busy = false;
         cancel.disabled = selectAll.disabled = false;
         for (const checkbox of checkboxes) checkbox.disabled = false;
@@ -2455,7 +2468,7 @@ class OpcuaNodePanel extends HTMLElement {
         dialog.close();
         await this._load();
       } catch (err) {
-        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        error.textContent = this._errorText(err);
         busy = false;
         remove.disabled = cancel.disabled = false;
         remove.textContent = this._t("deleteEntity");
@@ -2516,7 +2529,7 @@ class OpcuaNodePanel extends HTMLElement {
           this._timer = setTimeout(() => this._load(), 2500);
         }
       } catch (err) {
-        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        error.textContent = this._errorText(err);
       } finally {
         busy = false;
         remove.disabled = cancel.disabled = false;
@@ -2586,7 +2599,7 @@ class OpcuaNodePanel extends HTMLElement {
           endpoint,
         );
       } catch (err) {
-        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        error.textContent = this._errorText(err);
       } finally {
         busy = false;
         verify.disabled = cancel.disabled = nodeId.disabled = false;
@@ -2875,7 +2888,13 @@ class OpcuaNodePanel extends HTMLElement {
         selectedNode() || availableNodes.find((n) => n.node_id === row.node_id),
       );
       category.replaceChildren(
-        ...allowed.map((p) => element("option", this._t(p), { value: p })),
+        // Platform IDs as in the group headings; only the pseudo
+        // choices "auto" and "disabled" keep a translated label.
+        ...allowed.map((p) =>
+          element("option", p === "auto" || p === "disabled" ? this._t(p) : p, {
+            value: p,
+          }),
+        ),
       );
       category.value = allowed.includes(chosen) ? chosen : allowed[0];
     };
@@ -3459,7 +3478,7 @@ class OpcuaNodePanel extends HTMLElement {
           this._timer = setTimeout(() => this._load(), 2500);
         }
       } catch (err) {
-        error.textContent = this._t(err.code in TEXT.en ? err.code : "error");
+        error.textContent = this._errorText(err);
       } finally {
         saving = false;
         save.disabled = cancel.disabled = false;

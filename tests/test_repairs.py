@@ -295,6 +295,25 @@ async def test_category_change_removes_replaced_entity_without_repair(hass, entr
     await c.async_shutdown()
 
 
+async def test_change_from_explicit_category_keeps_new_entity(hass, entry):
+    """Saving a new category over an explicitly stored one must not fail.
+
+    The new entity is registered before the options name its platform; the
+    registry event must not let the orphan sync delete it as a leftover.
+    """
+    c, registry, old = await prepare(hass, entry)
+    assert (await save(hass, entry, "switch"))["entity_id"] == old.entity_id
+    await hass.async_block_till_done()
+    new = (await save(hass, entry, "binary_sensor"))["entity_id"]
+    await hass.async_block_till_done()
+    assert registry.async_get(new).disabled_by is None
+    assert registry.async_get(old.entity_id) is None
+    assert issue(hass, old) is None
+    assert entry.options[CONF_NODE_SETTINGS][KEY]["platform"] == "binary_sensor"
+    c.hub.set_value.assert_not_awaited()
+    await c.async_shutdown()
+
+
 async def test_excluding_a_node_keeps_its_entity_disabled(hass, entry):
     c, registry, old = await prepare(hass, entry)
     await save(hass, entry, "disabled")

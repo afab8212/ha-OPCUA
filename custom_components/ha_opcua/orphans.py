@@ -1,5 +1,6 @@
 """Identify obsolete registry entries without treating offline nodes as removed."""
 
+from contextlib import contextmanager
 from copy import deepcopy
 
 from asyncua import ua
@@ -19,6 +20,7 @@ from .const import (
 from .node_settings import effective_platform, validate_settings
 
 ISSUE_PREFIX = "orphan_entity_"
+SUSPENDED = f"{DOMAIN}_orphan_sync_suspended"
 NODE_PLATFORMS = {
     "sensor",
     "binary_sensor",
@@ -188,6 +190,25 @@ def async_remove_orphan(hass, entry, entity):
     hass.config_entries.async_update_entry(entry, options=options)
 
 
+@contextmanager
+def orphan_sync_suspended(hass, entry):
+    """Pause the orphan sync while a category change is half applied.
+
+    A category change registers the new entity before the new platform is
+    stored in the options. The registry "create" event runs the sync at
+    once; without this pause it would see the new entity as the leftover
+    (it differs from the still stored platform) and delete it immediately.
+    The caller runs async_sync_orphan_repairs() itself once the options
+    are written.
+    """
+    suspended = hass.data.setdefault(SUSPENDED, set())
+    suspended.add(entry.entry_id)
+    try:
+        yield
+    finally:
+        suspended.discard(entry.entry_id)
+
+
 @callback
 def async_sync_orphan_repairs(hass, entry):
     """Reconcile issues by immutable registry ID.
@@ -198,6 +219,8 @@ def async_sync_orphan_repairs(hass, entry):
     panel. Its node settings stay, they describe the replacement. A node
     gone from the PLC is never deleted automatically; it gets a repair.
     """
+    if entry.entry_id in hass.data.get(SUSPENDED, ()):
+        return
     registry = er.async_get(hass)
     wanted = set()
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)

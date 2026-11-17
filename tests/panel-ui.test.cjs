@@ -329,7 +329,7 @@ test("desktop categories, search, endpoint selection and safe text rendering", a
   );
   assert.equal(
     await page.locator(".panelVersion").textContent(),
-    "Pannello 1.13.1",
+    "Pannello 1.13.2",
   );
   assert.equal(
     await page.getByRole("button", { name: "Menu", exact: true }).count(),
