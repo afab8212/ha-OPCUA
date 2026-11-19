@@ -89,6 +89,47 @@ See [Home Assistant's brand image documentation](https://developers.home-assista
 
 By default, updates use polling only. Subscriptions require both an explicit per-entity selection and the endpoint’s **Auto-Subscription** switch to be on. See [Polling and subscriptions](#polling-and-subscriptions) for setup, filtering and upgrade behavior.
 
+### Secure connection with certificates
+
+The endpoint form (setup and **Configure → Connection**) also has:
+
+- **Security mode**: `None` (default), `Sign` or `SignAndEncrypt`
+- **Security policy**: `Aes128Sha256RsaOaep` (default), `Basic256Sha256` or `Aes256Sha256RsaPss`
+- **Client certificate**, **Client private key**, **Server CA certificate**: file paths on the Home Assistant host,
+  for example `/config/opcua-certs/client.crt`. PEM or DER; the key must not be password protected.
+
+Requirements for the client certificate:
+
+- A `URI` entry in the subject alternative name. The integration uses it as the session's ApplicationUri,
+  and the server compares both.
+- Key usage digitalSignature, keyEncipherment, dataEncipherment (and nonRepudiation), extended key usage clientAuth.
+- RSA 2048–4096 bits.
+
+When a server CA is set, the server certificate is accepted only if it is issued directly by that CA and one of its
+`URI` entries equals the server's ApplicationUri. Before saving, the form checks that the files exist and parse,
+that the certificate has a `URI` entry and that key and certificate match. It does not test the connection.
+Existing endpoints keep `None` and are not affected.
+
+Keep the key readable only by root (`chmod 600`) and outside `/config/www`. Home Assistant backups include it.
+
+#### CODESYS 3.5 servers (e.g. WAGO PFC200, firmware 04.09)
+
+Tested with the CODESYS OPC UA server 3.5.21:
+
+1. Issue a server certificate from your CA with the controller's ApplicationUri as `URI` SAN (read it from
+   namespace index 1), its hostname as `DNS` and its IP addresses.
+2. Copy it into the runtime's certificate store `/home/codesys_root/.pki/`:
+   `own/cert/<SHA1 of the DER certificate>.der`, `own/key/<SHA1 of the DER public key>.key` (RSA key as PKCS#1 DER),
+   the CA (and the Home Assistant client certificate) to `trusted/cert/`, the CA's CRL to `trusted/crl/`.
+3. Fill the certificate fields, otherwise the server never registers its certificate use case and keeps offering
+   only `None`: `config_opcua -s certAppName=<hostname> -s certCompany=<company> -s certCountry=<CC>`, then restart
+   the runtime with `config_opcua -r`.
+4. Once a certificate is active the server **no longer offers `None`**. Switch the Home Assistant endpoint to
+   `SignAndEncrypt` right after the restart; before that, the server has no secure endpoint to connect to.
+
+Certificate and user login are separate OPC UA layers: with a certificate the session can still log in as
+Anonymous. Turning off anonymous access on the server requires a username and password in the endpoint settings.
+
 ---
 
 ## OPC UA side panel
