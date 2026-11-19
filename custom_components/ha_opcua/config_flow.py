@@ -17,16 +17,23 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_HUB_CLIENT_CERT,
+    CONF_HUB_CLIENT_KEY,
     CONF_HUB_ID,
     CONF_HUB_PASSWORD,
     CONF_HUB_ROOT_NODE,
     CONF_HUB_SCAN_INTERVAL,
+    CONF_HUB_SECURITY_MODE,
+    CONF_HUB_SECURITY_POLICY,
+    CONF_HUB_SERVER_CA,
     CONF_HUB_URL,
     CONF_HUB_USERNAME,
     CONF_KNOWN_NODE_IDS,
     CONF_NAME_WITH_PATH,
     CONF_NODE_SETTINGS,
     CONF_SUBSCRIPTION_ENABLED,
+    DEFAULT_SECURITY_MODE,
+    DEFAULT_SECURITY_POLICY,
     DEFAULT_SUBSCRIPTION_ENABLED,
     DOMAIN,
 )
@@ -41,8 +48,63 @@ from .node_settings import (
     supports_value_labels,
     validate_settings,
 )
+from .security import (
+    SECURITY_MODES,
+    SECURITY_POLICIES,
+    SecurityConfigError,
+    load_security,
+)
 
 DEFAULT_SCAN_INTERVAL = 10
+SECURITY_KEYS = (
+    CONF_HUB_SECURITY_MODE,
+    CONF_HUB_SECURITY_POLICY,
+    CONF_HUB_CLIENT_CERT,
+    CONF_HUB_CLIENT_KEY,
+    CONF_HUB_SERVER_CA,
+)
+# Optional text fields the frontend drops when cleared (see async_step_connection).
+SECURITY_PATH_KEYS = (CONF_HUB_CLIENT_CERT, CONF_HUB_CLIENT_KEY, CONF_HUB_SERVER_CA)
+
+
+def security_schema(current: dict) -> dict:
+    """Security fields; certificate paths are files readable by Home Assistant."""
+    return {
+        vol.Required(
+            CONF_HUB_SECURITY_MODE,
+            default=current.get(CONF_HUB_SECURITY_MODE) or DEFAULT_SECURITY_MODE,
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=SECURITY_MODES,
+                translation_key="security_mode",
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        vol.Required(
+            CONF_HUB_SECURITY_POLICY,
+            default=current.get(CONF_HUB_SECURITY_POLICY) or DEFAULT_SECURITY_POLICY,
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=list(SECURITY_POLICIES),
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        **{
+            vol.Optional(
+                key, description={"suggested_value": current.get(key) or ""}
+            ): str
+            for key in SECURITY_PATH_KEYS
+        },
+    }
+
+
+async def async_check_security(hass, settings: dict) -> str | None:
+    """Return a translation error key when the certificate files are unusable."""
+    try:
+        await hass.async_add_executor_job(load_security, settings)
+    except SecurityConfigError as err:
+        return str(err)
+    return None
 
 
 class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -51,7 +113,12 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        if user_input is not None:
+        errors = {}
+        if user_input is not None and (
+            error := await async_check_security(self.hass, user_input)
+        ):
+            errors["base"] = error
+        elif user_input is not None:
             unique_id = user_input[CONF_NAME].lower()  # Normalize
             await self.async_set_unique_id(unique_id)
             if self._abort_if_unique_id_configured():
@@ -74,6 +141,7 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SUBSCRIPTION_ENABLED, DEFAULT_SUBSCRIPTION_ENABLED
                     ),
                     CONF_NAME_WITH_PATH: user_input.get(CONF_NAME_WITH_PATH, False),
+                    **{key: user_input.get(key, "") for key in SECURITY_KEYS},
                 },
                 # An empty (not absent) baseline marks this endpoint as having
                 # already completed its "zero known nodes" starting point, so
@@ -97,10 +165,13 @@ class AsyncUAConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_SUBSCRIPTION_ENABLED, default=DEFAULT_SUBSCRIPTION_ENABLED
                 ): bool,
                 vol.Optional(CONF_NAME_WITH_PATH, default=False): bool,
+                **security_schema(user_input or {}),
             }
         )
 
-        return self.async_show_form(step_id="user", data_schema=data_schema)
+        return self.async_show_form(
+            step_id="user", data_schema=data_schema, errors=errors
+        )
 
     @staticmethod
     @callback
@@ -126,19 +197,24 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_connection(self, user_input=None):
+        errors = {}
         if user_input is not None:
             options = deepcopy(dict(self._entry.options))
             options.update(user_input)
             # The frontend omits cleared optional fields. Persist explicit empty
             # overrides so old options and initial entry credentials cannot return.
-            for key in (CONF_HUB_USERNAME, CONF_HUB_PASSWORD):
+            for key in (CONF_HUB_USERNAME, CONF_HUB_PASSWORD, *SECURITY_PATH_KEYS):
                 options[key] = user_input.get(key, "")
             options[CONF_HUB_ROOT_NODE] = options[CONF_HUB_ROOT_NODE].strip()
-            return self.async_create_entry(title="", data=options)
+            if error := await async_check_security(self.hass, options):
+                errors["base"] = error
+            else:
+                return self.async_create_entry(title="", data=options)
 
-        current = {**self._entry.data, **self._entry.options}
+        current = {**self._entry.data, **self._entry.options, **(user_input or {})}
         return self.async_show_form(
             step_id="connection",
+            errors=errors,
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_HUB_URL, default=current[CONF_HUB_URL]): str,
@@ -174,6 +250,7 @@ class AsyncUAOptionsFlow(config_entries.OptionsFlow):
                         CONF_NAME_WITH_PATH,
                         default=current.get(CONF_NAME_WITH_PATH, False),
                     ): bool,
+                    **security_schema(current),
                 }
             ),
         )

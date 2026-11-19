@@ -15,7 +15,11 @@ from asyncua.common.ua_utils import data_type_to_variant_type
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from homeassistant.exceptions import (
+    ConfigEntryError,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -61,6 +65,7 @@ from .orphans import (
     async_setup_orphan_repairs,
     async_sync_orphan_repairs,
 )
+from .security import SecurityConfigError, apply_security, load_security
 from .values import scalar_variant
 
 _LOGGER = logging.getLogger(__name__)
@@ -192,12 +197,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hub_id = entry.data[CONF_HUB_ID]
     settings = {**entry.data, **entry.options}
+    try:
+        security = await hass.async_add_executor_job(load_security, settings)
+    except SecurityConfigError as err:
+        # Missing/invalid certificate files: retrying cannot help.
+        raise ConfigEntryError(f"OPC UA security settings: {err}") from err
     hub = OpcuaHub(
         hub_name=hub_id,
         hub_url=settings[CONF_HUB_URL],
         root_node_id=settings[CONF_HUB_ROOT_NODE],
         username=settings.get(CONF_HUB_USERNAME),
         password=settings.get(CONF_HUB_PASSWORD),
+        security=security,
     )
     coordinator = AsyncuaCoordinator(
         hass,
@@ -357,11 +368,21 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 class OpcuaHub:
     """Serialize session changes and operations; never replay writes."""
 
-    def __init__(self, hub_name, hub_url, root_node_id, username=None, password=None):
+    def __init__(
+        self,
+        hub_name,
+        hub_url,
+        root_node_id,
+        username=None,
+        password=None,
+        security=None,
+    ):
         self._hub_name = hub_name
         self._hub_url = hub_url
         self._username = username
         self._password = password
+        # SecurityConfig or None (unsigned, unencrypted channel).
+        self.security = security
         self.root_node_id = root_node_id
         self.discovery_complete = False
         # Each discovered variable's path below the deepest node that holds
@@ -438,6 +459,8 @@ class OpcuaHub:
                 self.client.set_user(self._username)
             if self._password:
                 self.client.set_password(self._password)
+            if self.security is not None:
+                await apply_security(self.client, self.security)
             await self.client.connect()
         except asyncio.CancelledError:
             await self._disconnect_locked()

@@ -27,7 +27,13 @@ def connection_attributes(coordinator):
         "port": port,
         "root_node_id": hub.root_node_id,
         "scan_interval_seconds": coordinator.poll_interval.total_seconds(),
-        "security_mode": "None",
+        "security_mode": hub.security.mode_name if hub.security else "None",
+        "security_policy": (
+            hub.security.policy.__name__.removeprefix("SecurityPolicy")
+            if hub.security
+            else None
+        ),
+        "server_certificate_checked": bool(hub.security and hub.security.trusted_cas),
         "authentication": (
             "username" if hub._username or "@" in hub._hub_url else "anonymous"
         ),

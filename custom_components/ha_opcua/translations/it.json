@@ -10,12 +10,35 @@
           "password": "Password",
           "scan_interval": "Intervallo di lettura (secondi)",
           "hub_root": "NodeId radice",
-          "name_with_path": "Includi il percorso del PLC nei nomi delle entità"
+          "name_with_path": "Includi il percorso del PLC nei nomi delle entità",
+          "security_mode": "Modalità di sicurezza",
+          "security_policy": "Criterio di sicurezza",
+          "client_certificate": "Certificato client (percorso file)",
+          "client_private_key": "Chiave privata client (percorso file)",
+          "server_ca_certificate": "CA attendibile per il certificato del server (percorso file)"
+        },
+        "data_description": {
+          "security_mode": "None mantiene la connessione non firmata e non cifrata. Sign o SignAndEncrypt richiedono certificato e chiave client.",
+          "client_certificate": "File PEM o DER leggibile da Home Assistant, es. /config/opcua/ha-client.crt. L'URI nel SubjectAltName viene usato come ApplicationUri del client.",
+          "client_private_key": "Chiave privata PEM o DER non cifrata corrispondente al certificato client.",
+          "server_ca_certificate": "File PEM o DER con la CA che ha emesso il certificato del server. Lasciare vuoto per accettare qualsiasi certificato del server (sconsigliato)."
         }
       }
     },
     "abort": {
       "already_configured": "Un hub con questo nome è già configurato."
+    },
+    "error": {
+      "invalid_security_mode": "Modalità di sicurezza sconosciuta.",
+      "invalid_security_policy": "Criterio di sicurezza sconosciuto.",
+      "client_certificate_missing": "File del certificato client non trovato.",
+      "client_certificate_invalid": "Il file del certificato client non è un certificato PEM/DER valido.",
+      "client_certificate_no_uri": "Il certificato client non contiene un URI nel SubjectAltName (ApplicationUri OPC UA).",
+      "client_key_missing": "File della chiave privata client non trovato.",
+      "client_key_invalid": "Chiave privata client non valida o protetta da password.",
+      "client_key_mismatch": "La chiave privata non appartiene al certificato client.",
+      "server_ca_missing": "File del certificato CA non trovato.",
+      "server_ca_invalid": "Il file del certificato CA non è un certificato PEM/DER valido."
     }
   },
   "options": {
@@ -34,10 +57,19 @@
           "password": "Password",
           "scan_interval": "Intervallo di lettura (secondi)",
           "hub_root": "NodeId radice",
-          "name_with_path": "Includi il percorso del PLC nei nomi delle entità"
+          "name_with_path": "Includi il percorso del PLC nei nomi delle entità",
+          "security_mode": "Modalità di sicurezza",
+          "security_policy": "Criterio di sicurezza",
+          "client_certificate": "Certificato client (percorso file)",
+          "client_private_key": "Chiave privata client (percorso file)",
+          "server_ca_certificate": "CA attendibile per il certificato del server (percorso file)"
         },
         "data_description": {
-          "name_with_path": "Se attivo, le nuove entità prendono il percorso completo sotto il NodeId radice (es. \"SP · xError\") e l'azione di rinomina del pannello propone questo nome per quelle esistenti. I nomi esistenti non cambiano mai da soli."
+          "name_with_path": "Se attivo, le nuove entità prendono il percorso completo sotto il NodeId radice (es. \"SP · xError\") e l'azione di rinomina del pannello propone questo nome per quelle esistenti. I nomi esistenti non cambiano mai da soli.",
+          "security_mode": "None mantiene la connessione non firmata e non cifrata. Sign o SignAndEncrypt richiedono certificato e chiave client.",
+          "client_certificate": "File PEM o DER leggibile da Home Assistant, es. /config/opcua/ha-client.crt. L'URI nel SubjectAltName viene usato come ApplicationUri del client.",
+          "client_private_key": "Chiave privata PEM o DER non cifrata corrispondente al certificato client.",
+          "server_ca_certificate": "File PEM o DER con la CA che ha emesso il certificato del server. Lasciare vuoto per accettare qualsiasi certificato del server (sconsigliato)."
         }
       },
       "nodes": {
@@ -85,7 +117,17 @@
       "duplicate_value_labels": "Valori e testi della tabella valori devono essere univoci.",
       "value_labels_outside_type": "Un valore della tabella supera l'intervallo del tipo di dato OPC UA.",
       "value_labels_conversion": "Una tabella valori non può essere combinata con una conversione lineare.",
-      "invalid_pulse": "La durata dell'impulso deve essere un intero tra 50 e 10000 ms."
+      "invalid_pulse": "La durata dell'impulso deve essere un intero tra 50 e 10000 ms.",
+      "invalid_security_mode": "Modalità di sicurezza sconosciuta.",
+      "invalid_security_policy": "Criterio di sicurezza sconosciuto.",
+      "client_certificate_missing": "File del certificato client non trovato.",
+      "client_certificate_invalid": "Il file del certificato client non è un certificato PEM/DER valido.",
+      "client_certificate_no_uri": "Il certificato client non contiene un URI nel SubjectAltName (ApplicationUri OPC UA).",
+      "client_key_missing": "File della chiave privata client non trovato.",
+      "client_key_invalid": "Chiave privata client non valida o protetta da password.",
+      "client_key_mismatch": "La chiave privata non appartiene al certificato client.",
+      "server_ca_missing": "File del certificato CA non trovato.",
+      "server_ca_invalid": "Il file del certificato CA non è un certificato PEM/DER valido."
     },
     "abort": {
       "integration_not_loaded": "Carica l’integrazione prima di configurare i nodi scoperti.",
@@ -105,6 +147,13 @@
         "datetime": "Data e ora",
         "select": "select",
         "button": "button"
+      }
+    },
+    "security_mode": {
+      "options": {
+        "None": "Nessuna (né firma né cifratura)",
+        "Sign": "Firma",
+        "SignAndEncrypt": "Firma e cifratura"
       }
     }
   },

@@ -11,12 +11,35 @@
           "scan_interval": "Polling interval (seconds)",
           "hub_root": "Root NodeId",
           "subscription_enabled": "Auto-Subscription (instant updates)",
-          "name_with_path": "Include PLC path in entity names"
+          "name_with_path": "Include PLC path in entity names",
+          "security_mode": "Security mode",
+          "security_policy": "Security policy",
+          "client_certificate": "Client certificate (file path)",
+          "client_private_key": "Client private key (file path)",
+          "server_ca_certificate": "Trusted CA for the server certificate (file path)"
+        },
+        "data_description": {
+          "security_mode": "None keeps the unsigned, unencrypted connection. Sign or SignAndEncrypt need a client certificate and key.",
+          "client_certificate": "PEM or DER file readable by Home Assistant, e.g. /config/opcua/ha-client.crt. Its SubjectAltName URI is used as the client ApplicationUri.",
+          "client_private_key": "Unencrypted PEM or DER private key matching the client certificate.",
+          "server_ca_certificate": "PEM or DER file with the CA that issued the server certificate. Leave empty to accept any server certificate (not recommended)."
         }
       }
     },
     "abort": {
       "already_configured": "A hub with this name is already configured."
+    },
+    "error": {
+      "invalid_security_mode": "Unknown security mode.",
+      "invalid_security_policy": "Unknown security policy.",
+      "client_certificate_missing": "Client certificate file not found.",
+      "client_certificate_invalid": "Client certificate file is not a valid PEM/DER certificate.",
+      "client_certificate_no_uri": "Client certificate has no URI in its SubjectAltName (the OPC UA ApplicationUri).",
+      "client_key_missing": "Client private key file not found.",
+      "client_key_invalid": "Client private key is invalid or password protected.",
+      "client_key_mismatch": "Private key does not belong to the client certificate.",
+      "server_ca_missing": "CA certificate file not found.",
+      "server_ca_invalid": "CA certificate file is not a valid PEM/DER certificate."
     }
   },
   "options": {
@@ -36,12 +59,21 @@
           "scan_interval": "Polling interval (seconds)",
           "hub_root": "Root NodeId",
           "subscription_enabled": "Auto-Subscription (instant updates)",
-          "name_with_path": "Include PLC path in entity names"
+          "name_with_path": "Include PLC path in entity names",
+          "security_mode": "Security mode",
+          "security_policy": "Security policy",
+          "client_certificate": "Client certificate (file path)",
+          "client_private_key": "Client private key (file path)",
+          "server_ca_certificate": "Trusted CA for the server certificate (file path)"
         },
         "data_description": {
           "scan_interval": "Values are always re-read on this interval, whether or not Auto-Subscription below is enabled.",
           "subscription_enabled": "When on, changed values are pushed the instant the PLC reports them, on top of the regular polling interval. Turn off to use polling only.",
-          "name_with_path": "When on, new entities are named with their full path below the root NodeId (e.g. \"SP · xError\"), and the panel's rename action offers that name for existing ones. Existing names never change on their own."
+          "name_with_path": "When on, new entities are named with their full path below the root NodeId (e.g. \"SP · xError\"), and the panel's rename action offers that name for existing ones. Existing names never change on their own.",
+          "security_mode": "None keeps the unsigned, unencrypted connection. Sign or SignAndEncrypt need a client certificate and key.",
+          "client_certificate": "PEM or DER file readable by Home Assistant, e.g. /config/opcua/ha-client.crt. Its SubjectAltName URI is used as the client ApplicationUri.",
+          "client_private_key": "Unencrypted PEM or DER private key matching the client certificate.",
+          "server_ca_certificate": "PEM or DER file with the CA that issued the server certificate. Leave empty to accept any server certificate (not recommended)."
         }
       },
       "nodes": {
@@ -104,7 +136,17 @@
       "duplicate_value_labels": "Values and texts in the value table must be unique.",
       "value_labels_outside_type": "A value in the value table exceeds the OPC UA data type range.",
       "value_labels_conversion": "A value table cannot be combined with a linear conversion.",
-      "invalid_pulse": "The pulse length must be an integer between 50 and 10000 ms."
+      "invalid_pulse": "The pulse length must be an integer between 50 and 10000 ms.",
+      "invalid_security_mode": "Unknown security mode.",
+      "invalid_security_policy": "Unknown security policy.",
+      "client_certificate_missing": "Client certificate file not found.",
+      "client_certificate_invalid": "Client certificate file is not a valid PEM/DER certificate.",
+      "client_certificate_no_uri": "Client certificate has no URI in its SubjectAltName (the OPC UA ApplicationUri).",
+      "client_key_missing": "Client private key file not found.",
+      "client_key_invalid": "Client private key is invalid or password protected.",
+      "client_key_mismatch": "Private key does not belong to the client certificate.",
+      "server_ca_missing": "CA certificate file not found.",
+      "server_ca_invalid": "CA certificate file is not a valid PEM/DER certificate."
     },
     "abort": {
       "integration_not_loaded": "Load the integration before configuring its discovered nodes.",
@@ -124,6 +166,13 @@
         "datetime": "Date and time",
         "select": "select",
         "button": "button"
+      }
+    },
+    "security_mode": {
+      "options": {
+        "None": "None (no signing, no encryption)",
+        "Sign": "Sign",
+        "SignAndEncrypt": "Sign and encrypt"
       }
     }
   },
