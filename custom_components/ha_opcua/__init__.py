@@ -108,6 +108,11 @@ _REQUEST_SIZE_STATUS_CODES = {
 _BLOCK_SIZES = {"read": 500, "browse": 100, "monitor": 500}
 # Read or Browse requests of one pass sent at the same time.
 _PARALLEL_REQUESTS = 4
+# asyncua's connection supervisor probes ServerStatus every watchdog_intervall
+# seconds and treats a probe slower than min(session_timeout / 2, interval) as a
+# lost connection. The default of 1 s drops sessions to busy PLCs (single-core
+# PFC200 at 100 % CPU answers a probe in >1 s now and then), so allow 10 s.
+WATCHDOG_INTERVAL = 10.0
 _OPERATION_LIMIT_IDS = {
     "read": ua.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxNodesPerRead,
     "browse": ua.ObjectIds.Server_ServerCapabilities_OperationLimits_MaxNodesPerBrowse,
@@ -444,7 +449,12 @@ class OpcuaHub:
             return True
         await self._disconnect_locked()
         try:
-            self.client = Client(url=self._hub_url, timeout=5, auto_reconnect=False)
+            self.client = Client(
+                url=self._hub_url,
+                timeout=5,
+                auto_reconnect=False,
+                watchdog_intervall=WATCHDOG_INTERVAL,
+            )
             client = self.client
 
             async def connection_lost(error):

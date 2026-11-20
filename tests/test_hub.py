@@ -129,6 +129,18 @@ async def test_timeout_never_replays_write_and_next_operation_reconnects(monkeyp
     await hub.disconnect()
 
 
+async def test_connect_uses_tolerant_watchdog(monkeypatch):
+    hub, client, _ = connected_hub()
+    hub._connected = False
+    replacement = Mock(connect=AsyncMock(), disconnect=AsyncMock(), session_timeout=3600000)
+    factory = Mock(return_value=replacement)
+    monkeypatch.setattr("custom_components.ha_opcua.Client", factory)
+    assert await hub.connect()
+    assert factory.call_args.kwargs["watchdog_intervall"] == 10.0
+    assert factory.call_args.kwargs["auto_reconnect"] is False
+    await hub.disconnect()
+
+
 async def test_disconnect_closes_stale_client():
     hub, client, _ = connected_hub()
     hub._connected = False
