@@ -83,7 +83,10 @@ async def test_offline_startup_recovery_pause_and_native_controls(
         assert await recipe.read_value() == " [A,B] "
         info = sensor.extra_state_attributes
         assert info["session_timeout_ms"] > 0
-        assert info["last_connected"] and info["last_successful_read"]
+        assert info["last_connected"]
+        # Volatile per-read timestamp: diagnostics only, never a state attribute.
+        assert "last_successful_read" not in info
+        assert connection_attributes(c)["last_successful_read"]
         assert info["discovered_nodes"] == info["polled_nodes"] == 1
         with patch.object(
             hass.config_entries, "async_reload", new=AsyncMock()

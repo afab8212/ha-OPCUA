@@ -48,4 +48,11 @@ class OpcuaConnectionSensor(OpcuaConnectionEntity, BinarySensorEntity):
 
     @property
     def extra_state_attributes(self):
-        return connection_attributes(self.coordinator)
+        # last_successful_read changes on every poll and every push update.
+        # As a state attribute it made the recorder write a new states row
+        # roughly every second while the state itself stayed "on";
+        # _unrecorded_attributes would only dedupe state_attributes, not the
+        # states rows. It stays available in the config entry diagnostics.
+        attributes = connection_attributes(self.coordinator)
+        attributes.pop("last_successful_read", None)
+        return attributes
